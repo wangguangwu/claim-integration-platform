@@ -6,6 +6,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+deploy/.env
 
 .venv/
 __pycache__/
