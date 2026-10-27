@@ -1,0 +1,28 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: claim-ai-service
+  profiles:
+    default: local
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false

@@ -1,0 +1,44 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: claim-application-service
+  profiles:
+    default: local
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+    stream:
+      rocketmq:
+        binder:
+          name-server: 127.0.0.1:9876
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/claim_application_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    hikari:
+      initialization-fail-timeout: -1
+      maximum-pool-size: 5
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379

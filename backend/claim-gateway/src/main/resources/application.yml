@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: claim-gateway
+  profiles:
+    default: local
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: claim-application-service
+              uri: lb://claim-application-service
+              predicates:
+                - Path=/api/application/**
+            - id: claim-case-service
+              uri: lb://claim-case-service
+              predicates:
+                - Path=/api/case/**
+            - id: claim-ai-service
+              uri: lb://claim-ai-service
+              predicates:
+                - Path=/api/diagnosis/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+    sentinel:
+      enabled: false

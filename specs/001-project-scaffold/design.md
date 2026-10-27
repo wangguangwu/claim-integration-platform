@@ -4,7 +4,6 @@
 
 | 模块 | 职责 | 主要依赖 |
 | ------------------------------ | -------------------------------------- | ----------------------------------- |
-| `claim-bom` | 第三方依赖版本统一管理 | 仅 BOM 导入 |
 | `claim-foundation-common` | 返回模型、异常、枚举、基础工具 | Jackson、Validation |
 | `claim-foundation-tenant` | Tenant 上下文、租户配置、协议版本 | common |
 | `claim-foundation-observability` | Trace、Metric、操作日志、审计日志 | common、Actuator、Micrometer Tracing |
@@ -22,8 +21,6 @@ claim-gateway ──┐
 claim-application-service ──┼──> claim-foundation-common
 claim-case-service ─────────┤    claim-foundation-tenant ──> common
 claim-ai-service ───────────┘    claim-foundation-observability ──> common
-
-所有模块的第三方版本 ──> claim-bom <── 根 POM 导入
 ```
 
 约束：
@@ -31,18 +28,18 @@ claim-ai-service ───────────┘    claim-foundation-observ
 - foundation 不反向依赖任何服务模块。
 - 服务模块之间没有 Maven 依赖，协作走消息或 HTTP 服务接口。
 - 网关不依赖业务服务模块，只做转发。
+- 第三方版本全部在根 POM 的 `dependencyManagement`，不单独建 BOM 模块。
 
 ## 3. POM 分层
 
 | 层 | 作用 |
-| ------------------ | ---------------------------------------------------------------- |
-| 根 POM | 聚合全部模块，继承 `spring-boot-starter-parent`，固定 Java 21，管理内部模块版本与插件 |
-| `claim-bom` | 只做第三方版本管理：Spring Cloud、Spring Cloud Alibaba、Spring AI、MyBatis-Plus、XXL-JOB |
+| -------------- | -------------------------------------------------------------------------------- |
+| 根 POM | 聚合全部模块，继承 `spring-boot-starter-parent`，固定 Java 21，导入 Spring Cloud、SCA、Spring AI 三个 BOM，管理 MyBatis-Plus、XXL-JOB 与内部模块版本 |
 | 服务模块 POM | 只声明自己需要的 starter，不写版本号 |
 
-`claim-bom` 不继承根 POM：根 POM 以 `import` 方式引用它，若它再继承根 POM 会形成循环。代价是 `claim-bom` 的版本需要与根 POM 手工保持一致，由根 POM 的 `claim-bom.version` 显式声明，便于检索。
+根 POM 本身就是 BOM：它已是所有模块的 parent，`dependencyManagement` 中的版本被全部子模块继承，子模块无需再 import 任何东西。只有需要给平台外项目提供版本清单时，才值得单独抽一个 BOM 模块。
 
-`spring-boot-maven-plugin` 统一在根 POM 的 `pluginManagement` 中配置，服务模块有启动类后再显式引入，避免当前无启动类时 `repackage` 失败。
+`spring-boot-maven-plugin` 统一在根 POM 的 `pluginManagement` 中配置，服务模块引入时只指定 `mainClass`。
 
 ## 4. 后端包结构
 
@@ -125,14 +122,14 @@ frontend/claim-web
 
 ## 7. 构建与版本管理
 
-- 技术版本来源：根 POM（Java、Boot）、`claim-bom`（第三方 BOM 与单构件）、前端 `package.json`。
-- 新增第三方依赖：先在 `claim-bom` 声明版本，服务模块只引坐标。
+- 技术版本来源：根 POM（Java、Boot、第三方 BOM 与单构件）、前端 `package.json`。
+- 新增第三方依赖：版本写在根 POM，服务模块只引坐标。
 - 构建命令：`mvn -DskipTests package`，在根目录执行，模块顺序由依赖关系推算。
 - 每次调整模块或依赖，同步更新本文档的模块表与目录树。
 
 ## 8. 设计取舍
 
 - **先骨架再实现**：先把依赖方向和目录钉死，后续每个域只填自己的内容，避免边写边改结构。
-- **BOM 独立成模块**：版本集中在单点，服务 POM 不出现版本号，升级时只改一处。
+- **版本只放根 POM**：子模块天然继承，不需要额外 import；多一层 BOM 模块反而带来版本号两处维护。
 - **不预置假租户目录**：占位目录会误导后续实现，约定写在文档里即可。
 - **AI 服务不持有业务库权限**：结构上就用 OpenFeign 调业务服务，从部署层面杜绝越权写库。
