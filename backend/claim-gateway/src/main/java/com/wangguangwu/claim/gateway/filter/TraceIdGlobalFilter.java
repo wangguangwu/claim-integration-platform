@@ -20,6 +20,13 @@ import reactor.core.publisher.Mono;
 @Component
 public class TraceIdGlobalFilter implements GlobalFilter, Ordered {
 
+    /**
+     * 沿用上游 TraceId，缺失时生成新值，并同时写入下游请求头与响应头。
+     *
+     * @param exchange 当前请求上下文
+     * @param chain    过滤器链
+     * @return 处理结果
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String traceId = exchange.getRequest().getHeaders().getFirst(TraceHeaders.TRACE_ID);

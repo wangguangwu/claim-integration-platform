@@ -20,6 +20,11 @@ import org.springframework.core.Ordered;
 @ConditionalOnClass(name = "jakarta.servlet.Filter")
 public class TenantAutoConfiguration {
 
+    /**
+     * 注册租户上下文过滤器，优先级高于业务过滤器。
+     *
+     * @return 过滤器注册器
+     */
     @Bean
     @ConditionalOnMissingBean(name = "tenantContextFilter")
     public FilterRegistrationBean<TenantContextFilter> tenantContextFilter() {

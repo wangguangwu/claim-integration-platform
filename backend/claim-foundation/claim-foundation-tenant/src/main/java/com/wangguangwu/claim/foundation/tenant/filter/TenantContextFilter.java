@@ -19,6 +19,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class TenantContextFilter extends OncePerRequestFilter {
 
+    /**
+     * 请求头齐全时绑定租户上下文，请求结束后无条件清理。
+     *
+     * @param request     当前请求
+     * @param response    当前响应
+     * @param filterChain 过滤器链
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
