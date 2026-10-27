@@ -1,0 +1,25 @@
+{
+  "name": "claim-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "理赔业务集成平台前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "element-plus": "2.14.7",
+    "pinia": "^2.3.1",
+    "vue": "3.5.44",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "5.9.3",
+    "vite": "6.4.5",
+    "vue-tsc": "^2.2.12"
+  }
+}
