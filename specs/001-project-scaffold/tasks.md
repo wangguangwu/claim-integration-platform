@@ -1,7 +1,5 @@
 # 001 工程骨架任务
 
-本 spec 不含业务逻辑，因此不新增单元测试；验证以构建、启动与网关行为为主。
-
 ## T1 根 POM 与版本管理
 
 - 状态：已完成
@@ -44,14 +42,21 @@
 - 产物：`package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`、`main.ts`、`App.vue`、`router/index.ts`、`DefaultLayout.vue`、`api/request.ts`、5 个占位页
 - 完成条件：`npm install && npm run build` 通过并产出 `dist`
 
-## T7 构建与回归验证
+## T7 过滤器单元测试
+
+- 状态：已完成
+- 对应 design：§7
+- 产物：`TenantGlobalFilterTest`、`TraceIdGlobalFilterTest`、`TenantContextFilterTest`，两个模块补 `spring-boot-starter-test`（test 作用域）
+- 完成条件：`mvn test` 通过；覆盖租户头齐全放行、租户头缺失拒绝、重复请求结果一致、TraceId 生成与透传、上下文绑定与异常路径清理
+
+## T8 构建与回归验证
 
 - 状态：已完成
 - 对应 design：§14
-- 产物：构建与启动验证记录（见下）
-- 完成条件：7 个可执行 jar 产出；四个服务启动成功；网关三条路由与租户拒绝行为符合 requirements §8
+- 产物：构建、测试与启动验证记录（见下）
+- 完成条件：7 个可执行 jar 产出；全部测试通过；四个服务启动成功；网关三条路由与租户拒绝行为符合 requirements §8
 
-## T8 文档同步
+## T9 文档同步
 
 - 状态：已完成
 - 对应 design：§8
@@ -61,8 +66,9 @@
 ## 验证记录
 
 - 网关 `local` profile 下 `/actuator/health` 返回 200
-- 缺少租户头返回 400 与 `TENANT_HEADER_MISSING`
+- 缺少租户头返回 400 与 `TENANT_HEADER_MISSING`，并输出告警日志
 - 携带租户头时 `/api/application/**`、`/api/case/**`、`/api/diagnosis/**` 均命中路由，下游未启动返回 503
+- `mvn -B clean test` BUILD SUCCESS，9 个用例全部通过
 - `mvn -B -DskipTests package` BUILD SUCCESS，产出 7 个可执行 jar
 - `npm run build` 通过，仅提示 Element Plus 全量引入导致的 chunk 体积警告
 - application / case 服务健康检查在 MySQL、Redis 未配置时为 DOWN，属本地环境预期
