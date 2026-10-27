@@ -28,12 +28,12 @@
 - 产物：`ApplicationServiceApplication`、`CaseServiceApplication`、`AiServiceApplication` 及各自 `application.yml`
 - 完成条件：各服务在 `local` profile 下按约定端口启动；不连接 Nacos；MySQL、Redis 不可用时进程仍能启动
 
-## T5 包结构与占位目录
+## T5 一级包结构
 
 - 状态：已完成
 - 对应 design：§11、§12
-- 产物：四个服务的分层包目录；前端 `views` / `layouts` / `api` / `router` 等目录
-- 完成条件：目录与 design 目录树逐项一致，不出现未登记目录与假租户目录
+- 产物：Application / Case 的 `interfaces`、`usecase`、`domain`、`infrastructure`；AI 的 `agent`、`tool`、`evidence`、`knowledge`、`policy`、`remediation`；网关的 `auth`、`tenant`、`filter`、`route`、`config`；前端 `views` / `layouts` / `api` / `router` 等一级目录
+- 完成条件：只有上述一级包，不存在二级及以下空目录；foundation 子包均有对应类，没有为未实现能力预留的空壳
 
 ## T6 前端骨架与构建
 

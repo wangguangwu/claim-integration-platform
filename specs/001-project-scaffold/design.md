@@ -158,48 +158,36 @@ com.wangguangwu.claim.<service>
 - 所有外部系统差异收敛在 `infrastructure` 下的 adapter。
 - 具体聚合、表结构和状态机不在本 spec 定义，由对应业务域 spec 决定。
 
-已落地的二级目录：
+已落地的包（只到一级；foundation 的子包由已存在的类决定）：
 
 ```
 claim-application-service
-├─ interfaces/{rest, dto, mq}
-├─ usecase/{sign, accept, underwrite, deliver, query}
-├─ domain/{model, valueobject, event, service, repository, statemachine}
-└─ infrastructure/{persistence/{mapper, po, converter}, adapter, file, mq}
+└─ {interfaces, usecase, domain, infrastructure}
 
 claim-case-service
-├─ interfaces/{rest, dto, mq}
-├─ usecase/{intake, orchestrate, callback, query}
-├─ domain/{model, valueobject, stage, event, service, repository, statemachine}
-└─ infrastructure/{persistence/{mapper, po, converter}, delivery/{adapter, codec, client}, mq, redis}
+└─ {interfaces, usecase, domain, infrastructure}
 
 claim-ai-service
-├─ agent         诊断流程、假设生成、Tool 调度
-├─ tool          只读查询实时业务数据
-├─ evidence      证据标准化与关联
-├─ knowledge     协议、错误码、历史故障检索
-├─ policy        动作授权
-└─ remediation   受控处置
+└─ {agent, tool, evidence, knowledge, policy, remediation}
 
 claim-gateway
 └─ {auth, tenant, filter, route, config}
 
-claim-foundation
-├─ common/{model, exception, enums, util}
-├─ tenant/{context, protocol, filter, config}
-└─ observability/{trace, metric, log, audit}
+claim-foundation-common
+└─ 暂无包，随第一批公共类创建
+
+claim-foundation-tenant
+└─ {context, config, protocol, filter}
+
+claim-foundation-observability
+└─ trace
 ```
 
-## 12. 租户适配目录约定
+二级及以下（`interfaces/rest`、`usecase/sign`、`persistence/mapper`、租户适配子包等）由对应业务域 spec 定义后再创建；目录以文件里声明的包为准，不预置空壳。
 
-Application 接入适配与 Case 交付适配都按 `{tenantCode}/{protocolVersion}` 建子包，公共逻辑上提到 `Abstract*Adapter`：
+## 12. 租户适配约定
 
-```
-infrastructure/adapter/{tenantCode}/{protocolVersion}/
-infrastructure/delivery/adapter/{tenantCode}/{protocolVersion}/
-```
-
-具体租户目录在接入该租户时创建。骨架不预置 tenant-a / tenant-b 之类的示例目录，避免占位目录被误当成真实实现。
+Application 接入适配与 Case 交付适配都放在各自 `infrastructure` 下，按 `{tenantCode}/{protocolVersion}` 组织，公共逻辑上提到 `Abstract*Adapter`。具体子包随实现类一起创建，骨架不预置目录，避免占位目录被误当成真实实现。
 
 ## 13. 前端结构
 
