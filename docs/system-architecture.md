@@ -286,9 +286,7 @@ claim-integration-platform
 │  ├─ claim-ai-service
 │  └─ claim-foundation
 ├─ specs
-│  ├─ application
-│  ├─ case
-│  └─ ai-diagnosis
+│  └─ 001-project-scaffold
 ├─ deploy
 └─ docs
 ```
@@ -436,7 +434,9 @@ Application 内部的聚合、实体、值对象、领域服务、Repository、�
 
 包名：
 
-**com.wangguangwu.claim.case**
+**com.wangguangwu.claim.cases**
+
+说明：`case` 是 Java 关键字，不能作为包名，Case 服务统一使用 `cases`。
 
 目录结构：
 
@@ -637,23 +637,21 @@ Tenant 负责平台内部的数据、配置、权限、协议和资源隔离。
 - 可靠性原则
 - AI 能力边界
 
-业务域内部设计进入对应 Spec：
+业务域内部设计按主题编号单独成 Spec：
 
 ```
 specs
-├─ application
+├─ 001-project-scaffold
 │  ├─ requirements.md
 │  ├─ design.md
 │  └─ tasks.md
-├─ case
-│  ├─ requirements.md
-│  ├─ design.md
-│  └─ tasks.md
-└─ ai-diagnosis
+└─ 00N-<topic>
    ├─ requirements.md
    ├─ design.md
    └─ tasks.md
 ```
+
+spec 按三位编号递增，一个 spec 只覆盖一个可独立验收的主题。各业务域在开始实现时单独成 spec，不提前铺开。
 
 业务域设计文档负责定义：
 
