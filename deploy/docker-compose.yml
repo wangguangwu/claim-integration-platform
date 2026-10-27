@@ -1,0 +1,167 @@
+name: claim-local
+
+# 仅用于本地开发和集成测试；生产环境不使用本文件部署中间件。
+services:
+  mysql:
+    image: mysql:8.4.13
+    container_name: claim-mysql
+    command:
+      # 与 Application 域 DDL 和业务时间保持一致，避免本地环境出现字符集或时区差异。
+      - --default-time-zone=+08:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # init 下的 SQL 仅在 MySQL 数据卷首次创建时由官方镜像执行。
+      - claim-mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - claim-local-network
+
+  redis:
+    image: redis:7.4.11-alpine
+    container_name: claim-redis
+    command:
+      # 禁用默认用户，仅开放 Application 使用的 ACL 账号，避免本地配置与生产鉴权模型不一致。
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --user
+      - ${REDIS_USERNAME:-claim_app}
+      - "on"
+      - ">${REDIS_PASSWORD:-claim_redis}"
+      - "~*"
+      - "&*"
+      - "+@all"
+      - --user
+      - default
+      - "off"
+    environment:
+      REDIS_USERNAME: ${REDIS_USERNAME:-claim_app}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-claim_redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - claim-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --user \"$$REDIS_USERNAME\" --pass \"$$REDIS_PASSWORD\" ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - claim-local-network
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.5.0
+    container_name: claim-rocketmq-namesrv
+    command: sh mqnamesrv
+    environment:
+      # 限制本地 NameServer JVM 堆，避免其占用开发机过多内存。
+      JAVA_OPT_EXT: "-server -Xms512m -Xmx512m -Xmn256m"
+      TZ: Asia/Shanghai
+    ports:
+      - "${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n localhost:9876 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - claim-local-network
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.5.0
+    container_name: claim-rocketmq-broker
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    environment:
+      BROKER_IP1: ${ROCKETMQ_BROKER_IP1:-127.0.0.1}
+      JAVA_OPT_EXT: "-server -Xms512m -Xmx512m -Xmn256m"
+      TZ: Asia/Shanghai
+    command:
+      - sh
+      - -c
+      - |
+        # 挂载的配置文件只读；运行时追加可由 .env 覆盖的宿主机可访问地址。
+        cp /opt/rocketmq/broker.conf /tmp/broker.conf
+        printf '\nbrokerIP1=%s\n' "$$BROKER_IP1" >> /tmp/broker.conf
+        exec sh mqbroker -n rocketmq-namesrv:9876 -c /tmp/broker.conf
+    ports:
+      - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${ROCKETMQ_BROKER_FAST_PORT:-10909}:10909"
+    volumes:
+      - ./rocketmq/broker.conf:/opt/rocketmq/broker.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n rocketmq-namesrv:9876 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - claim-local-network
+
+  rocketmq-dashboard:
+    image: apacherocketmq/rocketmq-dashboard:2.1.0
+    # 镜像提供 linux/arm64 变体；禁止强制 AMD64，避免 Apple Silicon 走 Rosetta/QEMU 模拟。
+    container_name: claim-rocketmq-dashboard
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+      rocketmq-broker:
+        condition: service_healthy
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      ROCKETMQ_DASHBOARD_USERNAME: ${ROCKETMQ_DASHBOARD_USERNAME:-claim_admin}
+      ROCKETMQ_DASHBOARD_PASSWORD: ${ROCKETMQ_DASHBOARD_PASSWORD:-claim_dashboard}
+      JAVA_OPTS: >-
+        -Drocketmq.config.loginRequired=true
+        -Drocketmq.config.dataPath=/tmp/rocketmq-console/data
+      TZ: Asia/Shanghai
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        # Dashboard 通过本地 users.properties 启用登录，账号从 .env 读取。
+        mkdir -p /tmp/rocketmq-console/data &&
+        printf '%s=%s,1\n' "$$ROCKETMQ_DASHBOARD_USERNAME" "$$ROCKETMQ_DASHBOARD_PASSWORD"
+        > /tmp/rocketmq-console/data/users.properties &&
+        exec java $$JAVA_OPTS -jar /rocketmq-dashboard.jar
+    ports:
+      - "${ROCKETMQ_DASHBOARD_PORT:-8082}:8082"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/8082 &&
+          printf "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 &&
+          head -1 <&3 | grep -q " 200 "'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - claim-local-network
+
+networks:
+  claim-local-network:
+    # 服务只在独立本地网络中互相发现，宿主机通过 ports 访问。
+    name: claim-local-network
+
+volumes:
+  claim-mysql-data:
+    # down 默认保留数据卷；需要全量重置时使用 docker compose down -v。
+    name: claim-mysql-data
+  claim-redis-data:
+    name: claim-redis-data

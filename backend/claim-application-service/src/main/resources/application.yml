@@ -29,16 +29,21 @@ spring:
     stream:
       rocketmq:
         binder:
-          name-server: 127.0.0.1:9876
+          # 默认连接本地 Compose NameServer；容器化运行时通过环境变量替换为服务地址。
+          name-server: ${CLAIM_APPLICATION_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/claim_application_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
+    # 默认连接 deploy/docker-compose.yml 创建的 Application 私有库和最小权限账号。
+    url: ${CLAIM_APPLICATION_DB_URL:jdbc:mysql://127.0.0.1:3306/claim_application_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${CLAIM_APPLICATION_DB_USERNAME:claim_app}
+    password: ${CLAIM_APPLICATION_DB_PASSWORD:claim_app}
     hikari:
       initialization-fail-timeout: -1
       maximum-pool-size: 5
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
+      # Redis 使用 Compose 初始化的 ACL 账号，不使用默认用户。
+      host: ${CLAIM_APPLICATION_REDIS_HOST:127.0.0.1}
+      port: ${CLAIM_APPLICATION_REDIS_PORT:6379}
+      username: ${CLAIM_APPLICATION_REDIS_USERNAME:claim_app}
+      password: ${CLAIM_APPLICATION_REDIS_PASSWORD:claim_redis}
