@@ -62,14 +62,14 @@ Application 负责理赔申请从外部接入到内部审核交付的完整处�
 - 租户协议转换
 - 参数校验
 - 幂等判断
-- signNo 生成
+- applicationNo 生成
 - Application 落库
 
-落库成功后立即返回 signNo，后续影像、承保和审核流程异步执行。
+落库成功后立即返回 applicationNo，后续影像、承保和审核流程异步执行。
 
 关键状态：
 
-- **同步签收成功**：申请完成校验及落库，平台返回 signNo。
+- **同步签收成功**：申请完成校验及落库，平台返回 applicationNo。
 - **待受理**：Application 已进入平台，等待影像处理。
 - **受理成功**：影像处理完成，可以进入后续业务处理。
 - **受理失败**：影像处理失败，停止后续流程并记录异常。
@@ -80,7 +80,7 @@ Application 负责理赔申请从外部接入到内部审核交付的完整处�
 - 租户协议适配
 - 申请校验
 - 申请幂等
-- signNo 生成
+- applicationNo 生成
 - Application 状态管理
 - 影像处理
 - 自动承保
@@ -566,10 +566,10 @@ claim-foundation
 
 核心业务编号：
 
-- Application：signNo
+- Application：applicationNo
 - Case：caseNo
 
-Case 保存 sourceSignNo，用于追溯来源 Application。
+Case 保存 sourceApplicationNo，用于追溯来源 Application。
 
 服务边界：
 
