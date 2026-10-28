@@ -12,6 +12,12 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      # Redis 是可降级依赖，就绪探针只看数据库，避免缓存故障摘除实例。
+      group:
+        readiness:
+          include: db
 
 ---
 spring:
