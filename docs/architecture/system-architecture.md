@@ -289,6 +289,10 @@ claim-integration-platform
 │  └─ 001-project-scaffold
 ├─ deploy
 └─ docs
+   ├─ architecture
+   ├─ environment
+   ├─ integration
+   └─ testing
 ```
 
 ### 3.1 claim-web
@@ -405,9 +409,9 @@ adapter
 
 协议路由：
 
-**tenantCode + protocolVersion → TenantAdapter**
+**tenantCode + protocolVersion → TenantApplicationPipeline**
 
-TenantAdapter 负责处理租户接入协议差异：
+TenantApplicationPipeline 由解析器、校验器、转换器组成，负责处理租户接入协议差异：
 
 - 协议解析
 - 参数校验
@@ -418,7 +422,7 @@ TenantAdapter 负责处理租户接入协议差异：
 
 请求链路：
 
-**外部请求 → Tenant 识别 → 协议路由 → TenantAdapter → Application UseCase**
+**外部请求 → Tenant 识别 → 协议路由 → TenantApplicationPipeline（Parser → Validator → Converter） → Application UseCase**
 
 Application 内部的聚合、实体、值对象、领域服务、Repository、状态机及表结构由 Application 业务域设计文档定义。
 
@@ -619,10 +623,10 @@ Tenant 负责平台内部的数据、配置、权限、协议和资源隔离。
 
 进行路由：
 
-- Application → TenantAdapter
+- Application → TenantApplicationPipeline
 - Case → TenantDeliveryAdapter
 
-租户差异应收敛在 Adapter 层，不进入核心业务逻辑。
+租户差异应收敛在租户协议接入层，不进入核心业务逻辑。
 
 ### 4.5 文档边界
 

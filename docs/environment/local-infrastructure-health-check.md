@@ -38,7 +38,7 @@ docker exec claim-mysql mysqladmin ping -h 127.0.0.1 -uclaim_app -pclaim_app
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SHOW TABLES;"
 ```
 
-预期存在 `application`、`material`、`issue`、`case_relation`、`interaction_log`、`outbox_event`、`consumed_event` 七张表。
+预期存在 `t_application`、`t_material`、`t_issue`、`t_case_relation`、`t_interaction_log`、`t_outbox_event`、`t_consumed_event` 七张表。
 
 ## Redis
 
@@ -95,3 +95,5 @@ curl -fsS http://127.0.0.1:8081/actuator/health
 ```
 
 预期返回 `{"status":"UP"}`。若依赖服务不可用，健康检查会明确展示对应组件状态，不应伪造 `UP`。
+
+Redis 属于可降级依赖：Redis 停机时 `/actuator/health` 汇总为 `DOWN`，但 `/actuator/health/readiness` 只统计数据库，仍返回 `UP`，签收继续走 MySQL 降级链路。

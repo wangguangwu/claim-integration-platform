@@ -13,7 +13,9 @@ __pycache__/
 
 *.log
 logs/
+scripts/jmeter/results/
 .DS_Store
 
 *.iml
+.idea/
 .vscode/

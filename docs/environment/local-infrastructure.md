@@ -1,4 +1,4 @@
-# 本地基础服务
+# 本地基础服务使用说明
 
 ## 服务范围
 
@@ -7,7 +7,7 @@
 | 服务 | 宿主机端口 | 用途 |
 |---|---:|---|
 | MySQL 8.4.13 | `3306` | Application 私有数据库 `claim_application_db` |
-| Redis 7.4.11 | `6379` | 后续缓存、协调与幂等辅助能力 |
+| Redis 7.4.11 | `6379` | 缓存、协调与幂等辅助能力 |
 | RocketMQ NameServer 5.5.0 | `9876` | RocketMQ 路由发现 |
 | RocketMQ Broker 5.5.0 | `10911`、`10909` | Application 异步命令 Topic |
 | RocketMQ Dashboard 2.1.0 | `8082` | 查看 NameServer、Broker、Topic 和消费者状态 |
@@ -61,7 +61,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 MySQL 首次创建数据卷时按文件名顺序执行 `deploy/mysql/init/` 下的 SQL：
 
 - `01-create-database.sql`：创建 `claim_application_db` 与 `claim_app` 应用账号。
-- `02-application-schema.sql`：创建 Application 域七张基础表、索引和唯一约束。
+- `02-application-schema.sql`：创建 Application 域七张 `t_` 前缀基础表、索引和唯一约束。
 
 服务默认连接信息：
 
@@ -108,4 +108,4 @@ Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动
 
 Docker 服务端口可通过 `MYSQL_PORT`、`REDIS_PORT`、`ROCKETMQ_NAMESRV_PORT`、`ROCKETMQ_BROKER_PORT`、`ROCKETMQ_BROKER_FAST_PORT` 覆盖。若宿主机连接 RocketMQ 需要非默认网卡地址，可设置 `ROCKETMQ_BROKER_IP1` 后再启动编排。
 
-各服务的容器、命令行与 Dashboard 检查方式见 [health-check.md](health-check.md)。
+各服务的容器、命令行与 Dashboard 检查方式见 [本地基础服务检查说明](local-infrastructure-health-check.md)。
