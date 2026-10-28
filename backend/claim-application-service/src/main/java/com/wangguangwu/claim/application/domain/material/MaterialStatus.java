@@ -8,5 +8,7 @@ package com.wangguangwu.claim.application.domain.material;
  */
 public enum MaterialStatus {
 
-    PENDING_PROCESS
+    PENDING_PROCESS,
+    PROCESSED,
+    FAILED
 }

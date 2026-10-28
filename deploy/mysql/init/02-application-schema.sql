@@ -1,7 +1,7 @@
 USE claim_application_db;
 
 -- Application 聚合根；租户与外部申请号共同保证接入幂等。
-CREATE TABLE IF NOT EXISTS t_application (
+CREATE TABLE IF NOT EXISTS t_claim_application (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
     application_no VARCHAR(64) NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS t_application (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- 材料保留初始 URL 与上传、转存后的 URL，支持追溯文件处理链路。
-CREATE TABLE IF NOT EXISTS t_material (
+CREATE TABLE IF NOT EXISTS t_claim_application_material (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     batch_no VARCHAR(64) NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS t_material (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- 同一申请当前仅允许一个未关闭问题件，生成列上的唯一索引负责并发约束。
-CREATE TABLE IF NOT EXISTS t_issue (
+CREATE TABLE IF NOT EXISTS t_claim_application_issue (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     issue_no VARCHAR(64) NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS t_issue (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- 审核签收返回的 Case 与 Application 的关联，重复回调不重复建关系。
-CREATE TABLE IF NOT EXISTS t_case_relation (
+CREATE TABLE IF NOT EXISTS t_claim_case_relation (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
     application_no VARCHAR(64) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS t_case_relation (
 
 -- 一行记录一个交互事件；同一 interaction_no 的多行按发生时间组成完整行为。
 -- 只有受理成功后才有平台申请号，因此签收受理前的失败不写入本表。
-CREATE TABLE IF NOT EXISTS t_interaction_log (
+CREATE TABLE IF NOT EXISTS t_claim_interaction_log (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     interaction_no VARCHAR(64) NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS t_interaction_log (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- 与业务状态同事务写入的待投递事件，为后续可靠异步投递提供基础。
-CREATE TABLE IF NOT EXISTS t_outbox_event (
+CREATE TABLE IF NOT EXISTS t_claim_outbox_event (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS t_outbox_event (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 -- 消费者按消费者组和事件标识去重，支撑至少一次投递。
-CREATE TABLE IF NOT EXISTS t_consumed_event (
+CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     consumer_group VARCHAR(128) NOT NULL,
     event_id VARCHAR(64) NOT NULL,

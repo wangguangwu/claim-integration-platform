@@ -9,14 +9,14 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Application 主表数据对象，对应 {@code t_application} 表。
+ * Application 主表数据对象，对应 {@code t_claim_application} 表。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
 @Setter
-@TableName("t_application")
+@TableName("t_claim_application")
 public class ApplicationDO {
 
     @TableId(type = IdType.AUTO)

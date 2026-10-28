@@ -41,7 +41,7 @@
 ### 编号、锁与存在查询
 
 - `applicationNo` 格式固定为 `AyyyyMMdd` 加 8 位日序列，例如 `A2026102700000001`。
-- Application 日序列以 Redis 为主计数器。Redis 计数 Key 不存在或 Redis 不可用时，从 MySQL `t_application` 表查询当天已落库的最大 `applicationNo`，尾号加一后生成候选编号；编号允许因事务回滚或进程异常产生空洞，不允许重复。
+- Application 日序列以 Redis 为主计数器。Redis 计数 Key 不存在或 Redis 不可用时，从 MySQL `t_claim_application` 表查询当天已落库的最大 `applicationNo`，尾号加一后生成候选编号；编号允许因事务回滚或进程异常产生空洞，不允许重复。
 - Redis 计数器落后于数据库（如 Redis 从旧快照恢复，或故障期间完全由 MySQL 兜底发号）导致唯一键冲突时，必须先把 Redis 计数器抬升到 MySQL 当天最大尾号，再在同一请求内重试，不得把请求当作失败返回。
 - `batchNo` 格式固定为 `ByyyyMMdd` 加 UUID 去连字符随机段，例如 `B20261027cfe4a9d8b3e14f5aa22cb812d6c5e901`。
 - 同一 `(tenantCode, externalApplicationNo)` 的签收使用 Redisson 可重入锁；获取锁最多等待 30 秒且不传 `leaseTime`，由 watchdog 在持锁 JVM 存活期间自动续期，释放必须位于 `finally`。

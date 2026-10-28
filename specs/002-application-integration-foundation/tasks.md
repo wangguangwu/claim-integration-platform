@@ -53,7 +53,7 @@
 
 - `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config` 通过。
 - MySQL、Redis、RocketMQ NameServer、Broker 均以默认端口启动并通过健康检查；`scripts/docker-start.sh` 在 Broker 健康后成功创建两个 Topic，Docker Desktop 不保留额外初始化容器。
-- MySQL 已验证存在 `t_application`、`t_material`、`t_issue`、`t_case_relation`、`t_interaction_log`、`t_outbox_event`、`t_consumed_event` 七张基础表；Material、Issue、InteractionLog 的字段、生成列和索引符合 design。
+- MySQL 已验证存在 `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event`、`t_claim_consumed_event` 七张基础表；Material、Issue、InteractionLog 的字段、生成列和索引符合 design。
 - Redis 使用 `claim_app` ACL 账号认证后返回 `PONG`。
 - 已验证 `claim_application_material_process_v1` 与 `claim_application_audit_delivery_v1` 存在；创建日志确认两个 Topic 均为 8 个读队列、8 个写队列。
 - 使用 Corretto 21 执行 `mvn -B clean test` 通过，9 个现有测试全部通过；执行 `mvn -B -DskipTests package` 通过。

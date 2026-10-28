@@ -8,7 +8,7 @@
 
 ## 压测目标与安全边界
 
-脚本调用本地示例协议 `demo-insurer-a/v1`，验证唯一外部申请号的并发创建吞吐，以及同一外部申请号的幂等控制。压测会向 `claim_application_db` 写入 `t_application`、`t_material`、`t_interaction_log`、`t_outbox_event` 数据；仅允许使用本地 Docker 开发库和虚构数据，禁止指向生产、测试共享库或真实个人信息环境。
+脚本调用本地示例协议 `demo-insurer-a/v1`，验证唯一外部申请号的并发创建吞吐，以及同一外部申请号的幂等控制。压测会向 `claim_application_db` 写入 `t_claim_application`、`t_claim_application_material`、`t_claim_interaction_log`、`t_claim_outbox_event` 数据；仅允许使用本地 Docker 开发库和虚构数据，禁止指向生产、测试共享库或真实个人信息环境。
 
 | 脚本 | 验证场景 | 默认负载 | 预期业务结果 |
 |---|---|---|---|
@@ -63,15 +63,15 @@ rg ',false,' scripts/jmeter/results/idempotency-20261028-001.jtl
 以下查询以外部申请号 `IDEMPOTENCY-20261028-001` 为例。先获取 Application：
 
 ```bash
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT id, tenant_code, application_no, external_application_no, status, application_attempt, created_at FROM t_application WHERE tenant_code = 'demo-insurer-a' AND external_application_no = 'IDEMPOTENCY-20261028-001';"
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT id, tenant_code, application_no, external_application_no, status, application_attempt, created_at FROM t_claim_application WHERE tenant_code = 'demo-insurer-a' AND external_application_no = 'IDEMPOTENCY-20261028-001';"
 ```
 
 幂等压测预期只返回一行，`status=PENDING_ACCEPT`、`application_attempt=1`。将查询结果中的 `application_no` 替换为 `<APPLICATION_NO>`，继续核对材料、交互日志与 Outbox：
 
 ```bash
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT application_no, batch_no, material_type, original_file_url, uploaded_file_url, status, deleted, created_at FROM t_material WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT interaction_no, action, result_status, request_id, trace_id, occurred_at FROM t_interaction_log WHERE application_no = '<APPLICATION_NO>' ORDER BY interaction_no, occurred_at;"
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT event_id, event_type, event_version, status, retry_count, created_at FROM t_outbox_event WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT application_no, batch_no, material_type, original_file_url, uploaded_file_url, status, deleted, created_at FROM t_claim_application_material WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT interaction_no, action, result_status, request_id, trace_id, occurred_at FROM t_claim_interaction_log WHERE application_no = '<APPLICATION_NO>' ORDER BY interaction_no, occurred_at;"
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT event_id, event_type, event_version, status, retry_count, created_at FROM t_claim_outbox_event WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
 ```
 
 首次签收应有同一材料批次、`PENDING_PROCESS` 材料、`STARTED + COMPLETED` 交互行为组和一条 `APPLICATION_CREATED` Outbox。幂等重复请求应产生 `STARTED + REUSED` 行为组，但不得新增 Material 或 Outbox。
