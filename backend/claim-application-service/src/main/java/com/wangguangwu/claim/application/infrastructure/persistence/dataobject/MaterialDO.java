@@ -9,14 +9,14 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * 理赔材料数据对象，对应 {@code t_material} 表。
+ * 理赔材料数据对象，对应 {@code t_claim_application_material} 表。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
 @Setter
-@TableName("t_material")
+@TableName("t_claim_application_material")
 public class MaterialDO {
 
     @TableId(type = IdType.AUTO)

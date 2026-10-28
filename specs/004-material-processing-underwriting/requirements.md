@@ -1,0 +1,118 @@
+# 004 材料处理与承保确认需求
+
+## 功能目标
+
+- 闭合 003 留下的异步缺口：将 `t_claim_outbox_event` 中待投递的申请事件可靠投递到 MQ，并由本服务消费后完成材料处理。
+- 由材料处理结果驱动 Application 从 `PENDING_ACCEPT` 推进到 `ACCEPTED` 或 `ACCEPT_FAILED`。
+- 材料处理成功后查询有效保单，将 Application 推进到 `WAIT_AUDIT` 或 `UNDERWRITING`；`UNDERWRITING` 在承保完成通知或补偿查询结果到达后推进到 `WAIT_AUDIT`。
+- 进入 `WAIT_AUDIT` 时写入审核交付事件，为 005 的审核交付提供唯一触发来源。
+
+## 业务规则
+
+### 事件投递
+
+- 只有已提交的 `t_claim_outbox_event` 记录可以投递；投递器按 `created_at` 顺序批量处理，不跳过更早的记录。
+- 同一事件在并发投递下只允许一个实例发送，其余实例放弃本次抢占，不重复发送。
+- 投递失败保留记录并按退避策略重试，不丢弃事件，也不把业务失败写入 Application 状态。
+- 超过最大重试次数的事件标记为投递失败并保留记录，由投递器记录错误日志供人工或监控处理，不静默删除。
+
+### 材料处理
+
+- 消费 `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` 事件时，只处理该 Application **当前未删除** 且状态为 `PENDING_PROCESS` 的材料。
+- 处理前必须校验事件载荷中的申请尝试次数与 Application 当前尝试次数一致，且 Application 状态为 `PENDING_ACCEPT`；不满足时只记录交互轨迹，不改变任何业务数据。
+- 当前批次全部材料处理成功：材料置为 `PROCESSED` 并写入上传后地址，Application 推进到 `ACCEPTED`。
+- 当前批次任一材料处理失败：该材料置为 `FAILED`，Application 推进到 `ACCEPT_FAILED`，本次尝试结束，由租户重新申请恢复。
+- 外部文件处理不可用或超时时，材料保持 `PENDING_PROCESS`，Application 保持 `PENDING_ACCEPT`，依靠消息重投或补偿重试恢复，**不得**判定为受理失败。
+- 文件上传能力通过统一端口抽象；本项目不实现真实文件系统，本次以本服务内的模拟接口返回上传后地址，模拟数据只存内存、不落盘。
+- 重复消息不得重复推进状态，也不得把已处理完成的材料重置回待处理状态。
+
+### 承保确认
+
+- 仅在 Application 处于 `ACCEPTED` 时执行保单查询；查询在数据库事务外进行。
+- 查询结果存在有效保单：Application 推进到 `WAIT_AUDIT`，并在同一事务写入 `AUDIT_DELIVERY_REQUESTED` 事件。
+- 查询结果不存在有效保单：Application 推进到 `UNDERWRITING`，提交后发起自动承保请求。
+- 保单查询失败或超时：Application 保持 `ACCEPTED`，由补偿任务重试分流，不判定为受理失败。
+- 承保完成通知只允许把 `UNDERWRITING` 推进到 `WAIT_AUDIT`，并写入 `AUDIT_DELIVERY_REQUESTED` 事件。
+- 重复、迟到或状态不匹配的承保完成通知只记录交互轨迹，返回成功，不改变业务数据。
+- 自动承保请求按 `applicationNo` 幂等；重复发起不得产生多份承保记录。
+- 自动承保不定义业务失败状态：通知缺失时由补偿任务查询承保结果，在取得结果前保持 `UNDERWRITING`。
+
+### 补偿
+
+- 投递补偿：重置发送超时未落地的事件；发送失败的事件由投递器按退避策略重试，超过上限置为 `FAILED` 并保留记录。
+- 分流补偿：`ACCEPTED` 停留超过阈值时重试保单查询分流。
+- 承保补偿：`UNDERWRITING` 停留超过阈值时查询承保结果；查到完成则推进到 `WAIT_AUDIT`，查不到记录则重发自动承保请求并保持 `UNDERWRITING`。
+- 补偿只在 Application 仍处于预期状态时推进，状态已变化时只记录交互轨迹。
+
+### 交互轨迹
+
+- 材料处理、承保查询、自动承保发起和承保完成通知均使用 InteractionLog 行为组记录 `STARTED` 与 `COMPLETED`、`REUSED` 或 `FAILED` 事件。
+- `interactionType` 固定为 `MATERIAL_PROCESS`、`UNDERWRITING`、`UNDERWRITING_CALLBACK`。
+- 轨迹只保留申请编号、交互行为组、请求标识、链路标识、外部系统名称、结果和脱敏错误信息，不记录人员敏感信息。
+
+## 正常场景
+
+1. 签收事务提交后，`APPLICATION_CREATED` 事件被投递到材料处理 Topic，并标记为已投递。
+2. 消费者收到事件，处理当前批次全部材料，材料置为 `PROCESSED` 并写入上传后地址，Application 推进到 `ACCEPTED`。
+3. `ACCEPTED` 后查询到有效保单，Application 推进到 `WAIT_AUDIT`，并写入 `AUDIT_DELIVERY_REQUESTED` 事件。
+4. `ACCEPTED` 后未查询到有效保单，Application 推进到 `UNDERWRITING` 并发起自动承保；承保完成通知到达后推进到 `WAIT_AUDIT`，同时写入 `AUDIT_DELIVERY_REQUESTED` 事件。
+5. `ACCEPT_FAILED` 的申请重新申请后产生 `APPLICATION_REAPPLIED` 事件，新材料批次按同一规则处理，旧的已软删材料不参与处理。
+6. `UNDERWRITING` 停留超时且承保记录已完成但通知丢失，补偿任务查询到完成结果后推进到 `WAIT_AUDIT`。
+
+## 异常场景
+
+| 场景 | 期望处理 |
+|---|---|
+| 同一事件被重复投递或重复消费 | 不重复处理材料、不重复推进状态，记录 `REUSED` 轨迹并正常确认消息 |
+| 事件载荷尝试次数与当前申请不一致 | 不处理材料，记录轨迹后确认消息，不重试 |
+| Application 不在 `PENDING_ACCEPT` | 不处理材料，记录轨迹后确认消息，不重试 |
+| 文件处理返回失败 | 材料置为 `FAILED`，Application 推进到 `ACCEPT_FAILED`，记录失败轨迹 |
+| 文件处理超时或文件系统不可用 | 材料保持 `PENDING_PROCESS`，Application 保持 `PENDING_ACCEPT`，消息重投或补偿重试 |
+| 保单查询失败或超时 | Application 保持 `ACCEPTED`，记录失败轨迹，由补偿重试 |
+| 自动承保请求失败 | Application 保持 `UNDERWRITING`，记录失败轨迹，由补偿重发 |
+| 承保完成通知重复或迟到 | 返回成功，只记录 `REUSED` 轨迹，不改变状态 |
+| 承保完成通知对应的申请不存在 | 返回明确业务错误，不创建任何数据 |
+| 承保完成通知携带的申请未处于 `UNDERWRITING` | 返回成功并记录轨迹，不改变状态 |
+| MQ 不可用 | 投递失败保留事件并退避重试，签收与查询接口不受影响 |
+| 消费过程中数据库异常 | 本地事务回滚，消息按 MQ 策略重投，不产生半完成状态 |
+| 投递或消费进程崩溃 | 停留态由补偿任务恢复；外部调用必须幂等，重复执行不产生重复数据 |
+
+## 边界条件
+
+- 材料处理以"当前未删除材料"为范围：同一 Application 可能存在多个历史批次，仅处理未删除批次。
+- 单次投递批量大小、重试次数、退避上限、各类补偿阈值通过配置项确定，不硬编码。
+- 承保完成通知、自动承保请求和保单查询均以 `applicationNo` 为幂等键。
+- 本 Spec 不改变 002 已冻结的 Topic、消费者组、消息信封和回调路径。
+- 本 Spec 不新增数据库表，也不修改既有表结构。
+
+## 本次范围
+
+- Outbox 事件投递器、投递状态流转、退避重试与投递补偿。
+- 材料处理 Topic 的消费者、消息幂等、材料状态推进与交互轨迹。
+- 文件上传端口，以及本服务内的模拟文件系统接口：返回可追溯的模拟上传地址，支持按材料类型模拟失败、按配置模拟延迟。
+- 保单查询端口、自动承保端口，以及本服务内的内存承保实现（保单列表 + 自动承保记录）。
+- 承保完成 HTTP 回调接口、幂等处理与审核交付事件写入。
+- `ACCEPTED` 滞留、`UNDERWRITING` 超时与投递滞留的补偿任务。
+- 本地模拟承保接口：登记/清除有效保单、查询保单、发起自动承保、查询承保结果、触发完成回调。
+- 单元测试与本地端到端验证。
+
+## 非本次范围
+
+- 真实承保系统、文件系统对接及其验签、鉴权和报文适配。
+- 审核交付的实际投递实现、审核签收、问题件、补材与撤销。
+- 承保数据持久化；本 Spec 的承保数据仅存在于进程内存，重启后失效。
+- MQ 死信队列、监控告警与生产容量规划。
+- 前端页面与状态查询接口。
+
+## 验收标准
+
+- `mvn -B test` 通过，新增用例覆盖投递抢占、投递重试、重复消费、陈旧事件、材料成功与失败、保单存在与不存在、回调幂等、`ACCEPTED` 与 `UNDERWRITING` 补偿。
+- 本地端到端：签收后 MQ 事件自动投递，材料在无人工干预下变为 `PROCESSED`，Application 在无有效保单时进入 `UNDERWRITING`，在收到承保完成通知后进入 `WAIT_AUDIT`。
+- 有效保单存在时，Application 直接进入 `WAIT_AUDIT`，不产生自动承保记录。
+- `WAIT_AUDIT` 下数据库存在且仅存在一条 `AUDIT_DELIVERY_REQUESTED` 事件，重复通知不新增。
+- 重复投递同一事件时，材料不被重复处理，Application 状态不被重置。
+- 文件处理失败时材料为 `FAILED`、Application 为 `ACCEPT_FAILED`，租户可重新申请并产生新的材料批次。
+- 模拟文件系统按源地址幂等，同一材料重复上传返回同一地址；命中失败配置的材料返回失败。
+- 承保完成通知在 Application 不在 `UNDERWRITING` 时返回成功但状态不变。
+- 关闭模拟承保的完成通知后，补偿任务能通过查询承保结果把 Application 推进到 `WAIT_AUDIT`。
+- MQ 停机时签收接口仍可成功，事件保留在 `t_claim_outbox_event` 中，恢复后自动补齐投递。

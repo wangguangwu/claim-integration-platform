@@ -9,14 +9,14 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * 申请交互事件数据对象，对应 {@code t_interaction_log} 表。
+ * 申请交互事件数据对象，对应 {@code t_claim_interaction_log} 表。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
 @Setter
-@TableName("t_interaction_log")
+@TableName("t_claim_interaction_log")
 public class InteractionLogDO {
 
     @TableId(type = IdType.AUTO)

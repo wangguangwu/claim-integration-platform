@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wangguangwu.claim.application.domain.material.Material;
 import com.wangguangwu.claim.application.domain.material.MaterialRepository;
+import com.wangguangwu.claim.application.domain.material.MaterialStatus;
 import com.wangguangwu.claim.application.infrastructure.persistence.convert.MaterialDataMapper;
 import com.wangguangwu.claim.application.infrastructure.persistence.dataobject.MaterialDO;
 import com.wangguangwu.claim.application.infrastructure.persistence.mapper.MaterialDOMapper;
@@ -54,5 +55,38 @@ public class MyBatisMaterialRepository implements MaterialRepository {
                 .eq(MaterialDO::getDeleted, NOT_DELETED)
                 .set(MaterialDO::getDeleted, DELETED)
                 .set(MaterialDO::getDeletedAt, LocalDateTime.now()));
+    }
+
+    /**
+     * 查询申请当前有效材料，按创建顺序返回。
+     *
+     * @param applicationNo 平台申请编号
+     * @return 未删除材料
+     */
+    @Override
+    public List<Material> findByApplicationNoAndDeletedFalse(String applicationNo) {
+        return materialMapper.selectList(Wrappers.lambdaQuery(MaterialDO.class)
+                        .eq(MaterialDO::getApplicationNo, applicationNo)
+                        .eq(MaterialDO::getDeleted, NOT_DELETED)
+                        .orderByAsc(MaterialDO::getId))
+                .stream()
+                .map(materialDataMapper::toDomain)
+                .toList();
+    }
+
+    /**
+     * 以待处理状态为更新条件写入处理结果，重复消息不覆盖已完成结果。
+     *
+     * @param material 已写入处理结果的材料
+     * @return 更新成功时为 true
+     */
+    @Override
+    public boolean updateProcessResult(Material material) {
+        MaterialDO materialDO = materialDataMapper.toDataObject(material);
+        return materialMapper.update(null, Wrappers.lambdaUpdate(MaterialDO.class)
+                .eq(MaterialDO::getId, materialDO.getId())
+                .eq(MaterialDO::getStatus, MaterialStatus.PENDING_PROCESS.name())
+                .set(MaterialDO::getStatus, materialDO.getStatus())
+                .set(MaterialDO::getUploadedFileUrl, materialDO.getUploadedFileUrl())) == 1;
     }
 }

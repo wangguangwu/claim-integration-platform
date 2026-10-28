@@ -34,7 +34,6 @@ public class ApplicationIntakeRecordFactory {
     private static final String ACTION_REUSED = "REUSED";
     private static final String EVENT_CREATED = "APPLICATION_CREATED";
     private static final String EVENT_REAPPLIED = "APPLICATION_REAPPLIED";
-    private static final String OUTBOX_PENDING = "PENDING";
     private static final int EVENT_VERSION = 1;
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
@@ -66,20 +65,22 @@ public class ApplicationIntakeRecordFactory {
      * 构建首次签收事件，载荷不包含人员敏感信息。
      *
      * @param application Application 聚合
+     * @param traceId     链路标识，用于组装消息信封
      * @return 待投递事件
      */
-    public OutboxEvent applicationCreatedEvent(Application application) {
-        return newOutboxEvent(application, EVENT_CREATED);
+    public OutboxEvent applicationCreatedEvent(Application application, String traceId) {
+        return newOutboxEvent(application, EVENT_CREATED, traceId);
     }
 
     /**
      * 构建重新申请事件，载荷不包含人员敏感信息。
      *
      * @param application Application 聚合
+     * @param traceId     链路标识，用于组装消息信封
      * @return 待投递事件
      */
-    public OutboxEvent applicationReappliedEvent(Application application) {
-        return newOutboxEvent(application, EVENT_REAPPLIED);
+    public OutboxEvent applicationReappliedEvent(Application application, String traceId) {
+        return newOutboxEvent(application, EVENT_REAPPLIED, traceId);
     }
 
     /**
@@ -128,14 +129,15 @@ public class ApplicationIntakeRecordFactory {
         }
     }
 
-    private OutboxEvent newOutboxEvent(Application application, String eventType) {
+    private OutboxEvent newOutboxEvent(Application application, String eventType, String traceId) {
         String payload = serialize(Map.of(
                 "applicationNo", application.getApplicationNo(),
                 "tenantCode", application.getTenantCode(),
                 "eventType", eventType,
-                "applicationAttempt", application.getApplicationAttempt()));
-        return new OutboxEvent(UUID.randomUUID().toString(), eventType, EVENT_VERSION, application.getApplicationNo(),
-                application.getTenantCode(), payload, OUTBOX_PENDING);
+                "applicationAttempt", application.getApplicationAttempt(),
+                "traceId", traceId));
+        return OutboxEvent.pending(UUID.randomUUID().toString(), eventType, EVENT_VERSION,
+                application.getApplicationNo(), application.getTenantCode(), payload);
     }
 
     private LocalDateTime now() {

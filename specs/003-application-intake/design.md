@@ -96,7 +96,7 @@ sequenceDiagram
 | `Application` | Application 聚合根，维护申请尝试次数、人员信息和状态重置规则 |
 | `ApplicationStatus` | `PENDING_ACCEPT`、`ACCEPTED`、`ACCEPT_FAILED`、`UNDERWRITING`、`WAIT_AUDIT`、`ISSUE`、`COMPLETED`、`REVOKED` 状态定义 |
 | `Material` | 材料批次、初始文件地址、上传后文件地址、处理状态和逻辑删除规则 |
-| `ApplicationDO`、`MaterialDO` | 与 `t_application`、`t_material` 表一一对应的基础设施数据对象 |
+| `ApplicationDO`、`MaterialDO` | 与 `t_claim_application`、`t_claim_application_material` 表一一对应的基础设施数据对象 |
 | `ApplicationDataMapper`、`MaterialDataMapper` | MapStruct 映射标准命令、领域模型和 DO，禁止在 Mapper 中编写业务规则 |
 | `ApplicationDOMapper`、`MaterialDOMapper` | 只继承 `BaseMapper`，查询与更新条件由 Repository 使用 Wrapper 构造，不编写手写 SQL |
 | `MybatisPlusConfiguration` | 注册分页插件，为取最大申请编号等单条查询提供分页改写 |
@@ -164,9 +164,9 @@ sequenceDiagram
 | `status` | 领域常量 | 本次固定 `PENDING_PROCESS` |
 | `deleted` | 领域规则 | 重新申请时旧材料置为 `true` |
 
-`t_application`、`t_material`、`t_interaction_log`、`t_outbox_event` 的表结构复用 `002` 初始化 SQL，本 Spec 不新增数据库表。`t_interaction_log.application_no` 保持 `NOT NULL`：只有签收受理成功后才会产生平台申请编号和交互轨迹，签收受理前的失败只记录应用日志，不写交互表。新增 DO 必须严格匹配既有列、生成列和唯一约束。
+`t_claim_application`、`t_claim_application_material`、`t_claim_interaction_log`、`t_claim_outbox_event` 的表结构复用 `002` 初始化 SQL，本 Spec 不新增数据库表。`t_claim_interaction_log.application_no` 保持 `NOT NULL`：只有签收受理成功后才会产生平台申请编号和交互轨迹，签收受理前的失败只记录应用日志，不写交互表。新增 DO 必须严格匹配既有列、生成列和唯一约束。
 
-Application 编号默认使用 Redis Key `claim:application:number:{yyyyMMdd}` 的原子计数器。Key 不存在时，在 Redisson 编号初始化锁内查询 `t_application` 表当天最大 `application_no` 并将尾号写入计数器，再递增取得新号。Redis 完全不可用时直接查询同一最大值并加一，不写 Redis；用例层必须依赖 `uk_application_no` 的唯一冲突重试，以处理并发降级时出现的相同候选编号。
+Application 编号默认使用 Redis Key `claim:application:number:{yyyyMMdd}` 的原子计数器。Key 不存在时，在 Redisson 编号初始化锁内查询 `t_claim_application` 表当天最大 `application_no` 并将尾号写入计数器，再递增取得新号。Redis 完全不可用时直接查询同一最大值并加一，不写 Redis；用例层必须依赖 `uk_application_no` 的唯一冲突重试，以处理并发降级时出现的相同候选编号。
 
 持久化层只使用 MyBatis-Plus：`Mapper` 继承 `BaseMapper`，条件查询使用 `LambdaQueryWrapper`、`lambdaUpdate`，取最大编号使用 `selectPage` 分页；禁止在 Mapper 上编写 `@Select`、`@Update` 手写 SQL。
 

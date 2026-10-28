@@ -71,4 +71,57 @@ public class Application {
         this.accidentPersonJson = accidentPersonJson;
         this.payeeJson = payeeJson;
     }
+
+    /**
+     * 材料处理成功，本次申请受理通过。
+     */
+    public void accept() {
+        transitionTo(ApplicationStatus.PENDING_ACCEPT, ApplicationStatus.ACCEPTED);
+    }
+
+    /**
+     * 材料处理失败，本次申请尝试结束，等待租户重新申请。
+     */
+    public void failAccept() {
+        transitionTo(ApplicationStatus.PENDING_ACCEPT, ApplicationStatus.ACCEPT_FAILED);
+    }
+
+    /**
+     * 存在有效保单，进入等待审核签收。
+     */
+    public void waitAudit() {
+        transitionTo(ApplicationStatus.ACCEPTED, ApplicationStatus.WAIT_AUDIT);
+    }
+
+    /**
+     * 不存在有效保单，进入自动承保处理中。
+     */
+    public void startUnderwriting() {
+        transitionTo(ApplicationStatus.ACCEPTED, ApplicationStatus.UNDERWRITING);
+    }
+
+    /**
+     * 自动承保完成，进入等待审核签收。
+     */
+    public void finishUnderwriting() {
+        transitionTo(ApplicationStatus.UNDERWRITING, ApplicationStatus.WAIT_AUDIT);
+    }
+
+    /**
+     * 判断当前状态是否为期望状态，供用例在调用外部系统前做前置校验。
+     *
+     * @param expectedStatus 期望状态
+     * @return 状态一致时为 true
+     */
+    public boolean isInStatus(ApplicationStatus expectedStatus) {
+        return status == expectedStatus;
+    }
+
+    private void transitionTo(ApplicationStatus expectedStatus, ApplicationStatus targetStatus) {
+        if (status != expectedStatus) {
+            throw new IllegalStateException("申请状态不允许迁移，applicationNo=" + applicationNo
+                    + "，期望状态=" + expectedStatus + "，实际状态=" + status);
+        }
+        status = targetStatus;
+    }
 }

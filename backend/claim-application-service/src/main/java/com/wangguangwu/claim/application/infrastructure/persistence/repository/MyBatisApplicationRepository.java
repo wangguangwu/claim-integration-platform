@@ -8,6 +8,8 @@ import com.wangguangwu.claim.application.domain.application.ApplicationStatus;
 import com.wangguangwu.claim.application.infrastructure.persistence.convert.ApplicationDataMapper;
 import com.wangguangwu.claim.application.infrastructure.persistence.dataobject.ApplicationDO;
 import com.wangguangwu.claim.application.infrastructure.persistence.mapper.ApplicationDOMapper;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -65,6 +67,40 @@ public class MyBatisApplicationRepository implements ApplicationRepository {
     }
 
     /**
+     * 按平台申请编号查询 Application，编号全局唯一。
+     *
+     * @param applicationNo 平台申请编号
+     * @return Application 聚合
+     */
+    @Override
+    public Optional<Application> findByApplicationNo(String applicationNo) {
+        return Optional.ofNullable(applicationMapper.selectOne(Wrappers.lambdaQuery(ApplicationDO.class)
+                        .eq(ApplicationDO::getApplicationNo, applicationNo)))
+                .map(applicationDataMapper::toDomain);
+    }
+
+    /**
+     * 查询指定状态且在给定时间之前未再更新的申请，按更新时间升序返回。
+     *
+     * @param status        目标状态
+     * @param updatedBefore 更新时间上限
+     * @param limit         最大条数
+     * @return 待补偿申请
+     */
+    @Override
+    public List<Application> findByStatusUpdatedBefore(ApplicationStatus status, LocalDateTime updatedBefore,
+                                                       int limit) {
+        Page<ApplicationDO> page = new Page<>(1L, limit, false);
+        return applicationMapper.selectPage(page, Wrappers.lambdaQuery(ApplicationDO.class)
+                        .eq(ApplicationDO::getStatus, status.name())
+                        .le(ApplicationDO::getUpdatedAt, updatedBefore)
+                        .orderByAsc(ApplicationDO::getUpdatedAt))
+                .getRecords().stream()
+                .map(applicationDataMapper::toDomain)
+                .toList();
+    }
+
+    /**
      * 按编号前缀倒序取第一条，得到当天已生成的最大申请编号。
      *
      * @param numberPrefix Application 编号前缀
@@ -112,5 +148,21 @@ public class MyBatisApplicationRepository implements ApplicationRepository {
                 .set(ApplicationDO::getPrimaryInsuredJson, applicationDO.getPrimaryInsuredJson())
                 .set(ApplicationDO::getAccidentPersonJson, applicationDO.getAccidentPersonJson())
                 .set(ApplicationDO::getPayeeJson, applicationDO.getPayeeJson())) == 1;
+    }
+
+    /**
+     * 以期望状态和申请尝试次数为条件推进状态，避免并发的迟到处理覆盖新尝试。
+     *
+     * @param application    已变更的 Application 聚合
+     * @param expectedStatus 更新前的状态
+     * @return 更新成功时为 true
+     */
+    @Override
+    public boolean updateStatus(Application application, ApplicationStatus expectedStatus) {
+        return applicationMapper.update(null, Wrappers.lambdaUpdate(ApplicationDO.class)
+                .eq(ApplicationDO::getApplicationNo, application.getApplicationNo())
+                .eq(ApplicationDO::getStatus, expectedStatus.name())
+                .eq(ApplicationDO::getApplicationAttempt, application.getApplicationAttempt())
+                .set(ApplicationDO::getStatus, application.getStatus().name())) == 1;
     }
 }

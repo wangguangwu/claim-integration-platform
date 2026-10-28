@@ -38,7 +38,7 @@ docker exec claim-mysql mysqladmin ping -h 127.0.0.1 -uclaim_app -pclaim_app
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SHOW TABLES;"
 ```
 
-预期存在 `t_application`、`t_material`、`t_issue`、`t_case_relation`、`t_interaction_log`、`t_outbox_event`、`t_consumed_event` 七张表。
+预期存在 `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event`、`t_claim_consumed_event` 七张表。
 
 ## Redis
 

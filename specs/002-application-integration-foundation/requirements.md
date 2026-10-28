@@ -21,7 +21,7 @@
 
 ### 数据基线
 
-- Application 域基础表固定为 `t_application`、`t_material`、`t_issue`、`t_case_relation`、`t_interaction_log`、`t_outbox_event` 和 `t_consumed_event`，表名统一使用 `t_` 前缀。
+- Application 域基础表固定为 `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event` 和 `t_claim_consumed_event`，表名统一使用 `t_claim_` 前缀。强归属单个申请的实体使用 `t_claim_application_*` 命名；可能跨申请、生命周期长于单次申请的关系表、操作日志与基础设施表使用域级 `t_claim_*` 命名。
 - Application 必须以 `(tenant_code, external_application_no)` 唯一识别同一租户的外部申请；`application_no` 是平台申请编号且全局唯一。
 - 同一 Application 可以保留多批材料、多个历史问题件和多个 Case 关联，但同一时刻最多存在一条未关闭 Issue。
 - Case 关联必须以 `(tenant_code, application_no, case_no)` 去重。

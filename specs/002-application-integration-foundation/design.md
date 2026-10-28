@@ -149,7 +149,7 @@ FLUSH PRIVILEGES;
 ```sql
 USE claim_application_db;
 
-CREATE TABLE IF NOT EXISTS t_application (
+CREATE TABLE IF NOT EXISTS t_claim_application (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
     application_no VARCHAR(64) NOT NULL,
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS t_application (
     KEY idx_application_status_updated_at (status, updated_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_material (
+CREATE TABLE IF NOT EXISTS t_claim_application_material (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     batch_no VARCHAR(64) NOT NULL,
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS t_material (
     KEY idx_material_application_deleted (application_no, deleted)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_issue (
+CREATE TABLE IF NOT EXISTS t_claim_application_issue (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     issue_no VARCHAR(64) NOT NULL,
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS t_issue (
     KEY idx_issue_application_created_at (application_no, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_case_relation (
+CREATE TABLE IF NOT EXISTS t_claim_case_relation (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
     application_no VARCHAR(64) NOT NULL,
@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS t_case_relation (
     KEY idx_case_relation_application (application_no)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_interaction_log (
+CREATE TABLE IF NOT EXISTS t_claim_interaction_log (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_no VARCHAR(64) NOT NULL,
     interaction_no VARCHAR(64) NOT NULL,
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS t_interaction_log (
     KEY idx_interaction_request_id (request_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_outbox_event (
+CREATE TABLE IF NOT EXISTS t_claim_outbox_event (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS t_outbox_event (
     KEY idx_outbox_application_created_at (application_no, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS t_consumed_event (
+CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     consumer_group VARCHAR(128) NOT NULL,
     event_id VARCHAR(64) NOT NULL,
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS t_consumed_event (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 ```
 
-`t_material.original_file_url` 保存租户首次提交的文件地址，`t_material.uploaded_file_url` 保存文件系统上传、转存后的地址。`t_issue.reason` 和 `t_issue.auditor` 分别保存问题原因和下发问题件的审核人。`t_interaction_log` 使用一行记录一个已发生的事件：`interaction_no` 是同一行为组的关联键，`interaction_type` 表示行为类型，例如 `IMAGE_UPLOAD`，`action` 表示阶段，例如 `STARTED`、`COMPLETED`、`FAILED`，`occurred_at` 表示该事件的实际发生时间。一次影像上传的开始与完成应写入两行日志，使用同一 `interaction_no`，按 `occurred_at` 排序后还原完整行为。`t_issue.open_application_no` 使用生成列和唯一索引表达“一个 Application 同时只允许一条未关闭 Issue”；关闭 Issue 后该列为 `NULL`，允许保留多条历史关闭记录。
+`t_claim_application_material.original_file_url` 保存租户首次提交的文件地址，`t_claim_application_material.uploaded_file_url` 保存文件系统上传、转存后的地址。`t_claim_application_issue.reason` 和 `t_claim_application_issue.auditor` 分别保存问题原因和下发问题件的审核人。`t_claim_interaction_log` 使用一行记录一个已发生的事件：`interaction_no` 是同一行为组的关联键，`interaction_type` 表示行为类型，例如 `IMAGE_UPLOAD`，`action` 表示阶段，例如 `STARTED`、`COMPLETED`、`FAILED`，`occurred_at` 表示该事件的实际发生时间。一次影像上传的开始与完成应写入两行日志，使用同一 `interaction_no`，按 `occurred_at` 排序后还原完整行为。`t_claim_application_issue.open_application_no` 使用生成列和唯一索引表达“一个 Application 同时只允许一条未关闭 Issue”；关闭 Issue 后该列为 `NULL`，允许保留多条历史关闭记录。
 
 ## MQ 契约设计
 
@@ -348,8 +348,8 @@ CREATE TABLE IF NOT EXISTS t_consumed_event (
 
 ## 事务、幂等与异常处理
 
-- `t_application`、`t_material`、`t_issue`、`t_case_relation`、`t_interaction_log`、`t_outbox_event` 的实际写入事务由后续用例 Spec 定义；本 Spec 通过唯一约束提供并发安全基础。
-- 任何事件处理都以 `eventId` 和消费者组在 `t_consumed_event` 中去重；插入冲突代表已成功处理或正在处理，后续消费逻辑不得重复推进状态。
+- `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event` 的实际写入事务由后续用例 Spec 定义；本 Spec 通过唯一约束提供并发安全基础。
+- 任何事件处理都以 `eventId` 和消费者组在 `t_claim_consumed_event` 中去重；插入冲突代表已成功处理或正在处理，后续消费逻辑不得重复推进状态。
 - 回调以 `X-Request-Id` 结合 `applicationNo`、`issueNo` 或 `caseNo` 进行幂等；传输请求标识不替代业务唯一约束。InteractionLog 的开始、完成、失败分别作为独立事件落库，查询同一 `interaction_no` 可得到完整行为链路。
 - Topic 初始化或数据库初始化失败必须直接失败并输出上下文；不得吞异常或伪造初始化成功。
 - DDL 禁止创建外键，避免 Application 服务异步处理、逻辑删除和跨表演进被物理约束阻塞；关联完整性由领域规则和唯一约束保证。

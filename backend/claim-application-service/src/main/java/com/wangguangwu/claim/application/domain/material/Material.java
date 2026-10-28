@@ -41,4 +41,29 @@ public class Material {
         material.status = MaterialStatus.PENDING_PROCESS;
         return material;
     }
+
+    /**
+     * 记录文件上传成功结果。
+     *
+     * @param uploadedFileUrl 上传后文件地址
+     */
+    public void markProcessed(String uploadedFileUrl) {
+        if (status != MaterialStatus.PENDING_PROCESS) {
+            throw new IllegalStateException("仅待处理材料允许写入处理结果，applicationNo=" + applicationNo
+                    + "，materialType=" + materialType);
+        }
+        this.uploadedFileUrl = uploadedFileUrl;
+        this.status = MaterialStatus.PROCESSED;
+    }
+
+    /**
+     * 记录文件处理失败结果，材料保留原始地址供追溯。
+     */
+    public void markFailed() {
+        if (status != MaterialStatus.PENDING_PROCESS) {
+            throw new IllegalStateException("仅待处理材料允许写入处理结果，applicationNo=" + applicationNo
+                    + "，materialType=" + materialType);
+        }
+        this.status = MaterialStatus.FAILED;
+    }
 }

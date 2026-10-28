@@ -9,14 +9,14 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * 待投递事件数据对象，对应 {@code t_outbox_event} 表。
+ * 待投递事件数据对象，对应 {@code t_claim_outbox_event} 表。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
 @Setter
-@TableName("t_outbox_event")
+@TableName("t_claim_outbox_event")
 public class OutboxEventDO {
 
     @TableId(type = IdType.AUTO)
@@ -48,4 +48,10 @@ public class OutboxEventDO {
 
     @TableField("published_at")
     private LocalDateTime publishedAt;
+
+    @TableField("created_at")
+    private LocalDateTime createdAt;
+
+    @TableField("updated_at")
+    private LocalDateTime updatedAt;
 }

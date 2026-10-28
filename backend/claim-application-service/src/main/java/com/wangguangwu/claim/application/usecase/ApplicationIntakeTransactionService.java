@@ -99,7 +99,7 @@ public class ApplicationIntakeTransactionService {
         String interactionNo = newInteractionNo();
         recordStarted(candidateApplicationNo, interactionNo, requestId, traceId);
         materialRepository.insertAll(recordFactory.createMaterials(candidateApplicationNo, command.materials()));
-        outboxEventRepository.insert(recordFactory.applicationCreatedEvent(application));
+        outboxEventRepository.insert(recordFactory.applicationCreatedEvent(application, traceId));
         recordFinished(candidateApplicationNo, interactionNo, requestId, traceId, true);
         return new ApplicationIntakeResult(candidateApplicationNo, ApplicationIntakeDisposition.CREATED);
     }
@@ -136,7 +136,7 @@ public class ApplicationIntakeTransactionService {
 
         materialRepository.softDeleteByApplicationNo(applicationNo);
         materialRepository.insertAll(recordFactory.createMaterials(applicationNo, command.materials()));
-        outboxEventRepository.insert(recordFactory.applicationReappliedEvent(application));
+        outboxEventRepository.insert(recordFactory.applicationReappliedEvent(application, traceId));
         recordFinished(applicationNo, interactionNo, requestId, traceId, true);
         return new ApplicationIntakeResult(applicationNo, ApplicationIntakeDisposition.REAPPLIED);
     }
