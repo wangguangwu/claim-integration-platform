@@ -90,7 +90,7 @@ flowchart TB
         INTERFACES["interfaces<br/>统一 Endpoint、审核回调入口、响应转换"]
         USECASE["usecase<br/>申请受理、材料处理、承保确认、审核交付、问题件、撤销编排"]
         DOMAIN["domain<br/>Application、Material、Issue、CaseRelation、领域端口"]
-        INFRASTRUCTURE["infrastructure<br/>TenantAdapter、持久化、FileStorage、承保/审核适配、Outbox、MQ"]
+        INFRASTRUCTURE["infrastructure<br/>TenantApplicationPipeline、持久化、FileStorage、承保/审核适配、Outbox、MQ"]
 
         INTERFACES --> USECASE
         USECASE --> DOMAIN
@@ -199,7 +199,7 @@ erDiagram
 ### 人员与材料数据
 
 - Application 使用 `applicantJson`、`primaryInsuredJson`、`accidentPersonJson`、`payeeJson` 四个 JSON 字段分别保存申请人、主被保险人、出险人和领款人，避免角色数据相互覆盖。
-- 每个 JSON 字段必须有明确的版本和必填字段约束；租户适配器负责外部字段映射，领域模型只接收标准化数据。
+- 每个 JSON 字段必须有明确的版本和必填字段约束；租户转换器负责外部字段映射，领域模型只接收标准化数据。
 - 证件号、银行卡号等敏感字段不得写入 INFO、WARN 和 ERROR 日志；日志仅记录脱敏值及 `applicationNo`、租户和 TraceId。
 - 首次提交和每次补材分别创建新的 `batchNo`。材料软删除只用于重新申请覆盖旧材料，不物理删除审计数据。
 
@@ -268,13 +268,13 @@ sequenceDiagram
     autonumber
     participant T as 租户系统
     participant G as Gateway
-    participant A as TenantAdapter
+    participant A as TenantPipeline
     participant U as ApplicationUseCase
     participant DB as MySQL
 
     T->>G: 提交理赔申请
     G->>A: 转发租户请求
-    A->>A: 验签、解密、解析、校验、字段映射
+    A->>A: 验签、解密、解析、校验、转换
     A->>U: 标准申请命令
     U->>DB: 按 tenantCode 与 externalApplicationNo 查询
 

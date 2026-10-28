@@ -60,7 +60,7 @@
 
 - 状态：已完成
 - 对应 design：§8
-- 产物：`docs/system-architecture.md` 的 spec 目录结构与 `cases` 包名
+- 产物：`docs/architecture/system-architecture.md` 的 spec 目录结构与 `cases` 包名
 - 完成条件：文档与代码目录、包名一致，无残留旧编号或旧包名
 
 ## 验证记录

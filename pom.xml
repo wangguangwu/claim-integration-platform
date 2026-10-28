@@ -35,6 +35,11 @@
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <spring-ai.version>1.1.8</spring-ai.version>
         <mybatis-plus.version>3.5.18</mybatis-plus.version>
+        <!-- 统一 Application 服务的领域对象与数据库对象映射版本。 -->
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <!-- Redisson 提供 Redis 原子计数、旁路缓存与 watchdog 分布式锁。 -->
+        <redisson.version>4.8.0</redisson.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <xxl-job.version>3.5.0</xxl-job.version>
         <claim-foundation.version>${project.version}</claim-foundation.version>
     </properties>
@@ -71,6 +76,30 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-jsqlparser</artifactId>
                 <version>${mybatis-plus.version}</version>
+            </dependency>
+            <dependency>
+                <!-- 由各服务按需引入，避免在领域层耦合 MapStruct。 -->
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <!-- 注解处理器只在编译期生成映射实现，不进入运行时产物。 -->
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <!-- 为 Spring Boot 应用自动装配 RedissonClient。 -->
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+            <dependency>
+                <!-- 保证 Lombok 生成的访问器在 MapStruct 解析前可见。 -->
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-mapstruct-binding</artifactId>
+                <version>${lombok-mapstruct-binding.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.xuxueli</groupId>
