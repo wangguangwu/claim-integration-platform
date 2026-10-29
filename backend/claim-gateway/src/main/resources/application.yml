@@ -12,16 +12,15 @@ spring:
         webflux:
           routes:
             - id: claim-application-service
-              # 本地默认直连应用服务；部署环境通过变量切换为注册中心负载均衡地址。
-              uri: ${CLAIM_APPLICATION_SERVICE_URI:http://127.0.0.1:8081}
+              uri: ${CLAIM_APPLICATION_SERVICE_URI:${claim.gateway.route.application-service}}
               predicates:
                 - Path=/api/application/**
             - id: claim-case-service
-              uri: lb://claim-case-service
+              uri: ${CLAIM_CASE_SERVICE_URI:${claim.gateway.route.case-service}}
               predicates:
                 - Path=/api/case/**
             - id: claim-ai-service
-              uri: lb://claim-ai-service
+              uri: ${CLAIM_AI_SERVICE_URI:${claim.gateway.route.ai-service}}
               predicates:
                 - Path=/api/diagnosis/**
 
@@ -30,6 +29,15 @@ management:
     web:
       exposure:
         include: health,info
+
+# 路由目标地址的取值优先级：环境变量 > 当前 profile 的默认值。
+# 默认按注册中心负载均衡解析，供接入 Nacos 的部署环境直接使用。
+claim:
+  gateway:
+    route:
+      application-service: lb://claim-application-service
+      case-service: lb://claim-case-service
+      ai-service: lb://claim-ai-service
 
 ---
 spring:
@@ -46,3 +54,11 @@ spring:
           enabled: false
     sentinel:
       enabled: false
+
+# 本地未启动注册中心，负载均衡地址无法解析，改为直连本机服务端口。
+claim:
+  gateway:
+    route:
+      application-service: http://127.0.0.1:8081
+      case-service: http://127.0.0.1:8082
+      ai-service: http://127.0.0.1:8083

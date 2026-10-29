@@ -19,7 +19,7 @@
 
 1. 启动本地服务：`./scripts/docker-start.sh`，并按 [本地基础服务检查说明](../environment/local-infrastructure-health-check.md) 确认依赖健康。
 2. 使用 JDK 21 启动 `claim-application-service`，确认 `http://127.0.0.1:8081/actuator/health` 返回 `UP`。
-3. 启动 `claim-gateway`，确认 `http://127.0.0.1:8080/actuator/health` 返回 `UP`。local profile 默认将理赔申请路由到 `http://127.0.0.1:8081`；非本地环境必须显式设置 `CLAIM_APPLICATION_SERVICE_URI`。
+3. 启动 `claim-gateway`，确认 `http://127.0.0.1:8080/actuator/health` 返回 `UP`。三条路由的目标地址统一按「环境变量 `CLAIM_*_SERVICE_URI` > 当前 profile 默认值」取值：local profile 直连本机服务端口，其他 profile 默认 `lb://` 走注册中心负载均衡，需要指向特定实例时用环境变量覆盖。
 4. 安装 Apache JMeter 5.6+：`brew install jmeter`，再执行 `jmeter --version` 验证。
 
 ## 执行压测
