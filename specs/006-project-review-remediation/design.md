@@ -90,7 +90,7 @@
 
 ## 十、可观测性与验证机制
 
-- 新增 `logback-spring.xml`，日志格式含 `%X{traceId} %X{applicationNo}`；入站 filter 与调度、消费入口负责 MDC set/clear；Outbox 投递把 traceId 写入消息头，消费端取出续链。
+- 新增 `logback-spring.xml`，日志格式含 `%X{traceId} %X{claimApplicationNo}`（键名取 007 收敛后的标识符）；入站 filter 与调度、消费入口负责 MDC set/clear；Outbox 投递把 traceId 写入消息头，消费端取出续链。
 - 实测修正：应用日志的默认格式里已经带出一段 `traceId-spanId`（micrometer tracing 提供），但它与网关写入的 `X-Trace-Id` 是两个不同标识——同一次申请在网关侧与业务侧日志里对不上。本任务要求把网关的 `X-Trace-Id` 作为唯一链路标识来源：入站用它初始化 trace 上下文，缺失才自建，出站与 MQ 头继续透传同一个值。
 - `management.endpoints.web.exposure.include` 增加 `metrics,prometheus`。
 - `scripts/smoke/golden-path.sh`：把文档中的手工 curl 固化，端口统一 `${GATEWAY_PORT:-8080}`，补齐 `X-Protocol-Version`，逐步用退出码断言（首次签收、同号幂等、未支持租户、历史数据还原、材料失败→重新申请、异步抵达 `WAIT_AUDIT`、DB 行数校验）。
@@ -99,7 +99,7 @@
 
 ## 对现有功能的影响
 
-- 对外 HTTP 路径、请求与响应结构、状态机语义、持久化 JSON 与既有列不变；历史数据仍可读。
+- 对外 HTTP 路径、请求与响应结构、状态机语义、持久化 JSON 与既有列不变；历史数据仍可读。本条只约束 006 自身轮次；业务对象字段名与数据库列名的改名由 [007 命名全链路收敛](../007-claim-application-naming/design.md) 承接，并在 006 第 3 轮之前执行。
 - MQ 主题与消费组名称不变，载荷字段名不变（改为类型化后序列化结果一致），历史在途消息可被新代码消费。
 - 错误响应中，此前返回 500 的领域不变式失败与重试超限改为业务码与 4xx/503，属于对外语义修正，需在集成契约文档标注。
 - 删除模块后，指向案件与诊断的两条网关路由消失；此前恒失败，不影响可用能力。
