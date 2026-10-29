@@ -64,3 +64,7 @@
 - 对应 design：§对现有功能的影响
 - 产物：构建与本地验证记录
 - 完成条件：已通过 JDK 21 下 `mvn -B -pl backend/claim-application-service -am test`（86 个测试）与 `mvn -B -q -DskipTests package`；本地验证签收后事件自动投递、材料处理、有效保单直达 `WAIT_AUDIT`、无保单进入 `UNDERWRITING` 并由模拟承保通知推进到 `WAIT_AUDIT`、关闭通知后补偿以 `compensation-<claimApplicationNo>` 请求标识推进、MQ 停机期间签收返回成功且就绪探针保持 UP、Broker 恢复后 Outbox 事件补齐投递、重复回调返回 `REUSED` 且不产生重复审核交付事件
+
+## 后续变更
+
+- 2026-10-29 [009 签收后异步链路](../009-post-intake-async-pipeline/design.md) 交付：本 Spec 的 `support/mock` 假件与四个 `Feign*` 外部适配器已删除，文件系统、承保系统与审核系统改为 `infrastructure/<域>/external` 的进程内本地实现；材料失败与承保超时的验证方式由 mock HTTP 接口改为 `claim.integration.local.*` 配置开关，验证步骤见 [签收后异步链路本地验证说明](../../docs/testing/application-async-material-underwriting.md)。本 Spec 的状态流转、交互轨迹与幂等口径不变。

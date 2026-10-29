@@ -14,7 +14,8 @@ public enum InteractionType {
     CLAIM_APPLICATION_INTAKE(InteractionDirection.INBOUND, "CLAIM_APPLICATION_SERVICE"),
     MATERIAL_PROCESS(InteractionDirection.INBOUND, "MATERIAL_PROCESSOR"),
     UNDERWRITING(InteractionDirection.OUTBOUND, "UNDERWRITING_SYSTEM"),
-    UNDERWRITING_CALLBACK(InteractionDirection.INBOUND, "UNDERWRITING_SYSTEM");
+    UNDERWRITING_CALLBACK(InteractionDirection.INBOUND, "UNDERWRITING_SYSTEM"),
+    AUDIT_DELIVERY(InteractionDirection.OUTBOUND, "AUDIT_SYSTEM");
 
     private final InteractionDirection direction;
     private final String targetSystem;

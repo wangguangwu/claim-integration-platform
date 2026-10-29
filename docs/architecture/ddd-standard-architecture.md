@@ -46,13 +46,13 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | `domain` | `ClaimApplicationStatus`、`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
 | 枚举自带的业务映射 | 枚举字段与方法 | `domain` | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
 | 仓储端口 | `*Repository` | `domain/<聚合>/port`（该域只有一个端口时直接放聚合包） | `ClaimApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` |
-| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`（16 个端口，其中 13 个在 `port` 子包） |
+| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ServiceAuditSystemPort`（17 个端口，其中 13 个在 `port` 子包） |
 | 配置适配器 | `*Properties`（实现 `domain` 的 `*Policy` 端口） | `infrastructure/<域>/config` | `OutboxRelayProperties`、`ClaimApplicationCompensationProperties` |
 | 仓储实现 | `MyBatis*Repository` | `infrastructure/<域>/persistence` | `infrastructure/intake/persistence/MyBatisClaimApplicationRepository` |
 | 持久化对象 | `*DO` | `infrastructure/<域>/persistence` | `ClaimApplicationDO`、`MaterialDO`、`OutboxEventDO` |
 | ORM 映射 | `*DOMapper` | `infrastructure/<域>/persistence` | `ClaimApplicationDOMapper` |
 | DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
-| 外部系统适配器 | `Feign*` + `*FeignClient` | `infrastructure/<域>/external` | `FeignAutoUnderwritingRequester`、`UnderwritingFeignClient` |
+| 外部系统实现 | 进程内本地实现用 `Local*`；接入真实系统时另加适配器 | `infrastructure/<域>/external` | `LocalMaterialFileProcessor`、`LocalValidPolicyQuery`、`LocalAutoUnderwritingRequester`、`LocalUnderwritingResultQuery`、`LocalAuditSystemClient` |
 | 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging}` | `RedisClaimApplicationExistenceQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher` |
 | 业务异常与错误码 | `*Exception`、`*ErrorCode`，常见错误用枚举命名的静态工厂 | `domain/<聚合>/exception`（跨域的进 `shared/contract`） | `ClaimApplicationIntakeException`、`ClaimApplicationIntakeException.invalid(...)`、`ClaimApplicationAsyncException` |
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
@@ -64,26 +64,27 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 ## 4. 本项目的落位
 
-根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 137，目录 76 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
+根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 134，目录 79 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
 
 | 域键 | `interfaces` | `usecase` | `domain` | `infrastructure` |
 |---|---|---|---|---|
-| 申请签收（`intake` / 聚合 `claim`） | 24 | 7 | 15 | 8 |
-| 材料处理（`material`） | 1 | 4 | 7 | 7 |
-| 承保确认（`underwriting`） | 3 | 6 | 5 | 4 |
-| 异步集成（`integration`） | 2 | 3 | 14 | 12 |
+| 申请签收（`intake` / 聚合 `claim`） | 20 | 7 | 15 | 8 |
+| 材料处理（`material`） | 1 | 4 | 7 | 6 |
+| 承保确认（`underwriting`） | 3 | 6 | 4 | 3 |
+| 审核交付（`audit`） | 1 | 4 | 2 | 1 |
+| 异步集成（`integration`） | 2 | 4 | 14 | 13 |
 | `shared` | 1 | — | — | 1（另有 `contract` 4） |
-| `support` | 2 | — | — | 4（另有 `config` 2） |
+| `support` | — | — | — | 2（`support/config`） |
 | 根包 | — | — | — | 1（`ClaimApplicationServiceApplication`） |
 
-- `interfaces/intake` 的 24 个类里有 18 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
+- `interfaces/intake` 的 20 个类里有 18 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务异常，共 12 个文件。
 - 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `domain/<聚合>/port`（理赔申请另有 `domain/claim/person` 放人员基类与四个角色）、`interfaces/intake/tenantprotocol/core/{pipeline,stage}`、`tenants/{tenant_a,tenant_b}`、`interfaces/intake/web/render`。一个域只剩一个端口时端口留在聚合包（现为 `interaction`、`consumption`、`compensation`），不建只挂一个子目录的中转层。
 - `integration` 是平台异步内核：Outbox 投递、消费去重、交互轨迹装配、滞留补偿。业务域允许调用它的记录装配工厂（`usecase/integration/record`），允许它的补偿重放业务用例，这两条是显式写进 005 的例外，不是默认规则。记录装配工厂只做载荷序列化与标识生成，交互事件本身由 `domain/integration/interaction/InteractionLog.of(...)` 装配。
 - 异步链路的批量、退避与滞留阈值由 `domain` 的 `OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy` 声明，`infrastructure/integration/config` 的 `*Properties` 绑定配置实现；调度间隔由 `@Scheduled` 占位符读取，不进入策略端口。
 - 两个 `@RestControllerAdvice` 都限定 `basePackages` 到各自的 `interfaces/<域>/web`：无作用域限制的兜底 advice 会接管其他入站通道的异常，与限定作用域的 advice 优先级不确定。
 - `shared` 不含用例：只含跨域契约、统一响应与摘要工具，因此没有 `usecase` 子包。
-- `support` 不属业务域，放 Spring 配置和受 `claim.mock.enabled` 控制的本地 Mock；内部仍按层名分子包（`support/mock/interfaces/web`、`support/mock/infrastructure`），避免一棵树里混用 `adapter` 与 `interfaces` 两个词。
+- `support` 不属业务域，只放 Spring 配置（`support/config`）；假件不再留在生产包，外部系统能力由 `infrastructure/<域>/external` 的进程内本地实现提供。
 
 ## 5. 判定与自检
 

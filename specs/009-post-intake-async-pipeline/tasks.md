@@ -34,7 +34,7 @@
 
 | 编号 | 任务 | 产物 | 完成条件 |
 |---|---|---|---|
-| T11 | 集成契约 | `docs/integration/claim-application-integration-contract.md` | MQ 表补死信主题与重投口径；外部系统一节改为"端口 + 本地实现" |
+| T11 | 集成契约 | `docs/integration/claim-application-integration-contract.md`、`docs/architecture/ddd-standard-architecture.md`、`docs/architecture/claim-application-architecture.md` | MQ 表补死信主题与重投口径；外部系统一节改为"端口 + 本地实现"；架构文档同步本地实现与 `audit` 域 |
 | T12 | 联调文档 | `docs/testing/application-async-material-underwriting.md` | 依赖 mock HTTP 入口的步骤改写为配置开关 + 重启；断言改为查轨迹与状态 |
 | T13 | Spec 回链 | `specs/004-.../tasks.md`、`specs/006-.../tasks.md` | 004 增加"后续变更"说明；006 P2-2 标记由 009 交付 |
 
@@ -50,3 +50,20 @@
 
 - 本 Spec 不写单元测试，验证以运行栈黄金路径与失败演练为准。
 - 任务顺序即执行顺序，前置任务未完成不进入下一批。
+
+## 运行栈验证记录（2026-10-29）
+
+环境：MySQL 3306、Redis 6379、RocketMQ 9876、应用 8081、网关 8080，JDK 21，报文经网关提交。
+
+| 场景 | 结果 |
+|---|---|
+| 全反应堆构建 | `mvn -B clean package` 9 个模块 SUCCESS |
+| 无保单黄金路径 | `A2026102900000056` 经签收 → 材料处理 → 自动承保 → 补偿查询 → `WAIT_AUDIT`；轨迹含 `MATERIAL_PROCESS`、三段 `UNDERWRITING`（含 `compensation-<申请号>`）、`UNDERWRITING_CALLBACK`、`AUDIT_DELIVERY` 的 `STARTED/COMPLETED`；outbox 两条 `PUBLISHED`；`t_claim_consumed_event` 两个消费组各一条 |
+| 有保单黄金路径 | `A2026102900000052` 直达 `WAIT_AUDIT`，只有一段 `UNDERWRITING` 分流轨迹，无 `UNDERWRITING_CALLBACK`，`AUDIT_DELIVERY` 交付完成 |
+| 重复回调 | 对已 `WAIT_AUDIT` 的申请再次回调返回 `REUSED`，`AUDIT_DELIVERY_REQUESTED` 仍为 1 条 |
+| Broker 停机后再恢复 | 签收返回 `SUCCESS` 且状态 `PENDING_ACCEPT`，outbox `retry_count` 递增、健康检查保持 `UP`；`pending-accept-timeout=10s` 时补偿以 `compensation-<申请号>-1` 直接把申请推进到 `UNDERWRITING`；Broker 恢复后待投事件补投为 `PUBLISHED`，重复消息记 `MATERIAL_PROCESS/REUSED` 且材料未重复上传 |
+| 材料失败 | `MATERIAL_TYPE_REJECTED` 命中本地失败名单时申请进入 `ACCEPT_FAILED`，该材料 `FAILED` 且无上传地址，错误码 `LOCAL_UPLOAD_REJECTED`，其余材料 `PROCESSED` |
+| 审核交付失败进入死信 | `fail-audit-delivery=true` 且 `max-reconsume-times=1` 时同一事件两次失败后进入 `%DLQ%claim-application-audit-delivery-v1`，不写 `AUDIT_DELIVERY` 轨迹，outbox 保持 `PUBLISHED` 不被重复投递 |
+| 敏感信息 | 上述运行日志中证件号、原始文件地址、上传地址命中 0 |
+
+验证前清理了本地 Broker 中 007 改名前的历史报文：这些报文缺 `claimApplicationNo`，新消费者无法处理会反复重投，删除 `claim_application_audit_delivery_v1` 及其重试、死信主题后重建。该操作只影响本地联调数据，申请与事件状态以 MySQL 为准。

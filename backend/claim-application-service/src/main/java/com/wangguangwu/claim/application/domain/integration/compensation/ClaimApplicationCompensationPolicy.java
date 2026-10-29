@@ -37,4 +37,11 @@ public interface ClaimApplicationCompensationPolicy {
      * @return 滞留阈值
      */
     Duration underwritingTimeout();
+
+    /**
+     * 待受理申请判定为材料处理滞留的时长。
+     *
+     * @return 滞留阈值
+     */
+    Duration pendingAcceptTimeout();
 }

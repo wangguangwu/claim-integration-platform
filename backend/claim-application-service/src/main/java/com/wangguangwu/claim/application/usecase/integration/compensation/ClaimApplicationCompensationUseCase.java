@@ -11,6 +11,8 @@ import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResult;
 import com.wangguangwu.claim.application.domain.underwriting.port.UnderwritingResultQuery;
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
+import com.wangguangwu.claim.application.usecase.material.MaterialProcessingUseCase;
+import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingCallbackUseCase;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingUseCase;
 import java.time.LocalDateTime;
@@ -22,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 补偿用例：恢复投递滞留、已受理滞留与承保中滞留，仅在状态仍符合预期时推进。
+ * 补偿用例：恢复投递滞留、待受理滞留、已受理滞留与承保中滞留，仅在状态仍符合预期时推进。
  *
  * <p>补偿重放的开始与结束轨迹都由 {@link ClaimApplicationCompensationTransactionService}
  * 一次性写入，重放中断时不会留下只有开始的行为组。</p>
@@ -43,6 +45,7 @@ public class ClaimApplicationCompensationUseCase {
     private final OutboxEventRepository outboxEventRepository;
     private final ClaimApplicationRepository claimApplicationRepository;
     private final UnderwritingUseCase underwritingUseCase;
+    private final MaterialProcessingUseCase materialProcessingUseCase;
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
     private final UnderwritingResultQuery underwritingResultQuery;
     private final AutoUnderwritingRequester autoUnderwritingRequester;
@@ -66,11 +69,38 @@ public class ClaimApplicationCompensationUseCase {
     }
 
     /**
-     * 对已受理滞留的申请重试承保分流，单条失败不影响同批其他申请。
+     * 对待受理滞留的申请重放材料处理，单条失败不影响同批其他申请。
+     *
+     * <p>事件标识由申请编号与尝试次数组成，失败回滚后下一轮沿用同一标识重试；
+     * 与真实消息并发时由条件更新与消费登记保证只有一次生效。</p>
      *
      * @return 尝试补偿的申请条数
      */
-    public int redispatchAcceptedClaimApplications() {
+    public int redrivePendingAcceptClaimApplications() {
+        LocalDateTime updatedBefore = now().minus(compensationPolicy.pendingAcceptTimeout());
+        List<ClaimApplication> claimApplications = claimApplicationRepository.findByStatusUpdatedBefore(
+                ClaimApplicationStatus.PENDING_ACCEPT, updatedBefore, compensationPolicy.batchSize());
+        for (ClaimApplication claimApplication : claimApplications) {
+            try {
+                materialProcessingUseCase.process(new MaterialProcessCommand(claimApplication.getClaimApplicationNo(),
+                        claimApplication.getTenantCode(), compensationEventId(claimApplication),
+                        UUID.randomUUID().toString(), claimApplication.getClaimApplicationAttempt()));
+            } catch (RuntimeException exception) {
+                log.warn("待受理申请补偿处理失败，等待下一轮补偿，claimApplicationNo={}",
+                        claimApplication.getClaimApplicationNo(), exception);
+            }
+        }
+        if (!claimApplications.isEmpty()) {
+            log.info("待受理滞留补偿执行完成，compensatedCount={}", claimApplications.size());
+        }
+        return claimApplications.size();
+    }
+
+    /**
+     * 对已受理滞留的申请重试承保分流，单条失败不影响同批其他申请。
+     *
+     * @return 尝试补偿的申请条数
+     */    public int redispatchAcceptedClaimApplications() {
         LocalDateTime updatedBefore = now().minus(compensationPolicy.acceptedStallTimeout());
         List<ClaimApplication> claimApplications = claimApplicationRepository.findByStatusUpdatedBefore(ClaimApplicationStatus.ACCEPTED,
                 updatedBefore, compensationPolicy.batchSize());
@@ -163,5 +193,10 @@ public class ClaimApplicationCompensationUseCase {
 
     private LocalDateTime now() {
         return LocalDateTime.now(BUSINESS_ZONE_ID);
+    }
+
+    private String compensationEventId(ClaimApplication claimApplication) {
+        return COMPENSATION_REQUEST_ID_PREFIX + claimApplication.getClaimApplicationNo() + "-"
+                + claimApplication.getClaimApplicationAttempt();
     }
 }

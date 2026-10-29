@@ -15,21 +15,24 @@ spring:
         enabled: ${CLAIM_APPLICATION_NACOS_CONFIG_ENABLED:true}
         import-check:
           enabled: ${CLAIM_APPLICATION_NACOS_CONFIG_IMPORT_CHECK_ENABLED:true}
-    openfeign:
-      client:
-        config:
-          default:
-            # 外部调用收紧超时，避免消费线程长时间占用。
-            connect-timeout: 1000
-            read-timeout: 2000
     function:
-      # 材料处理消费者以函数式绑定注册，由 binder 驱动消息接收。
-      definition: materialProcess
+      # 材料处理与审核交付消费者以函数式绑定注册，由 binder 驱动消息接收。
+      definition: materialProcess;auditDelivery
     stream:
       rocketmq:
         binder:
           # 默认连接本地 Compose NameServer；容器化运行时通过环境变量替换为服务地址。
           name-server: ${CLAIM_APPLICATION_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+        bindings:
+          # 消费失败不区分可重试与不可重试，重投耗尽后由 broker 转入 %DLQ%<消费组>。
+          materialProcess-in-0:
+            consumer:
+              push:
+                max-reconsume-times: ${CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES:3}
+          auditDelivery-in-0:
+            consumer:
+              push:
+                max-reconsume-times: ${CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES:3}
       bindings:
         materialProcess-in-0:
           destination: claim_application_material_process_v1
@@ -37,6 +40,10 @@ spring:
           content-type: application/json
         materialProcess-out-0:
           destination: claim_application_material_process_v1
+          content-type: application/json
+        auditDelivery-in-0:
+          destination: claim_application_audit_delivery_v1
+          group: claim-application-audit-delivery-v1
           content-type: application/json
         auditDelivery-out-0:
           destination: claim_application_audit_delivery_v1
@@ -80,31 +87,25 @@ claim:
       retry-base-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_BASE_SECONDS:5}
       retry-max-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_MAX_SECONDS:300}
   compensation:
-    # 补偿调度间隔、批量与三类滞留阈值，全部由配置决定。
+    # 补偿调度间隔、批量与四类滞留阈值，全部由配置决定。
     fixed-delay-ms: ${CLAIM_APPLICATION_COMPENSATION_FIXED_DELAY_MS:30000}
     batch-size: ${CLAIM_APPLICATION_COMPENSATION_BATCH_SIZE:20}
     outbox-sending-timeout: ${CLAIM_APPLICATION_COMPENSATION_OUTBOX_SENDING_TIMEOUT:60s}
     accepted-stall-timeout: ${CLAIM_APPLICATION_COMPENSATION_ACCEPTED_STALL_TIMEOUT:5m}
     underwriting-timeout: ${CLAIM_APPLICATION_COMPENSATION_UNDERWRITING_TIMEOUT:1m}
+    pending-accept-timeout: ${CLAIM_APPLICATION_COMPENSATION_PENDING_ACCEPT_TIMEOUT:5m}
   integration:
-    file-system:
-      # 真实文件系统地址必须显式给出：不提供默认值，缺失时出站客户端创建失败并报出该环境变量名。
-      url: ${CLAIM_APPLICATION_FILE_SYSTEM_URL}
-    underwriting:
-      url: ${CLAIM_APPLICATION_UNDERWRITING_URL}
-  mock:
-    # 模拟开关默认关闭，仅本地联调显式开启；关闭时文件系统与承保的模拟接口不再注册。
-    enabled: ${CLAIM_APPLICATION_MOCK_ENABLED:false}
-    file-system:
-      # 命中这些材料类型时模拟上传被拒绝，用于验证受理失败链路。
-      fail-material-types:
-        - MATERIAL_TYPE_REJECTED
-      # 大于 0 时模拟文件系统响应耗时，用于验证外部调用超时。
-      delay: 0ms
-    underwriting:
-      # 关闭后自动承保不再发送完成通知，用于验证补偿查询链路。
-      notify-on-complete: true
-      completion-delay: 1s
+    local:
+      # 每次外部调用的模拟耗时，用于观察异步链路与消费耗时。
+      delay: ${CLAIM_APPLICATION_LOCAL_INTEGRATION_DELAY:200ms}
+      # 保单查询结果，用于覆盖有保单直接等待审核与无保单进入自动承保两条分支。
+      valid-policy: ${CLAIM_APPLICATION_LOCAL_VALID_POLICY:false}
+      # 承保结果查询返回值，取值 COMPLETED / PROCESSING / NOT_FOUND。
+      underwriting-result: ${CLAIM_APPLICATION_LOCAL_UNDERWRITING_RESULT:COMPLETED}
+      # 命中这些材料类型时上传返回失败，用于验证受理失败链路。
+      fail-material-types: []
+      # 开启后审核交付固定失败，用于验证重投与死信。
+      fail-audit-delivery: ${CLAIM_APPLICATION_LOCAL_FAIL_AUDIT_DELIVERY:false}
 
 ---
 spring:
@@ -119,13 +120,3 @@ spring:
         enabled: false
         import-check:
           enabled: false
-
-claim:
-  integration:
-    file-system:
-      # 本地联调由本服务自带的模拟接口提供文件系统能力。
-      url: http://127.0.0.1:${server.port}
-    underwriting:
-      url: http://127.0.0.1:${server.port}
-  mock:
-    enabled: true

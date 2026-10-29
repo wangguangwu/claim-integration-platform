@@ -57,6 +57,10 @@
 | T20 | foundation 三子模块合一 | 单模块 jar + `AutoConfiguration.imports` | 零类 artifact 不存在；8 处 pom 引用清理；头名常量仍为两端共用来源 | #52 |
 | T21 | 假件剥离为独立模块 | `backend/claim-local-mock` 模块与启动说明 | 生产 jar 内假件类计数 0；本地仍能跑材料失败与承保超时链路 | #54 |
 
+> 2026-10-29 修订：T21 由 [009 签收后异步链路](../009-post-intake-async-pipeline/design.md) 以另一种形态交付——`support/mock` 的 6 个类 709 行直接删除，外部系统改由 `infrastructure/<域>/external` 的进程内本地实现提供，不再新建独立进程模块（本地实现只在进程内打印日志与休眠，多一个进程没有收益）。生产 jar 内假件类计数 0，材料失败与承保超时链路可由 `claim.integration.local.*` 配置覆盖，T21 追踪 #54 可以关闭。
+
+> 2026-10-29 修订：假件与 `Feign*` 适配器删除后，T1 中的 `claim.mock.enabled` 开关与外部系统 URL 占位符一并下线；T13 的“Feign 注解无 `/mock` 字面量”随之失去对象（`spring-cloud-starter-openfeign` 已从 `claim-application-service` 移除），T13 剩余产物（`BusinessClock`、MapStruct 转换）照旧。
+
 ## 每轮统一收口
 
 1. `mvn -B -pl backend/claim-application-service -am clean package` 构建通过。

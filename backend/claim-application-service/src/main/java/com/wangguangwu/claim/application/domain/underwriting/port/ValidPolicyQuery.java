@@ -3,7 +3,7 @@ package com.wangguangwu.claim.application.domain.underwriting.port;
 /**
  * 有效保单存在性查询端口。
  *
- * <p>承保系统不属于本项目实现范围，基础设施层以外部接口适配，本地以模拟实现返回内存数据。
+ * <p>承保系统不属于本项目实现范围，基础设施层以进程内实现按配置返回。
  * 承保系统不可用或超时时抛出异常，由调用方保持原状态等待重试。</p>
  *
  * @author wangguangwu

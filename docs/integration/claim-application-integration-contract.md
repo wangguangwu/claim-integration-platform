@@ -73,6 +73,17 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请或重新申请的材料 |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` | 将已具备审核条件的申请交付审核系统 |
 
+### 消费失败与死信
+
+消费函数不捕获业务异常，异常直接抛给 binder，由 RocketMQ 按消费组重投；重投次数由 `spring.cloud.stream.rocketmq.bindings.<binding>.consumer.push.max-reconsume-times` 声明，默认 3 次，可用环境变量 `CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES` 覆盖。重投耗尽后 broker 自动写入死信主题，平台不消费死信。
+
+| 消费组 | 死信主题 |
+|---|---|
+| `claim-application-material-processor-v1` | `%DLQ%claim-application-material-processor-v1` |
+| `claim-application-audit-delivery-v1` | `%DLQ%claim-application-audit-delivery-v1` |
+
+平台不区分可重试与不可重试异常：事件结构非法、申请不存在这类错误同样重投后进入死信，由人工排查重放。消息幂等由 `t_claim_consumed_event` 的 `(consumer_group, event_id)` 唯一键兜底。
+
 消息信封：
 
 ```json
@@ -102,3 +113,21 @@ InteractionLog 以“一个事件一条记录”保存跨系统和材料处理�
 | `IN202610270001` | `IMAGE_UPLOAD` | `COMPLETED` | `SUCCESS` | `2026-10-27T10:00:03+08:00` |
 
 查询同一 `interaction_no` 并按 `occurred_at` 升序排列，即可恢复一个完整行为。失败时新增 `action=FAILED` 的独立事件，不更新或覆盖开始事件。
+
+## 外部系统接入
+
+外部系统以领域端口接入，端口只声明业务能力，不绑定传输方式。当前版本的文件系统、承保系统与审核系统均为进程内本地实现：按配置休眠、打印交互日志并按配置返回结果，不发起 HTTP 调用。接入真实系统时新增对应适配器并替换本地实现，调用方无需改动。
+
+| 端口 | 职责 | 本地实现 | 配置 |
+|---|---|---|---|
+| `MaterialFileProcessor` | 上传材料文件 | `LocalMaterialFileProcessor` | `claim.integration.local.delay`、`fail-material-types` |
+| `ValidPolicyQuery` | 查询被保人是否存在有效保单 | `LocalValidPolicyQuery` | `claim.integration.local.valid-policy` |
+| `AutoUnderwritingRequester` | 发起自动承保 | `LocalAutoUnderwritingRequester` | `claim.integration.local.delay` |
+| `UnderwritingResultQuery` | 查询自动承保结果 | `LocalUnderwritingResultQuery` | `claim.integration.local.underwriting-result` |
+| `ServiceAuditSystemPort` | 交付申请给审核系统 | `LocalAuditSystemClient` | `claim.integration.local.fail-audit-delivery` |
+
+约定：
+
+- 外部系统明确拒绝以业务结果返回（如 `FileUploadResult.success=false`），进入业务失败分支。
+- 外部系统不可用或超时以异常抛出，调用方保持申请原状态，由消息重投或补偿任务恢复。
+- 交互日志只打印目标系统、交互类型、`claimApplicationNo` 与模拟耗时，不打印证件号、文件地址与报文。

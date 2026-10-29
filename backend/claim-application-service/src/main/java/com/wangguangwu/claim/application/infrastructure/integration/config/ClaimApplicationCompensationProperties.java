@@ -13,6 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param outboxSendingTimeout 发送中事件的滞留判定阈值
  * @param acceptedStallTimeout 已受理申请的分流滞留判定阈值
  * @param underwritingTimeout  承保中申请的结果查询阈值
+ * @param pendingAcceptTimeout 待受理申请的材料处理滞留判定阈值
  * @author wangguangwu
  * @since 2026-10-27
  */
@@ -21,5 +22,6 @@ public record ClaimApplicationCompensationProperties(
         int batchSize,
         Duration outboxSendingTimeout,
         Duration acceptedStallTimeout,
-        Duration underwritingTimeout) implements ClaimApplicationCompensationPolicy {
+        Duration underwritingTimeout,
+        Duration pendingAcceptTimeout) implements ClaimApplicationCompensationPolicy {
 }

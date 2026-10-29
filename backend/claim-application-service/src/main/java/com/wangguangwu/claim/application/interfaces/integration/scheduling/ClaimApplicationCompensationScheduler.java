@@ -20,11 +20,12 @@ public class ClaimApplicationCompensationScheduler {
     private final ClaimApplicationCompensationUseCase claimApplicationCompensationUseCase;
 
     /**
-     * 每轮依次恢复投递滞留、已受理滞留与承保中滞留。
+     * 每轮依次恢复投递滞留、待受理滞留、已受理滞留与承保中滞留。
      */
     @Scheduled(fixedDelayString = "${claim.compensation.fixed-delay-ms}")
     public void compensate() {
         runStep("投递滞留重置", claimApplicationCompensationUseCase::resetStuckSendingEvents);
+        runStep("待受理滞留补偿", claimApplicationCompensationUseCase::redrivePendingAcceptClaimApplications);
         runStep("已受理滞留补偿", claimApplicationCompensationUseCase::redispatchAcceptedClaimApplications);
         runStep("承保中滞留补偿", claimApplicationCompensationUseCase::recoverUnderwritingClaimApplications);
     }
