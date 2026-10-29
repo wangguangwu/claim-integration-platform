@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 
-import com.wangguangwu.claim.application.domain.underwriting.AutoUnderwritingRequester;
+import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

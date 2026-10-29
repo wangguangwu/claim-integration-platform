@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.material.external;
 
 import com.wangguangwu.claim.application.domain.material.FileUploadResult;
-import com.wangguangwu.claim.application.domain.material.MaterialFileProcessor;
+import com.wangguangwu.claim.application.domain.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.domain.material.MaterialUploadRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

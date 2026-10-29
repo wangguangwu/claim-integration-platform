@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 
 import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResult;
-import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResultQuery;
+import com.wangguangwu.claim.application.domain.underwriting.port.UnderwritingResultQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

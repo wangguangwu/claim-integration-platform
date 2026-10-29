@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.intake.cache;
 
-import com.wangguangwu.claim.application.domain.claim.ApplicationExistenceQuery;
-import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationExistenceQuery;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;

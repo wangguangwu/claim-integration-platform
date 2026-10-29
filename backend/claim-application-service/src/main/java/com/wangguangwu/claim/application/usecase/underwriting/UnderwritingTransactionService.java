@@ -1,9 +1,9 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
-import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventRepository;
+import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

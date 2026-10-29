@@ -1,9 +1,10 @@
 package com.wangguangwu.claim.application.interfaces.intake.web;
 
-import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.TenantProtocolPipelineFactory;
-import com.wangguangwu.claim.application.usecase.intake.ApplicationIntakeUseCase;
-import com.wangguangwu.claim.application.usecase.intake.command.ApplicationIntakeCommand;
-import com.wangguangwu.claim.application.usecase.intake.result.ApplicationIntakeResult;
+import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline.TenantProtocolPipelineFactory;
+import com.wangguangwu.claim.application.interfaces.intake.web.render.TenantApplicationResponseRouter;
+import com.wangguangwu.claim.application.usecase.intake.ClaimApplicationIntakeUseCase;
+import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
+import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApplicationIntakeController {
 
     private final TenantProtocolPipelineFactory pipelineFactory;
-    private final ApplicationIntakeUseCase applicationIntakeUseCase;
+    private final ClaimApplicationIntakeUseCase applicationIntakeUseCase;
     private final TenantApplicationResponseRouter responseRouter;
 
     /**
@@ -42,8 +43,8 @@ public class ApplicationIntakeController {
     public ResponseEntity<Object> intake(@RequestBody String rawPayload, HttpServletRequest request) {
         TenantInfo tenantInfo = TenantContext.get();
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        ApplicationIntakeCommand command = pipelineFactory.execute(tenantInfo, rawPayload);
-        ApplicationIntakeResult result = applicationIntakeUseCase.intake(command,
+        ClaimApplicationIntakeCommand command = pipelineFactory.execute(tenantInfo, rawPayload);
+        ClaimApplicationIntakeResult result = applicationIntakeUseCase.intake(command,
                 request.getHeader(TraceHeaders.REQUEST_ID), traceId);
         return responseRouter.renderSuccess(tenantInfo, traceId, result);
     }

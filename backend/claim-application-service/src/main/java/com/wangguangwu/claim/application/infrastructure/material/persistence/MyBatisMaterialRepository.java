@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.infrastructure.material.persistence;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wangguangwu.claim.application.domain.material.Material;
-import com.wangguangwu.claim.application.domain.material.MaterialRepository;
+import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
 import com.wangguangwu.claim.application.domain.material.MaterialStatus;
 import java.time.LocalDateTime;
 import java.util.List;

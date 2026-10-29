@@ -14,7 +14,7 @@
 - 接入层由 `TenantProtocolPipelineFactory` 按 `tenantCode + protocolVersion` 从 `TenantProtocolPipelineRegistry` 获取流水线。流水线固定按“验签、解密、解析、校验、转换”五步工作：真实租户按协议实现验签、解密，解析器把明文报文反序列化为租户 request，校验器校验必填字段与嵌套结构，转换器把各租户字段归一化为同一份受理命令（平台标准人员与材料字段）；用例据命令创建 `ClaimApplication`，领域及用例层不接收租户私有字段，接入层也不组装聚合。
 - 未找到协议流水线、验签失败、解密失败、报文解析失败或字段校验失败时，必须返回明确业务错误，不创建理赔申请、Material 或 OutboxEvent。
 - 受理命令与 `ClaimApplication` 至少包含外部申请号、申请人、主被保险人、出险人、领款人和首次材料；四类人员信息独立保存，不得相互覆盖。
-- 每个基础人员对象必须包含姓名、性别、证件类型、证件号四个字段；性别统一使用 `MALE`、`FEMALE` 枚举，租户转换器负责将租户报文字段转换为 `PersonInfo` 人员值对象。
+- 每个基础人员对象必须包含姓名、性别、证件类型、证件号四个字段；性别统一使用 `MALE`、`FEMALE` 枚举，租户转换器负责把租户报文字段转换为按角色区分的人员值对象——申请人、主被保险人、出险人、领款人各为一个类型（`Applicant`、`PrimaryInsured`、`AccidentPerson`、`Payee`），共同继承人员基类 `PersonInfo`，四类角色不得相互顶替。
 - 成功和失败响应默认使用平台统一结构；租户协议要求其它响应结构时，由该租户的响应渲染实现决定响应体、HTTP 状态和响应头，不得在 Controller 中按租户分支。
 
 ### 本地联调租户协议
@@ -92,7 +92,7 @@
 - 理赔申请、Material 领域模型、状态枚举、DO、Repository 端口与 MapStruct 映射。
 - 首次申请、重复请求、重新申请的事务编排和数据库持久化。
 - 理赔申请编号、材料批次编号生成端口及本地实现。
-- `PersonInfo` 人员值对象、Redisson watchdog 锁、理赔申请存在查询旁路缓存和 Redis/MySQL 编号降级。
+- `PersonInfo` 人员基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色值对象、Redisson watchdog 锁、理赔申请存在查询旁路缓存和 Redis/MySQL 编号降级。
 - InteractionLog 和 OutboxEvent 的本地事务写入。
 - 两条本地联调租户协议流水线与经 `claim-gateway` 对外接口执行的 JMeter 吞吐、幂等并发压测脚本。
 - 正常、幂等、并发、回滚和边界场景测试。

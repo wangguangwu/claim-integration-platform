@@ -1,5 +1,9 @@
 package com.wangguangwu.claim.application.domain.claim;
 
+import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
+import com.wangguangwu.claim.application.domain.claim.person.Applicant;
+import com.wangguangwu.claim.application.domain.claim.person.Payee;
+import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -37,16 +41,16 @@ public class ClaimApplication {
     private Integer applicationAttempt;
 
     /** 申请人标准化信息。 */
-    private PersonInfo applicant;
+    private Applicant applicant;
 
     /** 主被保险人标准化信息，用于保单查询。 */
-    private PersonInfo primaryInsured;
+    private PrimaryInsured primaryInsured;
 
     /** 出险人标准化信息。 */
-    private PersonInfo accidentPerson;
+    private AccidentPerson accidentPerson;
 
     /** 领款人标准化信息。 */
-    private PersonInfo payee;
+    private Payee payee;
 
     /** 本次提交的材料，落库后由材料仓储独立管理。 */
     private List<MaterialSubmission> materials;
@@ -63,8 +67,8 @@ public class ClaimApplication {
      * @param materials             本次提交的材料
      * @return 待签收的理赔申请
      */
-    public static ClaimApplication submit(String tenantCode, String externalApplicationNo, PersonInfo applicant,
-                                          PersonInfo primaryInsured, PersonInfo accidentPerson, PersonInfo payee,
+    public static ClaimApplication submit(String tenantCode, String externalApplicationNo, Applicant applicant,
+                                          PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
                                           List<MaterialSubmission> materials) {
         return ClaimApplication.builder().tenantCode(tenantCode).externalApplicationNo(externalApplicationNo)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
@@ -90,8 +94,8 @@ public class ClaimApplication {
      */
     public static ClaimApplication restore(Long id, String tenantCode, String applicationNo,
                                            String externalApplicationNo, ApplicationStatus status,
-                                           Integer applicationAttempt, PersonInfo applicant, PersonInfo primaryInsured,
-                                           PersonInfo accidentPerson, PersonInfo payee) {
+                                           Integer applicationAttempt, Applicant applicant,
+                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee) {
         return ClaimApplication.builder().id(id).tenantCode(tenantCode).applicationNo(applicationNo)
                 .externalApplicationNo(externalApplicationNo).status(status).applicationAttempt(applicationAttempt)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)

@@ -1,5 +1,6 @@
 package com.wangguangwu.claim.application.domain.integration.interaction;
 
+
 /**
  * 交互事件持久化端口。
  *

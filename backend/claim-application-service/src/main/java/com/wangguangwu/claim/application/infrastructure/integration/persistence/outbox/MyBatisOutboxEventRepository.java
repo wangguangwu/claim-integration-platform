@@ -3,7 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.integration.persistence
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEvent;
-import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventRepository;
+import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventStatus;
 import java.time.LocalDateTime;
 import java.util.List;

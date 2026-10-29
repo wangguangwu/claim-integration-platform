@@ -71,5 +71,5 @@
 - 依赖方向检查通过：`domain` 不依赖框架也不依赖 `interfaces`/`usecase`/`infrastructure`；`infrastructure` 不依赖 `usecase`/`interfaces`；`usecase` 不依赖 `interfaces`/`infrastructure`（含不绑定 `@ConfigurationProperties`）；跨域不引用对方 `interfaces`/`infrastructure`；DO 只出现在 `infrastructure`。
 - 目录与 design 的「目录词典」一致：`interfaces/<域>` 下只保留 `web`/`messaging`/`scheduling`/`tenantprotocol` 等入站通道，无 `inbound` 中转层；持久化角色位于 `infrastructure/<域>/persistence` 且按聚合分组；不存在以 `Mapper` 结尾的 DO↔领域对象转换器。
 - 聚合封装与所有权检查通过：`domain` 聚合根不存在公开 setter 且构造器私有；代码不出现他域聚合的 `new` 或逐字段拼装，跨域创建一律走 owning 域的工厂方法；`ClaimApplication`、`Material`、`OutboxEvent`、`InteractionLog` 的构造点只出现在各自的 `domain` 包内，工厂调用点只出现在 `domain` 与 `usecase`；交互词汇（`INBOUND`/`OUTBOUND`、目标系统标识）不在 `domain/integration/interaction` 之外重复出现。
-- `interfaces` 不引用任何聚合根：`grep -rh 'ClaimApplication' interfaces` 命中 0；租户协议流水线的产物是 `ApplicationIntakeCommand`。
+- `interfaces` 不引用任何聚合根：`grep -rh 'ClaimApplication' interfaces` 命中 0；租户协议流水线的产物是 `ClaimApplicationIntakeCommand`。
 - 经 `claim-gateway` 验证首次签收、同外部申请号重复提交、同号并发、`ACCEPT_FAILED` 重新申请与租户协议缺失错误映射，行为与迁移前一致。

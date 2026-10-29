@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.intake.number;
 
-import com.wangguangwu.claim.application.domain.claim.ApplicationNoGenerator;
-import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationNoGenerator;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;

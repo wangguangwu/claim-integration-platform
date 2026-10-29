@@ -2,7 +2,7 @@
 
 ## 总体架构
 
-统一接入将租户私有协议隔离在接入层。接口层接收 HTTP 请求并由工厂根据租户上下文获取协议流水线；流水线内部按“验签、解密、解析、校验、转换”五步把租户报文归一化为签收用例的标准入参 `ApplicationIntakeCommand`；用例层据此创建 `ClaimApplication` 聚合，再执行幂等签收和事务编排；领域层的 `ClaimApplication` 维护理赔申请状态规则；基础设施层完成 DO、Mapper、Repository、编号生成和 Outbox 持久化。
+统一接入将租户私有协议隔离在接入层。接口层接收 HTTP 请求并由工厂根据租户上下文获取协议流水线；流水线内部按“验签、解密、解析、校验、转换”五步把租户报文归一化为签收用例的标准入参 `ClaimApplicationIntakeCommand`；用例层据此创建 `ClaimApplication` 聚合，再执行幂等签收和事务编排；领域层的 `ClaimApplication` 维护理赔申请状态规则；基础设施层完成 DO、Mapper、Repository、编号生成和 Outbox 持久化。
 
 ```mermaid
 flowchart LR
@@ -16,8 +16,8 @@ flowchart LR
     DECRYPT --> PARSER["TenantProtocolParser"]
     PARSER --> VALIDATOR["TenantProtocolValidator"]
     VALIDATOR --> CONVERTER["TenantProtocolConverter"]
-    CONVERTER --> COMMAND["ApplicationIntakeCommand"]
-    CLAIM --> USECASE["ApplicationIntakeUseCase"]
+    CONVERTER --> COMMAND["ClaimApplicationIntakeCommand"]
+    CLAIM --> USECASE["ClaimApplicationIntakeUseCase"]
     USECASE --> DOMAIN["理赔申请聚合 / Material"]
     USECASE --> REPOSITORY["Repository 端口"]
     CONTROLLER --> RESPONSE["TenantApplicationResponseRouter"]
@@ -34,7 +34,7 @@ sequenceDiagram
     participant T as 租户系统
     participant G as Gateway
     participant R as 协议流水线
-    participant U as ApplicationIntakeUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant X as 事务服务
     participant RDS as Redis
     participant DB as MySQL
@@ -43,7 +43,7 @@ sequenceDiagram
     G->>R: 原始请求与 TenantContext
     R->>R: 选择流水线
     R->>R: 解析租户 request、校验字段、归一化为受理命令
-    R->>U: ApplicationIntakeCommand
+    R->>U: ClaimApplicationIntakeCommand
     U->>U: ClaimApplication.submit(...) 创建聚合
     U->>RDS: 获取同外部申请号锁（最多 30 秒）
     U->>RDS: 事务外查询存在缓存，未命中回源 MySQL
@@ -71,9 +71,9 @@ sequenceDiagram
 
 | 模块 | 改动内容 | 职责 |
 |---|---|---|
-| `interfaces/intake`（`web` + `tenantprotocol`） | 申请接入 Controller、协议流水线工厂与注册中心、解析/校验/转换组件、响应渲染路由、HTTP DTO | 处理 HTTP 与租户上下文，不包含签收业务规则 |
+| `interfaces/intake`（`web` + `web/render` + `tenantprotocol`） | 申请接入 Controller、协议流水线工厂与注册中心（`tenantprotocol/core/pipeline`）、解析/校验/转换端口（`tenantprotocol/core/stage`）、每租户一套协议组件（`tenantprotocol/tenants/{tenant_a,tenant_b}`）、响应渲染路由、HTTP DTO | 处理 HTTP 与租户上下文，不包含签收业务规则 |
 | `usecase/intake` | 申请签收用例、材料工厂、数据库事务服务、结果模型 | 管理幂等、重试和跨组件编排，事务内只访问数据库 |
-| `domain/claim`（含 `exception`） | 理赔申请聚合、状态枚举、`PersonInfo` 与 `Gender` 值对象、Repository 等端口、签收业务异常与错误码 | 维护聚合规则和状态约束，不依赖 Spring 或 ORM |
+| `domain/claim`（含 `person`、`port`、`exception`） | 理赔申请聚合、状态枚举、`PersonInfo` 人员基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色值对象与 `Gender` 枚举（`person`）、Repository 等端口（`port`）、签收业务异常与错误码 | 维护聚合规则和状态约束，不依赖 Spring 或 ORM |
 | `infrastructure/intake`（`persistence`、`cache`、`lock`、`number`） | DO、MyBatis-Plus Mapper 与 Wrapper 查询、仓储实现、DO↔领域转换器与人员 JSON 转换、编号生成、Redisson 锁与降级配置 | 实现领域端口和 Redis 故障降级，不编写手写 SQL |
 | `domain/material` | `Material`、`MaterialSubmission`、`MaterialRepository`、`MaterialBatchNoGenerator` | 签收创建的材料领域类型与批次编号端口，由 `usecase/intake` 跨域引用 |
 | `domain/integration` | `OutboxEvent`、`InteractionLog` 与各自 Repository 端口 | 由签收用例在同一事务内写入的异步事件与交互轨迹契约 |
@@ -89,19 +89,19 @@ sequenceDiagram
 | `TenantApplicationResponseRenderer` | 定义租户响应结构渲染端口，实现方决定响应体、HTTP 状态和响应头 |
 | `TenantApplicationResponseRouter` | 按租户选择唯一渲染器；未匹配或缺少租户上下文时使用统一结构 |
 | `UnifiedApplicationResponseRenderer` | 平台统一响应结构兜底实现，按错误码映射 400、500、503 |
-| `TenantProtocolPipeline` | 租户协议流水线端口，定义单条租户协议的支持判断与执行入口，输出 `ApplicationIntakeCommand` |
+| `TenantProtocolPipeline` | 租户协议流水线端口，定义单条租户协议的支持判断与执行入口，输出 `ClaimApplicationIntakeCommand` |
 | `TenantProtocolPipelineRegistry` | 注册全部租户协议流水线，按租户编码和协议版本选择唯一流水线，拒绝不支持或配置冲突的协议 |
-| `TenantProtocolPipelineFactory` | 根据租户上下文获取对应的租户协议流水线，执行协议适配并返回 `ApplicationIntakeCommand`，同时拒绝跨租户的转换结果 |
+| `TenantProtocolPipelineFactory` | 根据租户上下文获取对应的租户协议流水线，执行协议适配并返回 `ClaimApplicationIntakeCommand`，同时拒绝跨租户的转换结果 |
 | `AbstractTenantProtocolPipeline` | 租户协议流水线模板，固定「验签 → 解密 → 解析 → 校验 → 转换」执行链路；各节点提供默认实现，租户按需扩展，最终产出平台统一的受理命令 |
 | `TenantProtocolParser` | 把原始正文反序列化为租户 request 对象，不使用 Jackson JsonNode |
 | `TenantProtocolValidator` | 校验租户 request 的必填字段与嵌套结构 |
-| `TenantProtocolConverter` | 把租户 request 归一化为 `ApplicationIntakeCommand` 受理命令，拒绝无法识别的枚举编码 |
+| `TenantProtocolConverter` | 把租户 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，拒绝无法识别的枚举编码 |
 | `TenantProtocolFieldGuard` | 租户报文必填字段守卫，统一缺失字段的定位方式；异常统一由 `ApplicationIntakeException.invalid` 构造 |
-| `ApplicationIntakeUseCase` | 编排参数校验、分布式锁、事务外存在性与编号准备、唯一冲突重试 |
-| `ApplicationIntakeMaterialFactory` | 装配本次签收的材料批次：取批次号并让 `MaterialSubmission` 在 `domain/material` 内生成材料聚合，不访问数据库 |
+| `ClaimApplicationIntakeUseCase` | 编排参数校验、分布式锁、事务外存在性与编号准备、唯一冲突重试 |
+| `ClaimApplicationIntakeMaterialFactory` | 装配本次签收的材料批次：取批次号并让 `MaterialSubmission` 在 `domain/material` 内生成材料聚合，不访问数据库 |
 | `ApplicationLifecycleRecordFactory` | 交互事件与 Outbox 记录的唯一装配入口，位于 `usecase/integration/record`，由 005 收敛而来，签收侧只调用不自建 |
-| `ApplicationIntakeTransactionService` | 数据库事务服务，完成首次创建、重复复用、重新申请和冲突解析，事务内不访问 Redis |
-| `PersonInfo` | 领域人员值对象，承载姓名、性别枚举、证件类型和证件号 |
+| `ClaimApplicationIntakeTransactionService` | 数据库事务服务，完成首次创建、重复复用、重新申请和冲突解析，事务内不访问 Redis |
+| `PersonInfo` | 领域人员值对象的密封基类，承载姓名、性别枚举、证件类型和证件号四个基础字段与相等语义；`Applicant`、`PrimaryInsured`、`AccidentPerson`、`Payee` 是它的四个终态子类，只声明业务角色，聚合与受理命令按角色类型持有四类人员 |
 | `Gender` | 人员性别枚举 `MALE`、`FEMALE`，由租户转换器完成归一化 |
 | `ClaimApplication` | 理赔申请聚合根，由签收用例调用 `submit(...)` 工厂从受理命令创建；维护四类人员、提交材料、申请尝试次数与状态重置规则 |
 | `ApplicationStatus` | `PENDING_ACCEPT`、`ACCEPTED`、`ACCEPT_FAILED`、`UNDERWRITING`、`WAIT_AUDIT`、`ISSUE`、`COMPLETED`、`REVOKED` 状态定义 |
@@ -109,7 +109,7 @@ sequenceDiagram
 | `Material` | 材料批次、初始文件地址、上传后文件地址、处理状态和逻辑删除规则 |
 | `ApplicationDO`、`MaterialDO` | 与 `t_claim_application`、`t_claim_application_material` 表一一对应的基础设施数据对象 |
 | `ApplicationDataConverter`、`MaterialDataConverter` | MapStruct 映射领域模型和 DO，只做字段映射不写业务规则；`*Mapper` 一词专指 ORM 数据映射 |
-| `PersonInfoJsonConverter` | 领域人员值对象与数据库人员 JSON 列之间的序列化转换，由 `ApplicationDataConverter` 复用 |
+| `PersonInfoJsonConverter` | 人员值对象与数据库人员 JSON 列之间的序列化转换：写方向按 `PersonInfo` 基类只序列化四个基础字段，读方向按列名还原对应角色类型（抽象基类不能被直接反序列化，落库形状由该转换器内部的快照记录承载），由 `ApplicationDataConverter` 复用 |
 | `ApplicationDOMapper`、`MaterialDOMapper` | 只继承 `BaseMapper`，查询与更新条件由 Repository 使用 Wrapper 构造，不编写手写 SQL |
 | `MybatisPlusConfiguration` | 注册分页插件，为取最大申请编号等单条查询提供分页改写 |
 | `ApplicationNoGenerator` | 优先通过 Redis 当前日计数生成编号；计数缺失或不可用时查询 MySQL 当天最大申请号并加一；冲突后可把计数器与 MySQL 最大尾号对齐 |
@@ -140,9 +140,9 @@ sequenceDiagram
 2. 解密：`AbstractTenantProtocolPipeline.decrypt` 默认原样返回明文；真实租户覆写后解密已验签正文，失败时使用统一业务异常拒绝请求。
 3. `TenantProtocolParser`：把明文正文反序列化为租户 request record（如 `TenantAIntakeRequest`），JSON 不合法或结构不匹配时抛 `APPLICATION_INTAKE_INVALID`；禁止使用 Jackson `JsonNode` 传递报文。
 4. `TenantProtocolValidator`：校验 request 的必填文本与嵌套对象、数组，错误信息携带字段路径（如 `applicant.fullName`），不携带原始正文。
-5. `TenantProtocolConverter`：把 request 归一化为 `ApplicationIntakeCommand` 受理命令，负责字段去空格与枚举编码映射，无法识别的编码按字段拒绝。
+5. `TenantProtocolConverter`：把 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，负责字段去空格与枚举编码映射，无法识别的编码按字段拒绝。
 
-`AbstractTenantProtocolPipeline` 负责匹配租户编码与协议版本、按顺序调用五个节点、拒绝空报文。流水线只输出尚未分配平台申请编号的 `ApplicationIntakeCommand`；聚合创建、`applicationNo`、`status` 与持久化仍由签收用例完成，租户协议层不得访问 Repository、编号生成器、分布式锁或状态变更逻辑，也不得引用 `ClaimApplication`。
+`AbstractTenantProtocolPipeline` 负责匹配租户编码与协议版本、按顺序调用五个节点、拒绝空报文。流水线只输出尚未分配平台申请编号的 `ClaimApplicationIntakeCommand`；聚合创建、`applicationNo`、`status` 与持久化仍由签收用例完成，租户协议层不得访问 Repository、编号生成器、分布式锁或状态变更逻辑，也不得引用 `ClaimApplication`。
 
 ## 核心数据模型
 
@@ -156,14 +156,14 @@ sequenceDiagram
 | `externalApplicationNo` | 协议转换结果 | 与租户组成唯一键 |
 | `status` | 领域状态枚举 | 首次和重新申请均为 `PENDING_ACCEPT` |
 | `applicationAttempt` | 领域模型 | 首次为 1，重新申请递增 |
-| `applicant` | 协议转换结果 | 申请人标准化信息；首次写入，重新申请覆盖 |
-| `primaryInsured` | 协议转换结果 | 主被保险人标准化信息；供后续保单查询使用 |
-| `accidentPerson` | 协议转换结果 | 出险人标准化信息；首次写入，重新申请覆盖 |
-| `payee` | 协议转换结果 | 领款人标准化信息；首次写入，重新申请覆盖 |
+| `applicant` | 协议转换结果 | 申请人（`Applicant`）标准化信息；首次写入，重新申请覆盖 |
+| `primaryInsured` | 协议转换结果 | 主被保险人（`PrimaryInsured`）标准化信息；供后续保单查询使用 |
+| `accidentPerson` | 协议转换结果 | 出险人（`AccidentPerson`）标准化信息；首次写入，重新申请覆盖 |
+| `payee` | 协议转换结果 | 领款人（`Payee`）标准化信息；首次写入，重新申请覆盖 |
 | `materials` | 协议转换结果 | 本次提交的材料；只用于签收，落库后由 `Material` 独立管理，回读聚合时不填充 |
 | `createdAt` / `updatedAt` | 数据库维护 | 分别记录创建与最后更新时间，不由业务代码赋值 |
 
-四类人员统一使用领域值对象 `PersonInfo`，落库时由 `PersonInfoJsonConverter` 写入 `applicant_json`、`primary_insured_json`、`accident_person_json`、`payee_json` 四个 JSON 列：
+四类人员各是一个角色类型，同继承人员基类 `PersonInfo`，因此装配按类型而非位置对齐，四个角色互相顶替在编译期即不可能。落库时由 `PersonInfoJsonConverter` 写入 `applicant_json`、`primary_insured_json`、`accident_person_json`、`payee_json` 四个 JSON 列，列内只保存基类的四个基础字段，角色由列名决定：
 
 | 字段 | 含义 |
 |---|---|
@@ -200,15 +200,15 @@ flowchart LR
     PARSER --> TENANT_DTO["租户 request record"]
     TENANT_DTO --> VALIDATOR["TenantProtocolValidator"]
     VALIDATOR --> CONVERTER["TenantProtocolConverter"]
-    CONVERTER --> COMMAND["ApplicationIntakeCommand"]
+    CONVERTER --> COMMAND["ClaimApplicationIntakeCommand"]
     CLAIM --> DOMAIN["理赔申请聚合 / Material"]
     DOMAIN <--> DATA_MAPPER["MapStruct Converter"]
     DATA_MAPPER <--> DO["ApplicationDO / MaterialDO"]
 ```
 
-- 租户 request 到 `ApplicationIntakeCommand` 的映射属于具体 `TenantProtocolConverter`，不由公共 MapStruct Mapper 处理。
-- 流水线产出的 `ApplicationIntakeCommand` 只携带归一化后的业务字段；`applicationNo`、`status`、`applicationAttempt`、`batchNo`、逻辑删除标记等业务字段由用例或领域模型显式赋值。
-- 领域对象与 DO 之间使用 MapStruct 映射，四类人员值对象经 `PersonInfoJsonConverter` 写入对应 JSON 列，材料 URL 按同名字段复制。
+- 租户 request 到 `ClaimApplicationIntakeCommand` 的映射属于具体 `TenantProtocolConverter`，不由公共 MapStruct Mapper 处理。
+- 流水线产出的 `ClaimApplicationIntakeCommand` 只携带归一化后的业务字段；`applicationNo`、`status`、`applicationAttempt`、`batchNo`、逻辑删除标记等业务字段由用例或领域模型显式赋值。
+- 领域对象与 DO 之间使用 MapStruct 映射，四类人员角色值对象经 `PersonInfoJsonConverter` 写入对应 JSON 列，回读时按列名还原角色类型，材料 URL 按同名字段复制。
 - MapStruct Mapper 只处理数据转换，不查询数据库、不生成编号、不变更状态。
 
 ## 并发控制与旁路缓存设计

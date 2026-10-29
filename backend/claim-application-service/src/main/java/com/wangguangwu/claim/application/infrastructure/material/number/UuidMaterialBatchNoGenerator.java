@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.material.number;
 
-import com.wangguangwu.claim.application.domain.material.MaterialBatchNoGenerator;
+import com.wangguangwu.claim.application.domain.material.port.MaterialBatchNoGenerator;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;

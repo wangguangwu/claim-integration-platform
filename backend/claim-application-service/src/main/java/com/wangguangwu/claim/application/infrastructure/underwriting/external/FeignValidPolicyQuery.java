@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 
 import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
-import com.wangguangwu.claim.application.domain.underwriting.ValidPolicyQuery;
+import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

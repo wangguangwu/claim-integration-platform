@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.infrastructure.intake.persistence;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import java.time.LocalDateTime;

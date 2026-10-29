@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
-import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;

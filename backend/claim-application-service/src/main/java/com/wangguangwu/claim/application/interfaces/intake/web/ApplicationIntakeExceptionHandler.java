@@ -2,6 +2,7 @@ package com.wangguangwu.claim.application.interfaces.intake.web;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.interfaces.intake.web.render.TenantApplicationResponseRouter;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;

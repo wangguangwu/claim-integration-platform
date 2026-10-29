@@ -55,9 +55,9 @@ public class ApplicationDataConverter {
         return ClaimApplication.restore(applicationDO.getId(), applicationDO.getTenantCode(),
                 applicationDO.getApplicationNo(), applicationDO.getExternalApplicationNo(),
                 ApplicationStatus.valueOf(applicationDO.getStatus()), applicationDO.getApplicationAttempt(),
-                personInfoJsonConverter.fromJson(applicationDO.getApplicantJson()),
-                personInfoJsonConverter.fromJson(applicationDO.getPrimaryInsuredJson()),
-                personInfoJsonConverter.fromJson(applicationDO.getAccidentPersonJson()),
-                personInfoJsonConverter.fromJson(applicationDO.getPayeeJson()));
+                personInfoJsonConverter.toApplicant(applicationDO.getApplicantJson()),
+                personInfoJsonConverter.toPrimaryInsured(applicationDO.getPrimaryInsuredJson()),
+                personInfoJsonConverter.toAccidentPerson(applicationDO.getAccidentPersonJson()),
+                personInfoJsonConverter.toPayee(applicationDO.getPayeeJson()));
     }
 }

@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.integration.config;
 
-import com.wangguangwu.claim.application.domain.integration.outbox.OutboxRelayPolicy;
+import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxRelayPolicy;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

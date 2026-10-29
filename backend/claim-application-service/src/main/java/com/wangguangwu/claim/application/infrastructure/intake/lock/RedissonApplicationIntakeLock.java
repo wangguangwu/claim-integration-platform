@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.intake.lock;
 
-import com.wangguangwu.claim.application.domain.claim.ApplicationIntakeLock;
+import com.wangguangwu.claim.application.domain.claim.port.ApplicationIntakeLock;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;

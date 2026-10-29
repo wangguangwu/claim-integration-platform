@@ -1,5 +1,7 @@
 # 003 理赔申请统一接入与签收任务
 
+> 2026-10-29 起功能定稿前不保留单元测试：下文任务提到的测试类已随该决定删除，任务正文按当时交付记录保留。
+
 ## T1 Spec 评审与接入契约冻结
 
 - 状态：已确认
@@ -11,7 +13,7 @@
 
 - 状态：已完成
 - 对应 design：§改动模块、§主要类职责、§MapStruct 映射设计
-- 产物：MapStruct、Lombok 与注解处理器绑定配置，理赔申请/Material DO、领域模型、状态枚举、Gender 枚举、PersonInfo 人员值对象、MapStruct Mapper 接口
+- 产物：MapStruct、Lombok 与注解处理器绑定配置，理赔申请/Material DO、领域模型、状态枚举、Gender 枚举、PersonInfo 人员基类与四个角色值对象、MapStruct Mapper 接口
 - 完成条件：DO 字段与 002 DDL 一致；领域层不依赖 Spring、MyBatis-Plus；Lombok 生成的访问器可被 MapStruct 正确识别，映射实现可生成并通过编译
 
 ## T3 租户协议流水线与协议路由
@@ -19,7 +21,7 @@
 - 状态：已完成
 - 对应 design：§总体架构、§主要类职责、§示例租户协议适配、§接口设计
 - 产物：TenantProtocolPipeline、AbstractTenantProtocolPipeline、TenantProtocolPipelineRegistry、TenantProtocolPipelineFactory、TenantProtocolParser/Validator/Converter 接口、TenantProtocolFieldGuard、租户 A 与租户 B 的 request record 及其解析/校验/转换组件与流水线
-- 完成条件：工厂按 TenantContext 的租户编码和协议版本从注册中心选择唯一流水线；流水线固定按验签、解密、解析、校验、转换执行，示例协议使用验签和明文直通默认实现；`tenant-a/v1` 与 `tenant-b/v1` 均正确归一化为同一份 `ApplicationIntakeCommand` 受理命令；缺失或重复流水线返回明确错误；租户私有 DTO 不进入用例层；报文转换不使用 Jackson JsonNode
+- 完成条件：工厂按 TenantContext 的租户编码和协议版本从注册中心选择唯一流水线；流水线固定按验签、解密、解析、校验、转换执行，示例协议使用验签和明文直通默认实现；`tenant-a/v1` 与 `tenant-b/v1` 均正确归一化为同一份 `ClaimApplicationIntakeCommand` 受理命令；缺失或重复流水线返回明确错误；租户私有 DTO 不进入用例层；报文转换不使用 Jackson JsonNode
 
 ## T4 理赔申请与 Material 持久化
 
@@ -32,7 +34,7 @@
 
 - 状态：已完成
 - 对应 design：§核心链路设计、§并发控制、事务与异常处理
-- 产物：ApplicationIntakeUseCase（锁与事务外准备，原单实现接口与应用类已在 005 T8 合并为同名具体类）、ApplicationIntakeMaterialFactory（材料批次装配）、ApplicationLifecycleRecordFactory（交互与 Outbox 记录装配，005 收敛后的单一入口）、ApplicationIntakeTransactionService（数据库事务）、首次申请、重复请求、重新申请与冲突重试编排
+- 产物：ClaimApplicationIntakeUseCase（锁与事务外准备，原单实现接口与应用类已在 005 T8 合并为同名具体类）、ClaimApplicationIntakeMaterialFactory（材料批次装配）、ApplicationLifecycleRecordFactory（交互与 Outbox 记录装配，005 收敛后的单一入口）、ClaimApplicationIntakeTransactionService（数据库事务）、首次申请、重复请求、重新申请与冲突重试编排
 - 完成条件：事务内不访问 Redis；存在性判断和编号生成在锁内事务外完成；首次创建、重复复用、失败后重申请完全符合 requirements；理赔申请、Material、InteractionLog、OutboxEvent 的核心数据保持事务一致
 
 ## T6 统一接入接口
@@ -44,7 +46,7 @@
 
 ## T7 单元测试与集成测试
 
-- 状态：已完成
+- 状态：已回退（2026-10-29 决定：功能未定稿前不保留单元测试，`src/test` 已全部删除，经网关的 JMeter 脚本保留；功能定稿后按本任务产物与完成条件补齐）
 - 对应 design：§核心链路设计、§并发控制与旁路缓存设计、§并发控制、事务与异常处理
 - 产物：领域、用例、协议流水线路由、示例协议流水线、锁降级、编号降级与计数器校准、响应渲染单元测试；经 `claim-gateway` 对外接口执行的 JMeter 吞吐与幂等并发压测脚本
 - 完成条件：覆盖首次签收、重复请求、重新申请、并发重新申请降级为复用、流水线缺失、非法材料、两种协议全链路转换、锁等待超时、Redis 降级、缓存陈旧重试、计数器落后校准；JMeter 脚本可经网关验证唯一申请吞吐和同申请号幂等并发，以 HTTP 响应、`X-Trace-Id` 和响应编号一致性验收，不直接访问数据库

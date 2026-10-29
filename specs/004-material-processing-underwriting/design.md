@@ -95,7 +95,7 @@ sequenceDiagram
 
 | 模块 | 改动内容 | 职责 |
 |---|---|---|
-| `domain/claim` | `ClaimApplication` 生命周期迁移方法、`ApplicationRepository` 查询与条件更新、`PersonInfo` 证件号读取 | 维护状态迁移前置条件，不依赖 Spring、MQ、Feign |
+| `domain/claim` | `ClaimApplication` 生命周期迁移方法、`ApplicationRepository` 查询与条件更新、`PrimaryInsured` 角色证件号读取 | 维护状态迁移前置条件，不依赖 Spring、MQ、Feign |
 | `domain/material` + `usecase/material` + `interfaces/material` + `infrastructure/material` | `Material`、`MaterialRepository`、`MaterialStatus`、`MaterialFileProcessor` 端口；材料处理用例与事务服务；`MaterialProcessConsumer`；材料持久化与 Feign 文件客户端 | 材料聚合、消息接收与文件处理编排 |
 | `domain/underwriting` + `usecase/underwriting` + `interfaces/underwriting` + `infrastructure/underwriting` | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` 端口与 `PolicySnapshot`、`UnderwritingResult` 值对象；承保分流、回调用例与事务服务；回调 HTTP 接口；Feign 承保客户端 | 保单查询、自动承保发起与承保完成确认 |
 | `domain/integration` + `usecase/integration` + `interfaces/integration` + `infrastructure/integration` | `OutboxEventRepository`、`ConsumedEventRepository`、`InteractionLogRepository` 端口与实现；`ApplicationLifecycleRecordFactory` 记录装配；`OutboxRelayUseCase` 与 MQ 投递器；`ApplicationCompensationUseCase` 补偿调度；`OutboxRelayPolicy`、`ApplicationCompensationPolicy` 策略端口及其 `infrastructure/integration/config` 配置适配器 | 平台异步内核：投递、消费去重、交互轨迹与滞留补偿，允许编排业务域用例 |
@@ -120,7 +120,7 @@ sequenceDiagram
 | `UnderwritingCallbackUseCase` | 承保完成通知幂等处理，推进 `UNDERWRITING → WAIT_AUDIT` |
 | `ApplicationCompensationUseCase` | 恢复投递滞留、`ACCEPTED` 滞留与 `UNDERWRITING` 超时 |
 | `ApplicationLifecycleRecordFactory` | 构建交互事件与 `AUDIT_DELIVERY_REQUESTED` 事件，不访问数据库 |
-| `ClaimApplication` | 平台统一理赔申请模型，持有四类 `PersonInfo` 人员值对象；保单查询通过 `primaryInsuredCertificateNo()` 读取主被保险人证件号 |
+| `ClaimApplication` | 平台统一理赔申请模型，持有 `Applicant`、`PrimaryInsured`、`AccidentPerson`、`Payee` 四个人员角色值对象；保单查询通过 `primaryInsuredCertificateNo()` 读取主被保险人证件号 |
 | `MaterialFileProcessor` | 材料文件上传端口，返回上传后地址或失败原因 |
 | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` | 承保能力端口：保单查询、发起自动承保、查询承保结果，用例层只依赖这三个接口 |
 | `FeignMaterialFileProcessor`、`FeignValidPolicyQuery`、`FeignAutoUnderwritingRequester`、`FeignUnderwritingResultQuery` | 端口适配器：把领域请求转换为 Feign 报文，异常向上抛出表示外部系统不可用 |

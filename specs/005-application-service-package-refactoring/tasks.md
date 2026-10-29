@@ -1,5 +1,7 @@
 # 005 理赔申请服务包重构任务
 
+> 2026-10-29 起功能定稿前不保留单元测试：下文任务提到的测试类与测试包已随该决定删除，任务正文按当时交付记录保留。包结构在 2026-10-29 又做了一轮子包拆分（`domain/<聚合>/port`、`domain/claim/person`、`tenantprotocol/core/{pipeline,stage}`、`tenants/{tenant_a,tenant_b}`、`intake/web/render`），当前形态以本 Spec design 的目录词典与 `docs/architecture/ddd-standard-architecture.md` 为准。
+
 ## T1 包结构与代码迁移
 
 - 状态：已完成
@@ -11,7 +13,7 @@
 
 - 状态：已完成
 - 对应 design：目标目录、依赖方向规则、数据模型和接口设计、对现有功能的影响
-- 产物：迁移后的测试包；本 Spec 的依赖方向规则与目标目录；`docs/architecture/claim-application-architecture.md` 目录说明；`docs/architecture/ddd-standard-architecture.md` 标准说明与扫描自检；003、004 design 的改动模块表按最终目录改写。
+- 产物：迁移后的测试包（已随 2026-10-29 单元测试整体回退而删除）；本 Spec 的依赖方向规则与目标目录；`docs/architecture/claim-application-architecture.md` 目录说明；`docs/architecture/ddd-standard-architecture.md` 标准说明与扫描自检；003、004 design 的改动模块表按最终目录改写。
 - 完成条件：测试代码无旧包引用，文档准确描述层目录、依赖方向约束与网关压测入口。
 
 ## T3 构建与回归验证
@@ -19,7 +21,7 @@
 - 状态：已完成
 - 对应 design：依赖方向规则、基础设施与异常处理
 - 产物：Maven 测试结果、依赖方向检查结果与经网关的运行栈黄金路径验证记录。
-- 完成条件：`mvn -B -pl backend/claim-application-service -am test` 通过；跨域 `interfaces`/`infrastructure` 引用、DO 跨层、`domain` 依赖基础设施框架均为 0；JMeter 默认入口仍为网关，首次签收、同号幂等、同号并发、`ACCEPT_FAILED` 重新申请与未支持租户错误映射行为与迁移前一致。
+- 完成条件：`mvn -B -pl backend/claim-application-service -am package` 编译通过（2026-10-29 起单元测试已整体回退，`test` 阶段无用例）；跨域 `interfaces`/`infrastructure` 引用、DO 跨层、`domain` 依赖基础设施框架均为 0；JMeter 默认入口仍为网关，首次签收、同号幂等、同号并发、`ACCEPT_FAILED` 重新申请与未支持租户错误映射行为与迁移前一致。
 
 ## T4 标准目录词典对齐
 
@@ -39,7 +41,7 @@
 
 - 状态：已完成（代码与单测通过，黄金路径回归并入 T7）
 - 对应 design：目录词典（标准强制项：聚合根封装、聚合创建知识只留在 owning 域）、聚合封装与所有权归位
-- 产物：`ClaimApplication`、`Material` 去 Lombok setter、构造器私有并增 `restore(...)` 反水化工厂，主键改由 `bindId(...)` 守卫回填；`MaterialDataConverter` 读方向改 `default` 方法调 `Material.restore`，`ApplicationDataConverter` 因 MapStruct 无法向抽象基类做构造器注入且聚合无 setter 而整体改为显式手写的普通 Spring 组件；`ApplicationIntakeRecordFactory` 的 Outbox 与交互日志构造改委托 `ApplicationLifecycleRecordFactory` 并缩为 `ApplicationIntakeMaterialFactory`；材料创建改为 `MaterialSubmission.toMaterial(applicationNo, batchNo)`；受影响测试的 `setStatus`/`setId` 改用受控工厂；005 与本文件、`docs/architecture` 同步。
+- 产物：`ClaimApplication`、`Material` 去 Lombok setter、构造器私有并增 `restore(...)` 反水化工厂，主键改由 `bindId(...)` 守卫回填；`MaterialDataConverter` 读方向改 `default` 方法调 `Material.restore`，`ApplicationDataConverter` 因 MapStruct 无法向抽象基类做构造器注入且聚合无 setter 而整体改为显式手写的普通 Spring 组件；`ApplicationIntakeRecordFactory` 的 Outbox 与交互日志构造改委托 `ApplicationLifecycleRecordFactory` 并缩为 `ClaimApplicationIntakeMaterialFactory`；材料创建改为 `MaterialSubmission.toMaterial(applicationNo, batchNo)`；受影响测试的 `setStatus`/`setId` 改用受控工厂；005 与本文件、`docs/architecture` 同步。
 - 完成条件：`domain` 聚合根无公开 setter 且构造器私有；`usecase/integration/record` 与 `domain/integration` 之外不出现 `new OutboxEvent`、`OutboxEvent.pending`、`new InteractionLog`；`domain/material` 之外不出现 `new Material`；状态流转、错误码、HTTP 响应与落库结果与归位前逐项一致；`mvn -B -pl backend/claim-application-service -am test` 通过。
 
 ## T7 回退为层级优先目录
@@ -53,19 +55,19 @@
 
 - 状态：已完成
 - 对应 design：目录词典（标准强制项：聚合创建知识归属、同一后缀单一含义）、位置与名称复核
-- 产物：交互事件聚合构造收回 `domain/integration/interaction`——新增 `InteractionLog.of(...)` 工厂与 `InteractionDirection`、`InteractionResultStatus` 枚举，`InteractionType.direction()/targetSystem()`、`InteractionAction.resultStatus()` 承载固定映射，`ApplicationLifecycleRecordFactory` 去掉三份 `switch`、七个字符串常量和 `new InteractionLog`；删除 `ApplicationIntakeUseCase` 接口并把实现 `ApplicationIntakeService` 改名为 `ApplicationIntakeUseCase`（含测试类）；`TenantProtocolValidation` 改名 `TenantProtocolFieldGuard`，其"构建不合法异常"下沉为 `ApplicationIntakeException.invalid(...)` 并统一五处调用点与 `TenantProtocolPipeline{Registry,Factory}`、签收用例中的同类构造；`ApplicationIntakeExceptionHandler` 的 `@RestControllerAdvice` 限定 `basePackages` 到 `interfaces.intake.web`；归零扫描第 10 项去掉 `usecase/integration/record` 白名单并新增第 11 项词汇唯一性；架构文档第 1、3、4、5 节与 003 Spec 的类名同步。
+- 产物：交互事件聚合构造收回 `domain/integration/interaction`——新增 `InteractionLog.of(...)` 工厂与 `InteractionDirection`、`InteractionResultStatus` 枚举，`InteractionType.direction()/targetSystem()`、`InteractionAction.resultStatus()` 承载固定映射，`ApplicationLifecycleRecordFactory` 去掉三份 `switch`、七个字符串常量和 `new InteractionLog`；删除 `ClaimApplicationIntakeUseCase` 接口并把实现 `ApplicationIntakeService` 改名为 `ClaimApplicationIntakeUseCase`（含测试类）；`TenantProtocolValidation` 改名 `TenantProtocolFieldGuard`，其"构建不合法异常"下沉为 `ApplicationIntakeException.invalid(...)` 并统一五处调用点与 `TenantProtocolPipeline{Registry,Factory}`、签收用例中的同类构造；`ApplicationIntakeExceptionHandler` 的 `@RestControllerAdvice` 限定 `basePackages` 到 `interfaces.intake.web`；归零扫描第 10 项去掉 `usecase/integration/record` 白名单并新增第 11 项词汇唯一性；架构文档第 1、3、4、5 节与 003 Spec 的类名同步。
 - 完成条件：owning 域之外不出现聚合的 `new`（第 10 项为 0，无白名单）；交互词汇字面量只在 `domain/integration/interaction` 出现（第 11 项为 0）；`*UseCase` 后缀在四个域内都是具体类；无只差一个词的类名对；`mvn -B -pl backend/claim-application-service -am test` 通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、同号并发单行、未支持租户错误映射、tenant-b 协议、异步链路至 `WAIT_AUDIT`、材料失败与重新申请）与复核前逐项一致，落库的 `direction`/`target_system`/`result_status` 取值不变。
 
 ## T9 标准 DDD 归位收尾
 
 - 状态：已完成
 - 对应 design：目录词典（标准强制项：聚合组装只发生在用例与领域、配置绑定属于实现细节）、标准 DDD 归位追加
-- 产物：`MaterialSubmission` 由 `domain/material` 移入 `domain/claim`（申请提交的原始材料是签收命令的一部分），材料聚合改为提供 `Material.createPending(applicationNo, batchNo, submission)` 重载，删除 `toMaterial(...)`；`ApplicationIntakeCacheStaleException` 改名 `ApplicationExistenceMismatchException`，用例层的内部重试信号不再借用缓存词汇；`tenantprotocol/tenant` 改名 `tenantprotocol/tenants`；`OutboxRelayProperties`、`ApplicationCompensationProperties` 移出 `usecase` 到 `infrastructure/integration/config`，分别实现新增的 `domain/integration/outbox/OutboxRelayPolicy`、`domain/integration/compensation/ApplicationCompensationPolicy`，退避移位与截断算法随适配器从用例迁入；新增 `usecase/intake/command/ApplicationIntakeCommand`，租户协议 `Converter`/`Pipeline`/`AbstractTenantProtocolPipeline`/`PipelineFactory`/`Controller` 全链路改为产出命令，`ClaimApplication.submit(...)` 由 `ApplicationIntakeUseCase` 调用；两个用例测试改打桩策略端口，新增 `OutboxRelayPropertiesTest` 覆盖退避曲线；架构文档第 1～5 节与本 Spec 同步（扫描第 8 项端口数改为 16，新增第 12 项"入站层不引用聚合根"与第 13 项"用例层不绑定配置"）。
+- 产物：`MaterialSubmission` 由 `domain/material` 移入 `domain/claim`（申请提交的原始材料是签收命令的一部分），材料聚合改为提供 `Material.createPending(applicationNo, batchNo, submission)` 重载，删除 `toMaterial(...)`；`ApplicationIntakeCacheStaleException` 改名 `ApplicationExistenceMismatchException`，用例层的内部重试信号不再借用缓存词汇；`tenantprotocol/tenant` 改名 `tenantprotocol/tenants`；`OutboxRelayProperties`、`ApplicationCompensationProperties` 移出 `usecase` 到 `infrastructure/integration/config`，分别实现新增的 `domain/integration/outbox/OutboxRelayPolicy`、`domain/integration/compensation/ApplicationCompensationPolicy`，退避移位与截断算法随适配器从用例迁入；新增 `usecase/intake/command/ClaimApplicationIntakeCommand`，租户协议 `Converter`/`Pipeline`/`AbstractTenantProtocolPipeline`/`PipelineFactory`/`Controller` 全链路改为产出命令，`ClaimApplication.submit(...)` 由 `ClaimApplicationIntakeUseCase` 调用；两个用例测试改打桩策略端口，新增 `OutboxRelayPropertiesTest` 覆盖退避曲线；架构文档第 1～5 节与本 Spec 同步（扫描第 8 项端口数改为 16，新增第 12 项"入站层不引用聚合根"与第 13 项"用例层不绑定配置"）。
 - 完成条件：`interfaces` 对 `ClaimApplication` 的引用为 0（第 12 项为 0）；`usecase` 无 `@ConfigurationProperties` 且不 import `infrastructure`（第 4 项为 0）；`domain` 端口 16 个（第 8 项）；聚合工厂调用点只在 `domain` 与 `usecase`；`mvn -B -pl backend/claim-application-service -am test` 通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、同号并发单行、未支持租户错误映射、tenant-b 协议、异步链路至 `WAIT_AUDIT`、Outbox 双事件投递、材料失败与重新申请）与归位前逐项一致，落库字段与交互日志取值不变。
 
 ## T10 样板收敛（Lombok + SLF4J）
 
 - 状态：已完成
 - 对应 design：目录词典（本项目方言：依赖注入、日志与多字段装配的统一形态）
-- 产物：15 个类的手写 `private static final Logger LOGGER = LoggerFactory.getLogger(...)` 换成 `@Slf4j`，34 处 `LOGGER.` 调用点改 `log.`，`org.slf4j.Logger`/`LoggerFactory` import 删除；41 个纯赋值的 bean 构造器换成 `@RequiredArgsConstructor` + `private final`（`AbstractTenantProtocolPipeline` 用 `access = AccessLevel.PROTECTED` 保留子类 `super(...)` 调用），保留 5 处有逻辑的构造器：两个异常类需要 `super(message)`、两个租户流水线需要在 `super(...)` 里装配组件、`TenantApplicationResponseRouter` 需要在构造时过滤统一渲染器；`ClaimApplication`、`Material` 的逐字段赋值工厂体改为 `@Builder(access = AccessLevel.PRIVATE)` 的建造者链，公开创建入口仍只有 `submit`/`createPending`/`restore`；`ApplicationIntakeCommand` 加 `@Builder`，两个租户转换器按人员角色命名装配（四类同为 `PersonInfo`，位置参数易错位）；五个 `*DO` 加 `@Builder`+`@NoArgsConstructor`+`@AllArgsConstructor`，`ApplicationDataConverter`、`MyBatis{InteractionLog,OutboxEvent,ConsumedEvent}Repository` 的逐字段 setter 装配改为建造者链；架构文档第 5 节新增扫描第 14 项（手写 Logger）与第 15 项（手写构造器白名单 5 处）。
+- 产物：15 个类的手写 `private static final Logger LOGGER = LoggerFactory.getLogger(...)` 换成 `@Slf4j`，34 处 `LOGGER.` 调用点改 `log.`，`org.slf4j.Logger`/`LoggerFactory` import 删除；41 个纯赋值的 bean 构造器换成 `@RequiredArgsConstructor` + `private final`（`AbstractTenantProtocolPipeline` 用 `access = AccessLevel.PROTECTED` 保留子类 `super(...)` 调用），保留 5 处有逻辑的构造器：两个异常类需要 `super(message)`、两个租户流水线需要在 `super(...)` 里装配组件、`TenantApplicationResponseRouter` 需要在构造时过滤统一渲染器；`ClaimApplication`、`Material` 的逐字段赋值工厂体改为 `@Builder(access = AccessLevel.PRIVATE)` 的建造者链，公开创建入口仍只有 `submit`/`createPending`/`restore`；`ClaimApplicationIntakeCommand` 加 `@Builder`，两个租户转换器按人员角色命名装配（申请人、主被保险人、出险人、领款人各为一个角色类型，位置参数易错位）；五个 `*DO` 加 `@Builder`+`@NoArgsConstructor`+`@AllArgsConstructor`，`ApplicationDataConverter`、`MyBatis{InteractionLog,OutboxEvent,ConsumedEvent}Repository` 的逐字段 setter 装配改为建造者链；架构文档第 5 节新增扫描第 14 项（手写 Logger）与第 15 项（手写构造器白名单，条数以架构文档第 5 节当前结果为准）。
 - 完成条件：扫描第 14 项为 0、第 15 项为 5；`domain` 聚合根无公开 setter（第 9 项为 0）且 owning 域之外不出现聚合 `new`（第 10 项为 0）；生产类数不变（133）；`mvn -B test` 90 个测试全通过；经 `claim-gateway` 的黄金路径与收敛前逐项一致且落库字段不变，应用日志 `ERROR` 为 0。

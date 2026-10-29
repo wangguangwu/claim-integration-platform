@@ -1,0 +1,36 @@
+package com.wangguangwu.claim.application.domain.claim.person;
+
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.Accessors;
+
+/**
+ * 理赔申请参与人员的标准化身份信息基类，四个业务角色各自继承本类。
+ *
+ * <p>基类只承载姓名、性别、证件类型与证件号四个基础字段，角色差异由子类表达：
+ * 申请人、主被保险人、出险人和领款人各用独立类型传递，装配错位无法通过编译。
+ * 证件号属于敏感信息，本类不提供 {@code toString}，日志与异常信息只允许输出角色与申请编号。</p>
+ *
+ * @author wangguangwu
+ * @since 2026-10-27
+ */
+@Getter
+@Accessors(fluent = true)
+@EqualsAndHashCode
+@RequiredArgsConstructor(access = AccessLevel.PROTECTED)
+public abstract sealed class PersonInfo permits Applicant, PrimaryInsured, AccidentPerson, Payee {
+
+    /** 姓名。 */
+    private final String name;
+
+    /** 性别。 */
+    private final Gender gender;
+
+    /** 证件类型。 */
+    private final String certificateType;
+
+    /** 证件号码。 */
+    private final String certificateNo;
+}
