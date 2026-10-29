@@ -10,7 +10,7 @@
 | Redis 7.4.11 | `6379` | 缓存、协调与幂等辅助能力 |
 | RocketMQ NameServer 5.5.0 | `9876` | RocketMQ 路由发现 |
 | RocketMQ Broker 5.5.0 | `10911`、`10909` | 理赔申请异步命令 Topic |
-| RocketMQ Dashboard 2.1.0 | `8082` | 查看 NameServer、Broker、Topic 和消费者状态 |
+| RocketMQ Dashboard 2.1.0 | `8090` | 查看 NameServer、Broker、Topic 和消费者状态 |
 
 ## Apple Silicon（M 系列芯片）
 

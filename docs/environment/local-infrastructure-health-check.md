@@ -73,7 +73,7 @@ docker exec claim-rocketmq-broker sh mqadmin topicList -n rocketmq-namesrv:9876
 
 ## RocketMQ Dashboard
 
-访问 [http://127.0.0.1:8082](http://127.0.0.1:8082)，使用 `deploy/.env` 或 `.env.example` 中的 `ROCKETMQ_DASHBOARD_USERNAME`、`ROCKETMQ_DASHBOARD_PASSWORD` 登录。
+访问 [http://127.0.0.1:8090](http://127.0.0.1:8090)，使用 `deploy/.env` 或 `.env.example` 中的 `ROCKETMQ_DASHBOARD_USERNAME`、`ROCKETMQ_DASHBOARD_PASSWORD` 登录。宿主机端口用 8090 是为了给 `claim-case-service` 留出 8082。
 
 登录后可按以下路径检查：
 
