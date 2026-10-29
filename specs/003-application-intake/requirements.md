@@ -10,7 +10,7 @@
 
 ### 统一接入
 
-- 租户通过 `POST /api/application/v1/claim-applications` 提交申请，必须携带 `X-Tenant-Code`、`X-Protocol-Version`；`X-Trace-Id` 缺失时由网关生成。
+- 租户通过 `POST /api/claim/v1/application/intake` 提交申请，必须携带 `X-Tenant-Code`、`X-Protocol-Version`；`X-Trace-Id` 缺失时由网关生成。
 - 接入层由 `TenantProtocolPipelineFactory` 按 `tenantCode + protocolVersion` 从 `TenantProtocolPipelineRegistry` 获取流水线。流水线固定按“验签、解密、解析、校验、转换”五步工作：真实租户按协议实现验签、解密，解析器把明文报文反序列化为租户 request，校验器校验必填字段与嵌套结构，转换器把各租户字段归一化为同一份受理命令（平台标准人员与材料字段）；用例据命令创建 `ClaimApplication`，领域及用例层不接收租户私有字段，接入层也不组装聚合。
 - 未找到协议流水线、验签失败、解密失败、报文解析失败或字段校验失败时，必须返回明确业务错误，不创建理赔申请、Material 或 OutboxEvent。
 - 受理命令与 `ClaimApplication` 至少包含外部申请号、申请人、主被保险人、出险人、领款人和首次材料；四类人员信息独立保存，不得相互覆盖。

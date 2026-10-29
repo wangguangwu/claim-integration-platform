@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/application/v1/callbacks")
+@RequestMapping("/api/claim/v1/callbacks")
 public class UnderwritingCallbackController {
 
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;

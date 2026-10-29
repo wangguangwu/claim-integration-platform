@@ -17,8 +17,9 @@
 | 事件类型 | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` |
 | 交互类型 | `APPLICATION_INTAKE` | `CLAIM_APPLICATION_INTAKE` |
 | 错误码 | `APPLICATION_INTAKE_INVALID`、`APPLICATION_INTAKE_BUSY`、`APPLICATION_INTAKE_SYSTEM_ERROR` | `CLAIM_APPLICATION_INTAKE_INVALID`、`CLAIM_APPLICATION_INTAKE_BUSY`、`CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR` |
+| HTTP 接口前缀 | `/api/application/v1`，网关 `Path=/api/application/**` | `/api/claim/v1`，网关 `Path=/api/claim/**` |
 
-REST 前缀 `/api/application/v1`、网关路由 `Path=/api/application/**`、MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；租户私有入参字段名不受影响。
+MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；租户私有入参字段名不受影响。
 
 
 ## HTTP 契约
@@ -36,12 +37,12 @@ REST 前缀 `/api/application/v1`、网关路由 `Path=/api/application/**`、MQ
 
 | 接口 | 方法 | 调用方 | 用途 | 关联字段 |
 |---|---|---|---|---|
-| `/api/application/v1/claim-applications` | `POST` | 租户系统 | 提交理赔申请| `externalClaimApplicationNo` |
-| `/api/application/v1/claim-applications/{claimApplicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `claimApplicationNo`、`batchNo` |
-| `/api/application/v1/claim-applications/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `claimApplicationNo` |
-| `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `claimApplicationNo`、`caseNos`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
+| `/api/claim/v1/application/intake` | `POST` | 租户系统 | 提交理赔申请| `externalClaimApplicationNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `claimApplicationNo`、`batchNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `claimApplicationNo` |
+| `/api/claim/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
+| `/api/claim/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `claimApplicationNo`、`caseNos`、`X-Request-Id` |
+| `/api/claim/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
 
 成功响应：
 

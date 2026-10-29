@@ -38,7 +38,7 @@ sequenceDiagram
     participant RDS as Redis
     participant DB as MySQL
 
-    T->>G: POST claim-applications + 租户头
+    T->>G: POST /api/claim/v1/application/intake + 租户头
     G->>R: 原始请求与 TenantContext
     R->>R: 选择流水线
     R->>R: 解析租户 request、校验字段、归一化为受理命令
@@ -239,7 +239,7 @@ flowchart TD
 
 | 项目 | 定义 |
 |---|---|
-| 路径 | `POST /api/application/v1/claim-applications` |
+| 路径 | `POST /api/claim/v1/application/intake` |
 | 调用方 | 租户系统 |
 | 必填请求头 | `X-Tenant-Code`、`X-Protocol-Version` |
 | 可选请求头 | `X-Trace-Id` |

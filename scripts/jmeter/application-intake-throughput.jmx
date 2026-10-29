@@ -36,7 +36,7 @@
           <stringProp name="HTTPSampler.domain">${__P(HOST,127.0.0.1)}</stringProp>
           <stringProp name="HTTPSampler.port">${__P(PORT,8080)}</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
-          <stringProp name="HTTPSampler.path">/api/application/v1/claim-applications</stringProp>
+          <stringProp name="HTTPSampler.path">/api/claim/v1/application/intake</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>

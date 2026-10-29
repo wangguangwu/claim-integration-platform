@@ -37,7 +37,7 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 `tenant-a` 租户报文要求申请人、被保险人、出险人、领款人四个人员节点与 `attachments` 材料数组，性别只支持 `M`、`F`。
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8081/api/application/v1/claim-applications \
+curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-Code: tenant-a' \
   -H 'X-Protocol-Version: v1' \
@@ -58,7 +58,7 @@ curl -sS -X POST http://127.0.0.1:8081/api/application/v1/claim-applications \
 响应 `data.claimApplicationNo` 即平台申请编号，后续命令用变量承接：
 
 ```bash
-APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/application/v1/claim-applications \
+APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
   -H 'Content-Type: application/json' -H 'X-Tenant-Code: tenant-a' -H 'X-Protocol-Version: v1' \
   -H 'X-Request-Id: verify-004-001' -H 'X-Trace-Id: trace-004-001' -d @request.json \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["claimApplicationNo"])')
@@ -138,7 +138,7 @@ curl -sS -X DELETE http://127.0.0.1:8081/mock/underwriting/policies/110101199001
 1. 重复调用承保完成回调：
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8081/api/application/v1/callbacks/underwriting-completed \
+curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
   -H 'Content-Type: application/json' \
   -H 'X-Request-Id: verify-004-callback-dup' \
   -d "{\"claimApplicationNo\": \"$APP_NO\"}"
