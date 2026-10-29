@@ -10,7 +10,6 @@ import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/application/v1/claim-applications")
+@RequestMapping("/api/claim/v1/application")
 public class ClaimApplicationIntakeController {
 
     private final TenantProtocolPipelineFactory pipelineFactory;
@@ -39,7 +38,7 @@ public class ClaimApplicationIntakeController {
      * @param request    当前 HTTP 请求
      * @return 租户协议响应
      */
-    @PostMapping(consumes = MediaType.ALL_VALUE)
+    @PostMapping("/intake")
     public ResponseEntity<Object> intake(@RequestBody String rawPayload, HttpServletRequest request) {
         TenantInfo tenantInfo = TenantContext.get();
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);

@@ -14,7 +14,7 @@ spring:
             - id: claim-application-service
               uri: ${CLAIM_APPLICATION_SERVICE_URI:${claim.gateway.route.application-service}}
               predicates:
-                - Path=/api/application/**
+                - Path=/api/claim/**
             - id: claim-case-service
               uri: ${CLAIM_CASE_SERVICE_URI:${claim.gateway.route.case-service}}
               predicates:
