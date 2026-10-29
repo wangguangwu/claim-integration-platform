@@ -80,7 +80,7 @@ sequenceDiagram
 
 ### 4.2 重投与死信
 
-消费函数不捕获业务异常，异常直接抛给 binder，由 RocketMQ 重投；重投次数用 binder 的 push 消费者属性显式声明：
+消费函数只在最外层做一件事：捕获异常记录一条 ERROR 后原样抛出，交给 binder 由 RocketMQ 重投；不吞异常、不确认消费。重投次数用 binder 的 push 消费者属性显式声明：
 
 ```yaml
 spring:
@@ -109,6 +109,7 @@ spring:
 
 ### 4.3 观测
 
+- 每次消费失败由 `AuditDeliveryConsumer` / `MaterialProcessConsumer` 打印一条 ERROR，含 `consumerGroup`、`claimApplicationNo`、`eventId` 与异常摘要；只打印摘要不打印堆栈，堆栈由本地实现与 binder 输出，避免同一异常重复打印。
 - 每次重投由 binder 打印消费失败日志。
 - 本地实现抛错时自己打印一条 ERROR，带 `claimApplicationNo` 与目标系统。
 - 死信只通过 broker 侧观察，平台不额外落表，避免为失败路径新建数据模型。
@@ -163,7 +164,7 @@ claim:
 ### 6.2 实现约定
 
 - 休眠封装为一个私有方法：时长为 0 直接返回；`InterruptedException` 恢复中断标记后抛 `IllegalStateException`。
-- 日志统一格式：`外部系统本地实现调用，targetSystem={}, interactionType={}, claimApplicationNo={}, delay={}`，不打印证件号、文件地址、报文。
+- 日志统一格式：`外部系统本地实现调用，targetSystem={}, interactionType={}, claimApplicationNo={}, delay={}`，不打印证件号、文件地址、报文。保单查询端口的入参不含申请编号，日志中该字段固定为 `-`。
 - 文件上传成功返回 `https://local.invalid/material/<claimApplicationNo>/<materialType>`，失败返回约定错误码 `LOCAL_UPLOAD_REJECTED`。
 
 ### 6.3 与端口的关系

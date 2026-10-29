@@ -112,7 +112,7 @@ InteractionLog 以“一个事件一条记录”保存跨系统和材料处理�
 | `IN202610270001` | `IMAGE_UPLOAD` | `STARTED` | `PROCESSING` | `2026-10-27T10:00:00+08:00` |
 | `IN202610270001` | `IMAGE_UPLOAD` | `COMPLETED` | `SUCCESS` | `2026-10-27T10:00:03+08:00` |
 
-查询同一 `interaction_no` 并按 `occurred_at` 升序排列，即可恢复一个完整行为。失败时新增 `action=FAILED` 的独立事件，不更新或覆盖开始事件。
+查询同一 `interaction_no` 并按 `occurred_at` 升序排列，即可恢复一个完整行为。业务失败时新增 `action=FAILED` 的独立事件，不更新或覆盖开始事件；外部调用抛异常导致消费失败时不写任何轨迹，申请保持原状态，由消息重投恢复。
 
 ## 外部系统接入
 

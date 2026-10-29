@@ -23,7 +23,7 @@
 2. 消费者先按 `(消费者组, eventId)` 判重，已消费直接跳过，不重复调用审核系统。
 3. 只有处于 `WAIT_AUDIT` 的申请才交付审核系统；状态不匹配按重复事件处理，记录 `REUSED` 轨迹后登记消费。
 4. 交付不改变申请状态，`WAIT_AUDIT` 既是交付前状态也是本阶段终态。
-5. 每次交付记录一组交互轨迹：`interactionType=AUDIT_DELIVERY`，`action=STARTED/COMPLETED/REUSED/FAILED`，`requestId` 取消息 `eventId`。
+5. 每次交付记录一组交互轨迹：`interactionType=AUDIT_DELIVERY`，`action=STARTED/COMPLETED/REUSED`，`requestId` 取消息 `eventId`。交付抛异常时按第 10 条不写轨迹、不登记消费，只由第 11 条留下 ERROR 日志后重投。
 6. 申请不存在时按系统异常处理，不登记消费，抛出让 MQ 重投。
 
 ### 消费失败处理
@@ -43,7 +43,7 @@
 ### 外部系统本地实现
 
 15. 文件上传、保单查询、自动承保请求、承保结果查询、审核交付五个端口各提供一个进程内实现，不发起任何 HTTP 调用。
-16. 每次调用按配置休眠（默认 200 毫秒，0 表示不休眠），并打印一条 INFO 交互日志，含交互类型、`claimApplicationNo`、目标系统。
+16. 每次调用按配置休眠（默认 200 毫秒，0 表示不休眠），并打印一条 INFO 交互日志，含交互类型、`claimApplicationNo`、目标系统；端口入参不携带申请编号时该字段记 `-`。
 17. 交互日志不得输出证件号、文件原始地址等敏感信息。
 18. 返回结果由配置决定：保单是否存在、承保结果、需要拒绝的材料类型清单、审核交付是否故意失败。
 19. 平台不再保留 Feign 客户端、`@EnableFeignClients`、openfeign 依赖与 mock HTTP 入口。
@@ -52,8 +52,9 @@
 
 1. 有保单：签收 → 材料处理（本地实现返回成功）→ 保单查询命中 → `WAIT_AUDIT` → 审核交付消费 → 轨迹 `AUDIT_DELIVERY` 的 `STARTED` 与 `COMPLETED`。
 2. 无保单：签收 → 材料处理 → `UNDERWRITING` → 承保结果查询返回 `COMPLETED` → `WAIT_AUDIT` → 审核交付消费。
-3. 重复消息：同一 `eventId` 再次投递，不重复调用外部实现，轨迹记 `REUSED`，数据不变。
-4. 重新申请：`ACCEPT_FAILED` 后用同一外部申请号重新提交，材料重新处理并继续后续链路。
+3. 重复消息：同一 `eventId` 再次投递，消费登记判定已消费后直接跳过，不重复调用外部实现，不新增轨迹，数据不变。
+4. 状态不匹配的新事件（申请已不在 `WAIT_AUDIT`）：不调用外部实现，轨迹记 `REUSED` 并登记消费。
+5. 重新申请：`ACCEPT_FAILED` 后用同一外部申请号重新提交，材料重新处理并继续后续链路。
 
 ## 异常场景
 
@@ -92,7 +93,7 @@
 ## 验收标准
 
 1. 有保单与无保单两条路径都能从签收走到审核交付消费完成，`t_claim_interaction_log` 出现完整的 `AUDIT_DELIVERY` 行为组。
-2. 同一 `eventId` 重复投递时审核交付不再调用外部实现，轨迹记 `REUSED`。
+2. 同一 `eventId` 重复投递时审核交付不再调用外部实现：日志出现"已消费，跳过处理"，`t_claim_interaction_log` 与 `t_claim_consumed_event` 行数不变。
 3. 开启审核交付失败开关后，日志可见重投次数与 `max-reconsume-times` 配置一致，最终消息进入 `%DLQ%claim-application-audit-delivery-v1`（broker 日志或控制台可见）。
 4. 材料全部失败时申请进入 `ACCEPT_FAILED` 且不产生承保轨迹。
 5. 把 `claim.compensation.pending-accept-timeout` 调到 10 秒后，人为丢弃材料消息，补偿在下一轮把申请推进到 `ACCEPTED` 或 `WAIT_AUDIT`。

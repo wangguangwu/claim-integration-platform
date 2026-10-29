@@ -21,7 +21,7 @@
 
 | 编号 | 任务 | 产物 | 完成条件 |
 |---|---|---|---|
-| T8 | 重投与死信配置 | `spring.cloud.stream.rocketmq.bindings.{materialProcess,auditDelivery}-in-0.consumer.push.max-reconsume-times` | 两个 binding 显式声明重投次数并支持环境变量覆盖；消费函数不捕获业务异常；死信主题名写入设计文档 |
+| T8 | 重投与死信配置 | `spring.cloud.stream.rocketmq.bindings.{materialProcess,auditDelivery}-in-0.consumer.push.max-reconsume-times`；两个消费函数的失败日志 | 两个 binding 显式声明重投次数并支持环境变量覆盖；消费函数捕获异常仅用于打印一条 ERROR（含 `consumerGroup`、`claimApplicationNo`、`eventId`）后原样抛出，不确认消费；死信主题名写入设计文档 |
 
 ## 第 4 批 · 补偿补齐
 
@@ -63,7 +63,9 @@
 | 重复回调 | 对已 `WAIT_AUDIT` 的申请再次回调返回 `REUSED`，`AUDIT_DELIVERY_REQUESTED` 仍为 1 条 |
 | Broker 停机后再恢复 | 签收返回 `SUCCESS` 且状态 `PENDING_ACCEPT`，outbox `retry_count` 递增、健康检查保持 `UP`；`pending-accept-timeout=10s` 时补偿以 `compensation-<申请号>-1` 直接把申请推进到 `UNDERWRITING`；Broker 恢复后待投事件补投为 `PUBLISHED`，重复消息记 `MATERIAL_PROCESS/REUSED` 且材料未重复上传 |
 | 材料失败 | `MATERIAL_TYPE_REJECTED` 命中本地失败名单时申请进入 `ACCEPT_FAILED`，该材料 `FAILED` 且无上传地址，错误码 `LOCAL_UPLOAD_REJECTED`，其余材料 `PROCESSED` |
-| 审核交付失败进入死信 | `fail-audit-delivery=true` 且 `max-reconsume-times=1` 时同一事件两次失败后进入 `%DLQ%claim-application-audit-delivery-v1`，不写 `AUDIT_DELIVERY` 轨迹，outbox 保持 `PUBLISHED` 不被重复投递 |
+| 审核交付失败进入死信 | `fail-audit-delivery=true` 且 `max-reconsume-times=1` 时同一事件两次失败后进入 `%DLQ%claim-application-audit-delivery-v1`（`Max Offset=1`），不写 `AUDIT_DELIVERY` 轨迹，outbox 保持 `PUBLISHED` 不被重复投递 |
+| 消费失败日志 | `A2026102900000057` 的失败演练中，每次投递各有一条「审核交付消费失败」ERROR，含 `consumerGroup=claim-application-audit-delivery-v1`、`claimApplicationNo`、`eventId` 与异常摘要，无证件号 |
+| 重复消息 | 回拨 `claim-application-audit-delivery-v1` 消费位点重投同一事件，日志出现「审核交付事件已消费，跳过处理」，`t_claim_interaction_log` 与 `t_claim_consumed_event` 行数不变 |
 | 敏感信息 | 上述运行日志中证件号、原始文件地址、上传地址命中 0 |
 
 验证前清理了本地 Broker 中 007 改名前的历史报文：这些报文缺 `claimApplicationNo`，新消费者无法处理会反复重投，删除 `claim_application_audit_delivery_v1` 及其重试、死信主题后重建。该操作只影响本地联调数据，申请与事件状态以 MySQL 为准。

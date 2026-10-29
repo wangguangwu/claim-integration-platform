@@ -156,7 +156,7 @@ curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-compl
 
 预期返回 200，`data.disposition` 为 `REUSED`；`t_claim_outbox_event` 中 `AUDIT_DELIVERY_REQUESTED` 仍只有一条，申请状态不变。
 
-2. 重复消费验证：MQ 为至少一次投递，重复消息由 `t_claim_consumed_event` 的唯一约束拦截，材料不会重复上传、审核不会重复交付。核对 `t_claim_application_material` 行数不变、`t_claim_consumed_event` 中同一 `event_id` 仍只有一行。
+2. 重复消费验证：MQ 为至少一次投递，重复消息由 `t_claim_consumed_event` 的唯一约束拦截，材料不会重复上传、审核不会重复交付。核对 `t_claim_application_material` 行数不变、`t_claim_consumed_event` 中同一 `event_id` 仍只有一行。需要主动制造重复时，用 `mqadmin resetOffsetByTime` 回拨消费位点重投同一事件，日志出现「审核交付事件已消费，跳过处理」。
 
 ## 场景五：MQ 停机与待受理滞留补偿
 
@@ -230,14 +230,19 @@ java -jar backend/claim-application-service/target/claim-application-service-*.j
 
 2. 提交申请，申请进入 `WAIT_AUDIT` 后审核交付固定失败：
 
-- 应用日志出现两次「外部系统本地实现交付失败」的 ERROR，`claimApplicationNo` 可见、无证件号；
+- 应用日志出现「外部系统本地实现交付失败」ERROR，`claimApplicationNo` 可见、无证件号；次数等于初次投递加 `max-reconsume-times` 次重投（每次内部还会经 Spring Retry 重试若干次，日志条数因此多于投递次数）；
+- 每次投递失败另有一条「审核交付消费失败」ERROR，含 `consumerGroup=claim-application-audit-delivery-v1`、`claimApplicationNo`、`eventId`；
 - `t_claim_interaction_log` 没有 `AUDIT_DELIVERY` 行为组（外部调用失败，事务未开启）；
 - 重投耗尽后消息进入死信主题 `%DLQ%claim-application-audit-delivery-v1`，平台不消费死信。
 
 ```bash
-docker exec claim-rocketmq-broker sh -c 'mqadmin topicList -n 127.0.0.1:9876' \
-  | grep DLQ || echo "DLQ topic not found"
+docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topicList \
+  -n claim-rocketmq-namesrv:9876 | grep DLQ || echo "DLQ topic not found"
+docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topicStatus \
+  -n claim-rocketmq-namesrv:9876 -t '%DLQ%claim-application-audit-delivery-v1'
 ```
+
+预期 `#Max Offset` 为 1；平台没有死信消费者，读数不会继续增长。
 
 ## 状态核对清单
 
