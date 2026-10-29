@@ -58,6 +58,9 @@ public class ClaimApplication {
     /**
      * 创建租户协议提交结果，此时还没有平台申请编号与状态。
      *
+     * <p>租户编码、外部申请编号与材料清单是聚合创建的前置条件，非法输入在构造阶段拒绝；
+     * 人员字段由 {@code PersonInfo} 自行守卫。</p>
+     *
      * @param tenantCode            租户编码
      * @param externalClaimApplicationNo 外部申请编号
      * @param applicant             申请人
@@ -70,6 +73,15 @@ public class ClaimApplication {
     public static ClaimApplication submit(String tenantCode, String externalClaimApplicationNo, Applicant applicant,
                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
                                           List<MaterialSubmission> materials) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("租户编码不能为空");
+        }
+        if (externalClaimApplicationNo == null || externalClaimApplicationNo.isBlank()) {
+            throw new IllegalArgumentException("外部申请编号不能为空");
+        }
+        if (materials == null || materials.isEmpty()) {
+            throw new IllegalArgumentException("首次签收至少需要一项材料");
+        }
         return ClaimApplication.builder().tenantCode(tenantCode).externalClaimApplicationNo(externalClaimApplicationNo)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
                 .materials(materials).build();

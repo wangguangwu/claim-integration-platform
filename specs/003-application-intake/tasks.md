@@ -22,6 +22,7 @@
 - 对应 design：§总体架构、§主要类职责、§示例租户协议适配、§接口设计
 - 产物：TenantProtocolPipeline、AbstractTenantProtocolPipeline、TenantProtocolPipelineRegistry、TenantProtocolPipelineFactory、TenantProtocolParser/Validator/Converter 接口、TenantProtocolFieldGuard、租户 A 与租户 B 的 request record 及其解析/校验/转换组件与流水线
 - 完成条件：工厂按 TenantContext 的租户编码和协议版本从注册中心选择唯一流水线；流水线固定按验签、解密、解析、校验、转换执行，示例协议使用验签和明文直通默认实现；`tenant-a/v1` 与 `tenant-b/v1` 均正确归一化为同一份 `ClaimApplicationIntakeCommand` 受理命令；缺失或重复流水线返回明确错误；租户私有 DTO 不进入用例层；报文转换不使用 Jackson JsonNode
+- 后续变更：[008 签收必填校验注解化](../008-intake-annotation-validation/design.md) 已删除本任务产出的 `TenantProtocolFieldGuard` 与每租户 `*RequestValidator`，必填校验改由租户 request 上声明的 Bean Validation 注解承担
 
 ## T4 理赔申请与 Material 持久化
 

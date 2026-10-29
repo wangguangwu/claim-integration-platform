@@ -2,6 +2,8 @@ package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.tenan
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline.AbstractTenantProtocolPipeline;
+import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.BeanValidationTenantProtocolValidator;
+import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,8 +18,8 @@ public class TenantAProtocolPipeline extends AbstractTenantProtocolPipeline<Tena
     private static final String TENANT_CODE = "tenant-a";
     private static final String PROTOCOL_VERSION = "v1";
 
-    public TenantAProtocolPipeline(ObjectMapper objectMapper) {
+    public TenantAProtocolPipeline(ObjectMapper objectMapper, Validator validator) {
         super(TENANT_CODE, PROTOCOL_VERSION, new TenantARequestParser(objectMapper),
-                new TenantARequestValidator(), new TenantARequestConverter());
+                new BeanValidationTenantProtocolValidator<>(validator), new TenantARequestConverter());
     }
 }

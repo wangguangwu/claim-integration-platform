@@ -1,9 +1,16 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.tenants.tenant_a;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
  * A 租户申请报文，人员为扁平字段，材料位于 attachments。
+ *
+ * <p>必填约束由 Bean Validation 注解声明，字段路径即报文路径；
+ * 违规由 {@code BeanValidationTenantProtocolValidator} 统一翻译为平台业务异常。</p>
  *
  * @param requestNo   外部申请编号
  * @param applicant   申请人
@@ -15,12 +22,12 @@ import java.util.List;
  * @since 2026-10-27
  */
 public record TenantAIntakeRequest(
-        String requestNo,
-        TenantAPerson applicant,
-        TenantAPerson insured,
-        TenantAPerson accident,
-        TenantAPerson payee,
-        List<TenantAAttachment> attachments) {
+        @NotBlank(message = "不能为空") String requestNo,
+        @NotNull(message = "不能缺失") @Valid TenantAPerson applicant,
+        @NotNull(message = "不能缺失") @Valid TenantAPerson insured,
+        @NotNull(message = "不能缺失") @Valid TenantAPerson accident,
+        @NotNull(message = "不能缺失") @Valid TenantAPerson payee,
+        @NotEmpty(message = "不能为空") @Valid List<@NotNull(message = "不能缺失") TenantAAttachment> attachments) {
 
     /**
      * A 租户人员节点，性别使用单字母编码。
@@ -30,7 +37,11 @@ public record TenantAIntakeRequest(
      * @param idType   证件类型
      * @param idNo     证件号码
      */
-    public record TenantAPerson(String fullName, String sex, String idType, String idNo) {
+    public record TenantAPerson(
+            @NotBlank(message = "不能为空") String fullName,
+            @NotBlank(message = "不能为空") String sex,
+            @NotBlank(message = "不能为空") String idType,
+            @NotBlank(message = "不能为空") String idNo) {
     }
 
     /**
@@ -39,6 +50,8 @@ public record TenantAIntakeRequest(
      * @param type      材料类型
      * @param sourceUrl 材料原始地址
      */
-    public record TenantAAttachment(String type, String sourceUrl) {
+    public record TenantAAttachment(
+            @NotBlank(message = "不能为空") String type,
+            @NotBlank(message = "不能为空") String sourceUrl) {
     }
 }

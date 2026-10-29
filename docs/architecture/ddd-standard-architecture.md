@@ -58,7 +58,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
-| 报文防腐组件 | `*Parser`、`*Validator`、`*Converter`、`*FieldGuard` | `interfaces/<域>/tenantprotocol/core/stage`（端口）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/校验/转换） | `TenantARequestParser`、`TenantBRequestValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`）、`TenantProtocolFieldGuard` |
+| 报文防腐组件 | `*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/<域>/tenantprotocol/core/stage`（端口与适配器）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
 | 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ClaimApplicationResponseRenderer` |
 | 跨域契约 | 信封、命令 DTO | `shared/contract` | `ClaimApplicationEventEnvelope`、`UnderwritingCompletedCommand` |
 

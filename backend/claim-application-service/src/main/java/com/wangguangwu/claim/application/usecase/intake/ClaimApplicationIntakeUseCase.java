@@ -4,20 +4,18 @@ import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationExist
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
-import com.wangguangwu.claim.application.domain.claim.person.PersonInfo;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 /**
- * 理赔申请统一接入签收用例入口，负责参数校验、并发锁、事务外准备数据与唯一冲突恢复。
+ * 理赔申请统一接入签收用例入口，负责并发锁、事务外准备数据与唯一冲突恢复。
+ *
+ * <p>报文必填由租户 request 上的 Bean Validation 约束负责，领域不变式由聚合与值对象在构造处自守，
+ * 本类不重复字段校验，只编排锁、存在性判断、编号生成与事务落库。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -34,7 +32,7 @@ public class ClaimApplicationIntakeUseCase {
     private final ClaimApplicationIntakeTransactionService transactionService;
 
     /**
-     * 校验受理命令后创建理赔申请，并在同一外部申请号锁内签收，成功提交后失效存在性缓存。
+     * 创建理赔申请，并在同一外部申请号锁内签收，成功提交后失效存在性缓存。
      *
      * @param command   租户协议归一化后的受理命令
      * @param requestId 请求标识
@@ -42,7 +40,6 @@ public class ClaimApplicationIntakeUseCase {
      * @return 签收结果
      */
     public ClaimApplicationIntakeResult intake(ClaimApplicationIntakeCommand command, String requestId, String traceId) {
-        validate(command);
         ClaimApplication claimApplication = ClaimApplication.submit(command.tenantCode(), command.externalClaimApplicationNo(),
                 command.applicant(), command.primaryInsured(), command.accidentPerson(), command.payee(),
                 command.materials());
@@ -100,53 +97,6 @@ public class ClaimApplicationIntakeUseCase {
     private void evictAfterChanged(ClaimApplicationIntakeResult result, ClaimApplication claimApplication) {
         if (result.changed()) {
             claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
-        }
-    }
-
-    /**
-     * 校验用例层必须具备的标准字段，避免租户私有数据进入领域层。
-     *
-     * @param command 租户协议归一化后的受理命令
-     */
-    private void validate(ClaimApplicationIntakeCommand command) {
-        if (command == null || !StringUtils.hasText(command.tenantCode())
-                || !StringUtils.hasText(command.externalClaimApplicationNo())) {
-            throw ClaimApplicationIntakeException.invalid("租户编码和外部申请编号不能为空");
-        }
-        validatePerson(command.applicant(), "申请人");
-        validatePerson(command.primaryInsured(), "主被保险人");
-        validatePerson(command.accidentPerson(), "出险人");
-        validatePerson(command.payee(), "领款人");
-        validateMaterials(command.materials());
-    }
-
-    /**
-     * 校验四类人员的基础字段完整性。
-     *
-     * @param personInfo 人员信息
-     * @param personRole 人员角色名称
-     */
-    private void validatePerson(PersonInfo personInfo, String personRole) {
-        if (personInfo == null || !StringUtils.hasText(personInfo.name()) || personInfo.gender() == null
-                || !StringUtils.hasText(personInfo.certificateType())
-                || !StringUtils.hasText(personInfo.certificateNo())) {
-            throw ClaimApplicationIntakeException.invalid(personRole + "的姓名、性别、证件类型和证件号不能为空");
-        }
-    }
-
-    /**
-     * 校验至少存在一项材料，且每项保留类型和原始文件地址。
-     *
-     * @param materials 本次提交的材料
-     */
-    private void validateMaterials(List<MaterialSubmission> materials) {
-        if (materials == null || materials.isEmpty()) {
-            throw ClaimApplicationIntakeException.invalid("首次签收至少需要一项材料");
-        }
-        boolean invalidMaterial = materials.stream().anyMatch(material -> material == null
-                || !StringUtils.hasText(material.materialType()) || !StringUtils.hasText(material.originalFileUrl()));
-        if (invalidMaterial) {
-            throw ClaimApplicationIntakeException.invalid("材料类型和初始文件地址不能为空");
         }
     }
 }

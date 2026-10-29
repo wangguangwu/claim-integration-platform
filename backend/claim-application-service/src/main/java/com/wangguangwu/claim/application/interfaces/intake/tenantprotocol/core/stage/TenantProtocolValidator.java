@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage;
 
 /**
- * 租户私有报文校验器，校验必填字段与嵌套结构。
+ * 租户私有报文校验器，校验租户 request 上声明的 Bean Validation 约束。
  *
  * @param <R> 租户 request 类型
  * @author wangguangwu

@@ -17,7 +17,9 @@
 |---|---|---|---|---|
 | T5 | 删除租户响应渲染 SPI | 单一渲染入口 | `web/render` 剩 1 个类；两类租户与未支持租户响应逐字段不变 | #49 |
 | T6 | 删除零引用枚举值与伪端口 | 领域与端口签名收敛 | 引用计数归零或按新签名收敛；`PolicySnapshot` 不存在 | #50 |
-| T7 | 删除五个零引用依赖 | 根与模块 `pom.xml` | 各 pom 中上述 artifact 的直接声明计数 0（`spring-boot-starter-validation` 由 spring-cloud-stream 与 openfeign 传递引入，依赖树计数无法归零）；`clean package` 通过、jar 体积下降 | #51 |
+| T7 | 删除五个零引用依赖 | 根与模块 `pom.xml` | 各 pom 中上述 artifact 的直接声明计数 0（`spring-boot-starter-validation` 由 spring-cloud-stream 与 openfeign 传递引入，依赖树计数无法归零）；`clean package` 通过、jar 体积下降 |
+
+> 2026-10-29 修订：`spring-boot-starter-validation` 已由 [008 签收必填校验注解化](../008-intake-annotation-validation/design.md) 恢复为 `claim-application-service` 的直接依赖。T7 的删除依据是该依赖零引用，008 引入 `jakarta.validation` 注解后该前提失效；其余四个依赖仍保持删除。 #51 |
 
 ## 第 3 轮 · 语义收敛（先立本 Spec 语义，再改码）
 
@@ -27,7 +29,7 @@
 |---|---|---|---|---|
 | T8 | 业务异常与错误码合一 | `shared/contract` 单一异常与枚举、两个 advice、集成契约错误码表 | 异常类型数=1、错误码枚举数=1；既有错误响应逐条比对不变 | #57 |
 | T9 | 不变式失败映射业务码 | 领域抛业务异常、advice 映射 | 状态机违例经网关返回 4xx/业务码，不再 500；重试超限返回 `INTAKE_BUSY` | #47 |
-| T10 | 必填校验与状态判定单一化 | `PersonInfo`/`ClaimApplication` 自守、Validator 收缩、仓储去判定 | 重复实现点计数 0；非法输入在领域构造即失败；重新申请判定只出现在聚合 | #56（依赖 T9） |
+| T10 | 必填校验与状态判定单一化 | `PersonInfo`/`ClaimApplication` 自守、Validator 收缩、仓储去判定 | 重复实现点计数 0；非法输入在领域构造即失败；重新申请判定只出现在聚合 | #56（依赖 T9；必填校验部分由 [008](../008-intake-annotation-validation/design.md) 交付，本行状态以 008 完成为准） |
 | T11 | 租户接入实现去重 | 泛型 Parser、配置化 Pipeline、`toPerson` 装配 | `tenants` 行数 471→≤260；两类租户响应逐字段不变 | #55 |
 | T12 | 事件载荷类型化与 MQ 名称收口 | `shared/contract` 载荷 record、`MqContract`、tag 设置 | 载荷字符串键名非定义处引用 0；主题字面量 23→1 处定义；消费组双写消除 | #58 |
 | T13 | 契约路径外置与时间/映射风格统一 | Feign 路径配置化、`BusinessClock`、MapStruct 转换 | `Asia/Shanghai` 字面量 1 处；Feign 注解无 `/mock` 字面量；仓储内联转换 0；domain 无列宽常量 | #59 |

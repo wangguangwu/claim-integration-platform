@@ -1,9 +1,7 @@
 package com.wangguangwu.claim.application.domain.claim.person;
 
-import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
@@ -19,7 +17,6 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @EqualsAndHashCode
-@RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract sealed class PersonInfo permits Applicant, PrimaryInsured, AccidentPerson, Payee {
 
     /** 姓名。 */
@@ -33,4 +30,29 @@ public abstract sealed class PersonInfo permits Applicant, PrimaryInsured, Accid
 
     /** 证件号码。 */
     private final String certificateNo;
+
+    /**
+     * 创建人员身份信息，四个基础字段是人员不变式，非法输入在构造阶段拒绝。
+     *
+     * @param name            姓名
+     * @param gender          性别
+     * @param certificateType 证件类型
+     * @param certificateNo   证件号码
+     */
+    protected PersonInfo(String name, Gender gender, String certificateType, String certificateNo) {
+        this.name = requireText(name, "姓名");
+        if (gender == null) {
+            throw new IllegalArgumentException("性别不能为空");
+        }
+        this.gender = gender;
+        this.certificateType = requireText(certificateType, "证件类型");
+        this.certificateNo = requireText(certificateNo, "证件号");
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+        return value;
+    }
 }

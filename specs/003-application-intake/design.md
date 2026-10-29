@@ -91,10 +91,10 @@ sequenceDiagram
 | `TenantProtocolPipelineFactory` | 根据租户上下文获取对应的租户协议流水线，执行协议适配并返回 `ClaimApplicationIntakeCommand`，同时拒绝跨租户的转换结果 |
 | `AbstractTenantProtocolPipeline` | 租户协议流水线模板，固定「验签 → 解密 → 解析 → 校验 → 转换」执行链路；各节点提供默认实现，租户按需扩展，最终产出平台统一的受理命令 |
 | `TenantProtocolParser` | 把原始正文反序列化为租户 request 对象，不使用 Jackson JsonNode |
-| `TenantProtocolValidator` | 校验租户 request 的必填字段与嵌套结构 |
+| `TenantProtocolValidator` | 校验租户 request 上声明的 Bean Validation 约束，违规按字段路径报出 |
 | `TenantProtocolConverter` | 把租户 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，拒绝无法识别的枚举编码 |
-| `TenantProtocolFieldGuard` | 租户报文必填字段守卫，统一缺失字段的定位方式；异常统一由 `ClaimApplicationIntakeException.invalid` 构造 |
-| `ClaimApplicationIntakeUseCase` | 编排参数校验、分布式锁、事务外存在性与编号准备、唯一冲突重试 |
+| `BeanValidationTenantProtocolValidator` | 注解约束适配器：取字段路径字典序最小的违规，按「字段路径 + 注解文案」构造 `ClaimApplicationIntakeException.invalid`；由 008 引入，替代每租户手写校验器与 `TenantProtocolFieldGuard` |
+| `ClaimApplicationIntakeUseCase` | 编排分布式锁、事务外存在性与编号准备、唯一冲突重试；不承担字段校验 |
 | `ClaimApplicationIntakeMaterialFactory` | 装配本次签收的材料批次：取批次号并让 `MaterialSubmission` 在 `domain/material` 内生成材料聚合，不访问数据库 |
 | `ClaimApplicationLifecycleRecordFactory` | 交互事件与 Outbox 记录的唯一装配入口，位于 `usecase/integration/record`，由 005 收敛而来，签收侧只调用不自建 |
 | `ClaimApplicationIntakeTransactionService` | 数据库事务服务，完成首次创建、重复复用、重新申请和冲突解析，事务内不访问 Redis |
@@ -116,9 +116,9 @@ sequenceDiagram
 | `Sha256Digest` | 统一 SHA-256 十六进制摘要，供锁 Key 与缓存 Key 复用 |
 | `RedissonConfiguration` | 延迟建立 Redisson 连接并收紧连接、命令超时与重试，保证 Redis 停机时应用可启动且快速切换降级链路 |
 | `TenantAProtocolPipeline` | 使用默认验签、解密节点，串联租户 A 解析、校验、转换组件，支持 `tenant-a/v1` |
-| `TenantAIntakeRequest`、`TenantARequestParser/Validator/Converter` | 租户 A request DTO 及其解析、校验、转换实现 |
+| `TenantAIntakeRequest`、`TenantARequestParser/Converter` | 租户 A request DTO（必填约束以注解声明）及其解析、转换实现 |
 | `TenantBProtocolPipeline` | 使用默认验签、解密节点，串联租户 B 解析、校验、转换组件，支持 `tenant-b/v1` |
-| `TenantBIntakeRequest`、`TenantBRequestParser/Validator/Converter` | 租户 B request DTO 及其解析、校验、转换实现 |
+| `TenantBIntakeRequest`、`TenantBRequestParser/Converter` | 租户 B request DTO（必填约束以注解声明）及其解析、转换实现 |
 
 所有新增类使用中文 JavaDoc，日期使用 `2026-10-27`。
 
@@ -136,7 +136,7 @@ sequenceDiagram
 1. 验签：`AbstractTenantProtocolPipeline.verifySignature` 默认直通；真实租户覆写后按租户协议验证签名，失败时使用统一业务异常拒绝请求。
 2. 解密：`AbstractTenantProtocolPipeline.decrypt` 默认原样返回明文；真实租户覆写后解密已验签正文，失败时使用统一业务异常拒绝请求。
 3. `TenantProtocolParser`：把明文正文反序列化为租户 request record（如 `TenantAIntakeRequest`），JSON 不合法或结构不匹配时抛 `CLAIM_APPLICATION_INTAKE_INVALID`；禁止使用 Jackson `JsonNode` 传递报文。
-4. `TenantProtocolValidator`：校验 request 的必填文本与嵌套对象、数组，错误信息携带字段路径（如 `applicant.fullName`），不携带原始正文。
+4. `TenantProtocolValidator`：由 `BeanValidationTenantProtocolValidator` 执行租户 request 上声明的 Bean Validation 约束，覆盖必填文本、嵌套对象与数组元素；错误信息按「字段路径 + 注解文案」输出（如 `applicant.fullName 不能为空`），不携带原始正文；租户新增字段只需在 request record 上声明注解，不新增校验类。
 5. `TenantProtocolConverter`：把 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，负责字段去空格与枚举编码映射，无法识别的编码按字段拒绝。
 
 `AbstractTenantProtocolPipeline` 负责匹配租户编码与协议版本、按顺序调用五个节点、拒绝空报文。流水线只输出尚未分配平台申请编号的 `ClaimApplicationIntakeCommand`；聚合创建、`claimApplicationNo`、`status` 与持久化仍由签收用例完成，租户协议层不得访问 Repository、编号生成器、分布式锁或状态变更逻辑，也不得引用 `ClaimApplication`。

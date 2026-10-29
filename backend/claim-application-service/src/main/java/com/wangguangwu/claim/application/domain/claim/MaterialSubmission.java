@@ -12,4 +12,18 @@ package com.wangguangwu.claim.application.domain.claim;
  * @since 2026-10-27
  */
 public record MaterialSubmission(String materialType, String originalFileUrl) {
+
+    /**
+     * 创建提交材料，两项字段是材料不变式，非法输入在构造阶段拒绝。
+     */
+    public MaterialSubmission {
+        requireText(materialType, "材料类型");
+        requireText(originalFileUrl, "初始文件地址");
+    }
+
+    private static void requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+    }
 }
