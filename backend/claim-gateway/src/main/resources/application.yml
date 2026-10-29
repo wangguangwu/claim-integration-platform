@@ -12,7 +12,8 @@ spring:
         webflux:
           routes:
             - id: claim-application-service
-              uri: lb://claim-application-service
+              # 本地默认直连应用服务；部署环境通过变量切换为注册中心负载均衡地址。
+              uri: ${CLAIM_APPLICATION_SERVICE_URI:http://127.0.0.1:8081}
               predicates:
                 - Path=/api/application/**
             - id: claim-case-service

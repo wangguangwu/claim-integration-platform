@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 唯一外部申请号吞吐压测：每次请求使用 UUID，验证并发创建能力。 -->
+<!-- 对外理赔申请接入吞吐压测：请求经 claim-gateway 转发，每次使用 UUID 验证并发创建能力。 -->
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Application Intake Throughput" enabled="true">
-      <stringProp name="TestPlan.comments">仅限本地开发库；请求使用 demo-insurer-a/v1。</stringProp>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="理赔申请对外接入吞吐压测" enabled="true">
+      <stringProp name="TestPlan.comments">仅限本地环境；通过 claim-gateway 的对外接口请求 tenant-a/v1。</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="用户变量" enabled="true">
@@ -25,7 +25,7 @@
         <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="租户请求头" enabled="true">
           <collectionProp name="HeaderManager.headers">
             <elementProp name="" elementType="Header"><stringProp name="Header.name">Content-Type</stringProp><stringProp name="Header.value">application/json</stringProp></elementProp>
-            <elementProp name="" elementType="Header"><stringProp name="Header.name">X-Tenant-Code</stringProp><stringProp name="Header.value">demo-insurer-a</stringProp></elementProp>
+            <elementProp name="" elementType="Header"><stringProp name="Header.name">X-Tenant-Code</stringProp><stringProp name="Header.value">tenant-a</stringProp></elementProp>
             <elementProp name="" elementType="Header"><stringProp name="Header.name">X-Protocol-Version</stringProp><stringProp name="Header.value">v1</stringProp></elementProp>
           </collectionProp>
         </HeaderManager>
@@ -34,7 +34,7 @@
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><stringProp name="Argument.value">{"requestNo":"LOAD-${__UUID()}","applicant":{"fullName":"压测申请人","sex":"F","idType":"ID_CARD","idNo":"LOAD-A"},"insured":{"fullName":"压测被保人","sex":"M","idType":"ID_CARD","idNo":"LOAD-I"},"accident":{"fullName":"压测出险人","sex":"M","idType":"ID_CARD","idNo":"LOAD-C"},"payee":{"fullName":"压测领款人","sex":"F","idType":"ID_CARD","idNo":"LOAD-P"},"attachments":[{"type":"IMAGE","sourceUrl":"https://example.com/load.jpg"}]}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
           <stringProp name="HTTPSampler.domain">${__P(HOST,127.0.0.1)}</stringProp>
-          <stringProp name="HTTPSampler.port">${__P(PORT,8081)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(PORT,8080)}</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
           <stringProp name="HTTPSampler.path">/api/application/v1/applications</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
@@ -46,6 +46,8 @@
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="HTTP 200 断言" enabled="true"><collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp><stringProp name="Assertion.test_field">Assertion.response_code</stringProp><intProp name="Assertion.test_type">2</intProp></ResponseAssertion>
           <hashTree/>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="业务成功断言" enabled="true"><collectionProp name="Asserion.test_strings"><stringProp name="success">&quot;code&quot;:&quot;SUCCESS&quot;</stringProp></collectionProp><stringProp name="Assertion.test_field">Assertion.response_data</stringProp><intProp name="Assertion.test_type">2</intProp></ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="网关 TraceId 断言" enabled="true"><collectionProp name="Asserion.test_strings"><stringProp name="trace">X-Trace-Id</stringProp></collectionProp><stringProp name="Assertion.test_field">Assertion.response_headers</stringProp><intProp name="Assertion.test_type">2</intProp></ResponseAssertion>
           <hashTree/>
         </hashTree>
       </hashTree>

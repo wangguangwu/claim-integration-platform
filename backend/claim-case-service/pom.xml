@@ -14,7 +14,7 @@
     <artifactId>claim-case-service</artifactId>
 
     <name>claim-case-service</name>
-    <description>Case 业务域：规则判断、阶段编排、外部交付与回执</description>
+    <description>案件业务域：规则判断、阶段编排、外部交付与回执</description>
 
     <dependencies>
         <dependency>

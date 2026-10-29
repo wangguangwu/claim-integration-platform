@@ -1,40 +1,124 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 同一外部申请号并发压测：所有线程共享编号，验证分布式锁和数据库唯一约束。 -->
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Application Intake Idempotency" enabled="true">
-      <stringProp name="TestPlan.comments">仅限本地开发库；重复执行前可通过 -JEXTERNAL_APPLICATION_NO 指定新的外部申请号。</stringProp>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="理赔申请对外接入幂等压测" enabled="true">
+      <stringProp name="TestPlan.comments">仅限本地环境；通过 claim-gateway 的对外接口提交。重复执行前可通过 -JEXTERNAL_APPLICATION_NO 指定新的外部申请号。</stringProp>
       <boolProp name="TestPlan.functional_mode">false</boolProp>
       <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
-      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="用户变量" enabled="true"><collectionProp name="Arguments.arguments"/></elementProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="用户变量" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
     </TestPlan>
     <hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="同单号并发线程" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="同单号并发线程">
+        <stringProp name="TestPlan.comments">10</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(THREADS,20)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(RAMP_UP_SECONDS,1)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
-        <stringProp name="ThreadGroup.on_sample_error">CONTINUE</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器" enabled="true"><stringProp name="LoopController.loops">${__P(LOOPS,1)}</stringProp><boolProp name="LoopController.continue_forever">false</boolProp></elementProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="循环控制器">
+          <stringProp name="LoopController.loops">${__P(LOOPS,1)}</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
       </ThreadGroup>
       <hashTree>
-        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="租户请求头" enabled="true"><collectionProp name="HeaderManager.headers"><elementProp name="" elementType="Header"><stringProp name="Header.name">Content-Type</stringProp><stringProp name="Header.value">application/json</stringProp></elementProp><elementProp name="" elementType="Header"><stringProp name="Header.name">X-Tenant-Code</stringProp><stringProp name="Header.value">demo-insurer-a</stringProp></elementProp><elementProp name="" elementType="Header"><stringProp name="Header.name">X-Protocol-Version</stringProp><stringProp name="Header.value">v1</stringProp></elementProp></collectionProp></HeaderManager>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="租户请求头" enabled="true">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Content-Type</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">X-Tenant-Code</stringProp>
+              <stringProp name="Header.value">tenant-a</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">X-Protocol-Version</stringProp>
+              <stringProp name="Header.value">v1</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="并发提交同一理赔申请" enabled="true">
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"><elementProp name="" elementType="HTTPArgument"><boolProp name="HTTPArgument.always_encode">false</boolProp><stringProp name="Argument.value">{"requestNo":"${__P(EXTERNAL_APPLICATION_NO,IDEMPOTENCY-001)}","applicant":{"fullName":"幂等申请人","sex":"F","idType":"ID_CARD","idNo":"IDEMPOTENT-A"},"insured":{"fullName":"幂等被保人","sex":"M","idType":"ID_CARD","idNo":"IDEMPOTENT-I"},"accident":{"fullName":"幂等出险人","sex":"M","idType":"ID_CARD","idNo":"IDEMPOTENT-C"},"payee":{"fullName":"幂等领款人","sex":"F","idType":"ID_CARD","idNo":"IDEMPOTENT-P"},"attachments":[{"type":"IMAGE","sourceUrl":"https://example.com/idempotency.jpg"}]}</stringProp><stringProp name="Argument.metadata">=</stringProp></elementProp></collectionProp></elementProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="并发提交同一理赔申请">
           <stringProp name="HTTPSampler.domain">${__P(HOST,127.0.0.1)}</stringProp>
-          <stringProp name="HTTPSampler.port">${__P(PORT,8081)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(PORT,8080)}</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
           <stringProp name="HTTPSampler.path">/api/application/v1/applications</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&quot;requestNo&quot;:&quot;${__P(EXTERNAL_APPLICATION_NO,IDEMPOTENCY-001)}&quot;,&quot;applicant&quot;:{&quot;fullName&quot;:&quot;幂等申请人&quot;,&quot;sex&quot;:&quot;F&quot;,&quot;idType&quot;:&quot;ID_CARD&quot;,&quot;idNo&quot;:&quot;IDEMPOTENT-A&quot;},&quot;insured&quot;:{&quot;fullName&quot;:&quot;幂等被保人&quot;,&quot;sex&quot;:&quot;M&quot;,&quot;idType&quot;:&quot;ID_CARD&quot;,&quot;idNo&quot;:&quot;IDEMPOTENT-I&quot;},&quot;accident&quot;:{&quot;fullName&quot;:&quot;幂等出险人&quot;,&quot;sex&quot;:&quot;M&quot;,&quot;idType&quot;:&quot;ID_CARD&quot;,&quot;idNo&quot;:&quot;IDEMPOTENT-C&quot;},&quot;payee&quot;:{&quot;fullName&quot;:&quot;幂等领款人&quot;,&quot;sex&quot;:&quot;F&quot;,&quot;idType&quot;:&quot;ID_CARD&quot;,&quot;idNo&quot;:&quot;IDEMPOTENT-P&quot;},&quot;attachments&quot;:[{&quot;type&quot;:&quot;IMAGE&quot;,&quot;sourceUrl&quot;:&quot;https://example.com/idempotency.jpg&quot;}]}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
         </HTTPSamplerProxy>
         <hashTree>
-          <!-- 同单号并发时同时约束 HTTP 成功和统一业务成功码。 -->
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="HTTP 200 断言" enabled="true"><collectionProp name="Asserion.test_strings"><stringProp name="200">200</stringProp></collectionProp><stringProp name="Assertion.test_field">Assertion.response_code</stringProp><intProp name="Assertion.test_type">2</intProp></ResponseAssertion>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="HTTP 200 断言" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+          </ResponseAssertion>
           <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="业务成功断言" enabled="true"><collectionProp name="Asserion.test_strings"><stringProp name="success">&quot;code&quot;:&quot;SUCCESS&quot;</stringProp></collectionProp><stringProp name="Assertion.test_field">Assertion.response_data</stringProp><intProp name="Assertion.test_type">2</intProp></ResponseAssertion>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="业务成功断言" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1566281978">&quot;code&quot;:&quot;SUCCESS&quot;</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="网关 TraceId 断言" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="1490503864">X-Trace-Id</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_headers</stringProp>
+            <intProp name="Assertion.test_type">2</intProp>
+            <stringProp name="Assertion.custom_message"></stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取理赔申请编号" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">claimApplicationNo</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.applicationNo</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="同号幂等响应断言" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="script">String actualApplicationNo = vars.get(&quot;claimApplicationNo&quot;);
+if (actualApplicationNo == null || actualApplicationNo.isBlank()) {
+    AssertionResult.setFailure(true);
+    AssertionResult.setFailureMessage(&quot;响应未返回 data.applicationNo&quot;);
+    return;
+}
+String propertyKey = &quot;claim.application.intake.idempotency.&quot;
+        + props.getProperty(&quot;EXTERNAL_APPLICATION_NO&quot;, &quot;IDEMPOTENCY-001&quot;);
+synchronized (props) {
+    String expectedApplicationNo = props.getProperty(propertyKey);
+    if (expectedApplicationNo == null) {
+        props.setProperty(propertyKey, actualApplicationNo);
+    } else if (!expectedApplicationNo.equals(actualApplicationNo)) {
+        AssertionResult.setFailure(true);
+        AssertionResult.setFailureMessage(&quot;幂等响应编号不一致，expected=&quot; + expectedApplicationNo
+                + &quot;, actual=&quot; + actualApplicationNo);
+    }
+}</stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="cacheKey">false</stringProp>
+          </JSR223Assertion>
           <hashTree/>
         </hashTree>
       </hashTree>

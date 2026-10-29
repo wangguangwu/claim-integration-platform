@@ -4,7 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Case 业务域启动类。
+ * 案件业务域启动类。
  *
  * @author wangguangwu
  * @since 2026-10-27

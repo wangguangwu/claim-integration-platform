@@ -1,4 +1,4 @@
--- Application 服务独占数据库，避免与 Case、AI 等服务跨库直连。
+-- 理赔申请服务独占数据库，避免与案件、AI 等服务跨库直连。
 CREATE DATABASE IF NOT EXISTS claim_application_db
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_0900_ai_ci;
