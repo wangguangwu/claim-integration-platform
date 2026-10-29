@@ -89,7 +89,7 @@ sequenceDiagram
 | `TenantProtocolPipeline` | 租户协议流水线端口，定义单条租户协议的支持判断与执行入口，输出 `ClaimApplicationIntakeCommand` |
 | `TenantProtocolPipelineRegistry` | 注册全部租户协议流水线，按租户编码和协议版本选择唯一流水线，拒绝不支持或配置冲突的协议 |
 | `TenantProtocolPipelineFactory` | 根据租户上下文获取对应的租户协议流水线，执行协议适配并返回 `ClaimApplicationIntakeCommand`，同时拒绝跨租户的转换结果 |
-| `AbstractTenantProtocolPipeline` | 租户协议流水线模板，固定「验签 → 解密 → 解析 → 校验 → 转换」执行链路；各节点提供默认实现，租户按需扩展，最终产出平台统一的受理命令 |
+| `AbstractTenantProtocolPipeline` | 租户协议流水线模板，固定「验签 → 解密 → 解析 → 校验 → 转换」执行链路；校验节点默认装配注解约束校验器，并提供 `validateTenantRules` 扩展点供租户追加跨字段规则；验签、解密提供默认实现，最终产出平台统一的受理命令 |
 | `TenantProtocolParser` | 把原始正文反序列化为租户 request 对象，不使用 Jackson JsonNode |
 | `TenantProtocolValidator` | 校验租户 request 上声明的 Bean Validation 约束，违规按字段路径报出 |
 | `TenantProtocolConverter` | 把租户 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，拒绝无法识别的枚举编码 |
@@ -136,7 +136,7 @@ sequenceDiagram
 1. 验签：`AbstractTenantProtocolPipeline.verifySignature` 默认直通；真实租户覆写后按租户协议验证签名，失败时使用统一业务异常拒绝请求。
 2. 解密：`AbstractTenantProtocolPipeline.decrypt` 默认原样返回明文；真实租户覆写后解密已验签正文，失败时使用统一业务异常拒绝请求。
 3. `TenantProtocolParser`：把明文正文反序列化为租户 request record（如 `TenantAIntakeRequest`），JSON 不合法或结构不匹配时抛 `CLAIM_APPLICATION_INTAKE_INVALID`；禁止使用 Jackson `JsonNode` 传递报文。
-4. `TenantProtocolValidator`：由 `BeanValidationTenantProtocolValidator` 执行租户 request 上声明的 Bean Validation 约束，覆盖必填文本、嵌套对象与数组元素；错误信息按「字段路径 + 注解文案」输出（如 `applicant.fullName 不能为空`），不携带原始正文；租户新增字段只需在 request record 上声明注解，不新增校验类。
+4. `TenantProtocolValidator`：模板默认装配 `BeanValidationTenantProtocolValidator`，执行租户 request 上声明的 Bean Validation 约束，覆盖必填文本、嵌套对象与数组元素；错误信息按「字段路径 + 注解文案」输出（如 `applicant.fullName 不能为空`），不携带原始正文；租户新增字段只需在 request record 上声明注解，不新增校验类。注解表达不了的跨字段、跨节点规则由租户覆写 `validateTenantRules` 追加，在注解校验之后执行。
 5. `TenantProtocolConverter`：把 request 归一化为 `ClaimApplicationIntakeCommand` 受理命令，负责字段去空格与枚举编码映射，无法识别的编码按字段拒绝。
 
 `AbstractTenantProtocolPipeline` 负责匹配租户编码与协议版本、按顺序调用五个节点、拒绝空报文。流水线只输出尚未分配平台申请编号的 `ClaimApplicationIntakeCommand`；聚合创建、`claimApplicationNo`、`status` 与持久化仍由签收用例完成，租户协议层不得访问 Repository、编号生成器、分布式锁或状态变更逻辑，也不得引用 `ClaimApplication`。

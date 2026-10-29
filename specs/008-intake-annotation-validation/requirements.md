@@ -24,6 +24,9 @@
 7. 用例层不得重复领域已守的校验；`ClaimApplicationIntakeUseCase` 不承载任何字段级校验。
 8. 每个租户的校验规则只允许存在一份实现。删除手写校验器后，不得保留"注解 + 手写"双份校验。
 9. 校验实现不得吞异常：注解约束违规必须转成平台业务异常，不得把 `ConstraintViolationException` 泄漏为 500。
+10. 注解约束校验是流水线的固定步骤，由流水线模板默认装配，租户不写校验代码、不接触校验实现类。
+11. 注解无法表达的跨字段、跨节点规则通过租户扩展点 `validateTenantRules` 追加：扩展点默认不追加规则，在注解校验之后执行，违规同样抛 `ClaimApplicationIntakeException.invalid`。
+12. 租户不得替换或关闭注解约束校验：协议差异（某租户字段可选）由该租户的 request 类型本身表达，避免契约静默失效。
 
 ## 正常场景
 
@@ -58,7 +61,8 @@
 
 - 恢复 `spring-boot-starter-validation` 直接依赖。
 - 两个租户 request record 及其嵌套 record 增加 Bean Validation 注解。
-- 新增一个通用"注解约束违规 → 平台业务异常"校验适配器，替代两份手写租户校验器。
+- 新增一个通用"注解约束违规 → 平台业务异常"校验适配器，作为流水线模板默认装配的校验节点，替代两份手写租户校验器。
+- 流水线模板新增 `validateTenantRules` 租户扩展点，供后续跨字段规则追加。
 - 删除 `TenantARequestValidator`、`TenantBRequestValidator`、`TenantProtocolFieldGuard`。
 - 删除 `ClaimApplicationIntakeUseCase` 中的 `validate`、`validatePerson`、`validateMaterials` 及其 import。
 - 领域自守：`PersonInfo`、`MaterialSubmission`、`ClaimApplication.submit`。
@@ -80,3 +84,4 @@
 4. `PersonInfo`、`MaterialSubmission`、`ClaimApplication.submit` 对非法输入在构造阶段抛出 `IllegalArgumentException`。
 5. 经网关的六条黄金路径响应码、`code`、`data` 结构与改造前一致；缺字段报文返回 400 且 message 含精确字段路径。
 6. `mvn -B clean package` 全反应堆通过；两服务重启日志无新增 ERROR；数据库无新增列与表。
+7. 两个租户流水线的构造器不引用 `BeanValidationTenantProtocolValidator`，校验节点由模板默认装配；注解校验与租户扩展点的执行顺序可由代码直接读出且为先注解后扩展。

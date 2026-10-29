@@ -22,6 +22,7 @@
 | `interfaces/intake/tenantprotocol/core/stage` | 新增 `BeanValidationTenantProtocolValidator` | 注解约束违规到业务异常的适配器 |
 | 同上 | `TenantProtocolValidator` | 接口职责注释改为"Bean Validation 约束校验" |
 | 同上 | 删除 `TenantProtocolFieldGuard` | 手写字段守卫由注解替代 |
+| `interfaces/intake/tenantprotocol/core/pipeline` | `AbstractTenantProtocolPipeline` | 校验节点默认装配注解校验器，新增 `validateTenantRules` 租户扩展点 |
 | `tenants/tenant_a` | `TenantAIntakeRequest` | 主类型与两个嵌套 record 增加约束注解 |
 | 同上 | 删除 `TenantARequestValidator` | 由注解与适配器替代 |
 | 同上 | `TenantAProtocolPipeline` | 构造器注入 `jakarta.validation.Validator` 并装配适配器 |
@@ -97,16 +98,37 @@ public void validate(R request) {
 - 保留泛型参数 `<R>`：适配器实例与解析器、转换器共用同一 request 类型，装配错位无法通过编译。
 - 不引入 `@Validated` 与 `MethodValidationPostProcessor`：校验发生在流水线内部，由模板方法显式调用，方法级切面会绕开业务异常体系。
 
-## 五、流水线装配
+## 五、流水线装配与租户扩展
 
-`AbstractTenantProtocolPipeline` 的五段链路不变，校验节点仍由 `TenantProtocolValidator` 承担，只是实现从"每租户一份"变为"全局一份"：
+`AbstractTenantProtocolPipeline` 的五段链路不变，校验节点拆成"默认段 + 扩展段"：默认段焊在模板里，租户不接触校验实现；扩展段留给注解表达不了的规则。
+
+```java
+protected AbstractTenantProtocolPipeline(String tenantCode, String protocolVersion, TenantProtocolParser<R> parser,
+                                         TenantProtocolConverter<R> converter, Validator validator) {
+    ...
+    this.constraintValidator = new BeanValidationTenantProtocolValidator<>(validator);
+}
+
+public final ClaimApplicationIntakeCommand execute(String rawPayload) {
+    ...
+    constraintValidator.validate(request);   // 默认：注解约束，不可关闭
+    validateTenantRules(request);            // 扩展：租户追加规则，默认空实现
+    return converter.convert(tenantCode, request);
+}
+```
+
+租户流水线只传 `jakarta.validation.Validator`，不引用任何校验实现：
 
 ```java
 public TenantAProtocolPipeline(ObjectMapper objectMapper, Validator validator) {
     super(TENANT_CODE, PROTOCOL_VERSION, new TenantARequestParser(objectMapper),
-            new BeanValidationTenantProtocolValidator<>(validator), new TenantARequestConverter());
+            new TenantARequestConverter(), validator);
 }
 ```
+
+后续出现"材料类型与险种必须匹配""出险人不得与投保人相同"这类跨字段规则时，租户覆写 `validateTenantRules(R request)`，或在该方法里委托一个实现 `TenantProtocolValidator` 的规则类。扩展段在注解之后执行，入参已非空且结构完整。
+
+不提供"替换默认校验器"的装配方式：注解声明在租户自己的 request 上，就是该租户的协议契约；允许替换等于允许契约静默失效。协议差异（某租户某字段可选）由该租户的 request 类型本身表达。
 
 `jakarta.validation.Validator` 由 Spring Boot 的 `ValidationAutoConfiguration` 提供（`LocalValidatorFactoryBean`），流水线通过构造器注入，不使用字段注入与 `@Autowired`。
 

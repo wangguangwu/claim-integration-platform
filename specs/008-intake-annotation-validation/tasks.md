@@ -8,7 +8,7 @@
 |---|---|---|---|
 | V1 | 恢复校验依赖 | `claim-application-service/pom.xml` 中的 `spring-boot-starter-validation` | 依赖树含 `hibernate-validator`；模块编译通过 |
 | V2 | 租户 request 注解化 | `TenantAIntakeRequest`、`TenantBIntakeRequest` 及其五个嵌套 record 的约束注解 | design §三 映射表逐条落地；字段名与嵌套结构未变；无手写判空新增 |
-| V3 | 注解适配器与流水线装配 | 新增 `BeanValidationTenantProtocolValidator`；`TenantAProtocolPipeline`、`TenantBProtocolPipeline` 注入 `Validator` | 两租户流水线均装配同一泛型适配器；`TenantProtocolValidator` 注释同步；无 `@Autowired` 字段注入 |
+| V3 | 注解适配器与流水线装配 | 新增 `BeanValidationTenantProtocolValidator`；`AbstractTenantProtocolPipeline` 默认装配该校验器并新增 `validateTenantRules` 扩展点；`TenantAProtocolPipeline`、`TenantBProtocolPipeline` 注入 `Validator` | 两租户流水线不引用校验实现类，默认校验由模板装配；扩展点默认空实现且只在注解校验之后执行；`TenantProtocolValidator` 注释同步；无 `@Autowired` 字段注入 |
 
 ## 第 2 批 · 删除重复实现与领域自守
 

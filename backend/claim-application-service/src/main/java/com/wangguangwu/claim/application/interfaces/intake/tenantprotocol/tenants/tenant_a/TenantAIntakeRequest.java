@@ -10,7 +10,7 @@ import java.util.List;
  * A 租户申请报文，人员为扁平字段，材料位于 attachments。
  *
  * <p>必填约束由 Bean Validation 注解声明，字段路径即报文路径；
- * 违规由 {@code BeanValidationTenantProtocolValidator} 统一翻译为平台业务异常。</p>
+ * 违规由流水线默认的校验节点统一翻译为平台业务异常。</p>
  *
  * @param requestNo   外部申请编号
  * @param applicant   申请人
