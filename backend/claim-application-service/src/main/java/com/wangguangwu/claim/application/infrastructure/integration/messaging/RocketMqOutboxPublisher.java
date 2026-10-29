@@ -1,8 +1,8 @@
 package com.wangguangwu.claim.application.infrastructure.integration.messaging;
 
-import com.wangguangwu.claim.application.domain.integration.outbox.ApplicationEventType;
+import com.wangguangwu.claim.application.domain.integration.outbox.ClaimApplicationEventType;
 import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventPublisher;
-import com.wangguangwu.claim.application.shared.contract.ApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.messaging.Message;
@@ -27,9 +27,9 @@ public class RocketMqOutboxPublisher implements OutboxEventPublisher {
      * @param envelope 消息信封
      */
     @Override
-    public void publish(ApplicationEventEnvelope envelope) {
-        String bindingName = ApplicationEventType.from(envelope.eventType()).bindingName();
-        Message<ApplicationEventEnvelope> message = MessageBuilder.withPayload(envelope).build();
+    public void publish(ClaimApplicationEventEnvelope envelope) {
+        String bindingName = ClaimApplicationEventType.from(envelope.eventType()).bindingName();
+        Message<ClaimApplicationEventEnvelope> message = MessageBuilder.withPayload(envelope).build();
         if (!streamBridge.send(bindingName, message)) {
             throw new IllegalStateException("Outbox 事件发送失败，未找到可用的消息绑定，bindingName=" + bindingName
                     + ", eventId=" + envelope.eventId());

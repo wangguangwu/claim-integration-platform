@@ -37,7 +37,7 @@ public class MockUnderwritingStore {
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     private final Map<String, PolicyRecord> policiesByCertificateNo = new ConcurrentHashMap<>();
-    private final Map<String, AutoUnderwritingRecord> autoUnderwritingsByApplicationNo = new ConcurrentHashMap<>();
+    private final Map<String, AutoUnderwritingRecord> autoUnderwritingsByClaimApplicationNo = new ConcurrentHashMap<>();
     private final ScheduledExecutorService completionScheduler = Executors.newSingleThreadScheduledExecutor();
     private final MockUnderwritingProperties properties;
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
@@ -92,8 +92,8 @@ public class MockUnderwritingStore {
      * @return 最新承保记录
      */
     public AutoUnderwritingRecord requestAutoUnderwriting(AutoUnderwritingCommand command) {
-        return autoUnderwritingsByApplicationNo.computeIfAbsent(command.applicationNo(), applicationNo -> {
-            AutoUnderwritingRecord record = new AutoUnderwritingRecord(applicationNo, UnderwritingResult.PROCESSING,
+        return autoUnderwritingsByClaimApplicationNo.computeIfAbsent(command.claimApplicationNo(), claimApplicationNo -> {
+            AutoUnderwritingRecord record = new AutoUnderwritingRecord(claimApplicationNo, UnderwritingResult.PROCESSING,
                     UUID.randomUUID().toString(), LocalDateTime.now(BUSINESS_ZONE_ID), null);
             scheduleCompletion(record);
             return record;
@@ -103,22 +103,22 @@ public class MockUnderwritingStore {
     /**
      * 查询自动承保结果。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保记录；不存在时为空
      */
-    public Optional<AutoUnderwritingRecord> findAutoUnderwriting(String applicationNo) {
-        return Optional.ofNullable(autoUnderwritingsByApplicationNo.get(applicationNo));
+    public Optional<AutoUnderwritingRecord> findAutoUnderwriting(String claimApplicationNo) {
+        return Optional.ofNullable(autoUnderwritingsByClaimApplicationNo.get(claimApplicationNo));
     }
 
     /**
      * 手工触发完成并始终发送承保完成通知，供联调使用。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 完成后的承保记录；不存在时为空
      */
-    public Optional<AutoUnderwritingRecord> completeAutoUnderwriting(String applicationNo) {
-        Optional<AutoUnderwritingRecord> completedRecord = markCompleted(applicationNo);
-        completedRecord.ifPresent(record -> notifyCompletion(record.notificationRequestId(), applicationNo));
+    public Optional<AutoUnderwritingRecord> completeAutoUnderwriting(String claimApplicationNo) {
+        Optional<AutoUnderwritingRecord> completedRecord = markCompleted(claimApplicationNo);
+        completedRecord.ifPresent(record -> notifyCompletion(record.notificationRequestId(), claimApplicationNo));
         return completedRecord;
     }
 
@@ -133,23 +133,23 @@ public class MockUnderwritingStore {
     private void scheduleCompletion(AutoUnderwritingRecord record) {
         Duration completionDelay = properties.completionDelay();
         long delayMillis = completionDelay == null ? 0L : Math.max(completionDelay.toMillis(), 0L);
-        completionScheduler.schedule(() -> completeAutomatically(record.applicationNo(), record.notificationRequestId()),
+        completionScheduler.schedule(() -> completeAutomatically(record.claimApplicationNo(), record.notificationRequestId()),
                 delayMillis, TimeUnit.MILLISECONDS);
     }
 
-    private void completeAutomatically(String applicationNo, String notificationRequestId) {
-        markCompleted(applicationNo).ifPresent(record -> {
+    private void completeAutomatically(String claimApplicationNo, String notificationRequestId) {
+        markCompleted(claimApplicationNo).ifPresent(record -> {
             if (properties.notifyOnComplete()) {
-                notifyCompletion(notificationRequestId, applicationNo);
+                notifyCompletion(notificationRequestId, claimApplicationNo);
             }
         });
     }
 
-    private Optional<AutoUnderwritingRecord> markCompleted(String applicationNo) {
-        return Optional.ofNullable(autoUnderwritingsByApplicationNo.computeIfPresent(applicationNo,
+    private Optional<AutoUnderwritingRecord> markCompleted(String claimApplicationNo) {
+        return Optional.ofNullable(autoUnderwritingsByClaimApplicationNo.computeIfPresent(claimApplicationNo,
                 (key, record) -> record.status() == UnderwritingResult.COMPLETED
                         ? record
-                        : new AutoUnderwritingRecord(applicationNo, UnderwritingResult.COMPLETED,
+                        : new AutoUnderwritingRecord(claimApplicationNo, UnderwritingResult.COMPLETED,
                                 record.notificationRequestId(), record.registeredAt(),
                                 LocalDateTime.now(BUSINESS_ZONE_ID))));
     }
@@ -158,14 +158,14 @@ public class MockUnderwritingStore {
      * 进程内触发承保完成通知，与 HTTP 回调共用同一套幂等规则。
      *
      * @param requestId     通知请求标识
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      */
-    private void notifyCompletion(String requestId, String applicationNo) {
+    private void notifyCompletion(String requestId, String claimApplicationNo) {
         try {
             underwritingCallbackUseCase.complete(
-                    new UnderwritingCompletedCommand(applicationNo, requestId, createTraceId()));
+                    new UnderwritingCompletedCommand(claimApplicationNo, requestId, createTraceId()));
         } catch (RuntimeException exception) {
-            log.warn("模拟承保完成通知处理失败，等待补偿任务恢复，applicationNo={}", applicationNo, exception);
+            log.warn("模拟承保完成通知处理失败，等待补偿任务恢复，claimApplicationNo={}", claimApplicationNo, exception);
         }
     }
 
@@ -176,11 +176,11 @@ public class MockUnderwritingStore {
     /**
      * 自动承保命令。
      *
-     * @param applicationNo        平台申请编号
+     * @param claimApplicationNo        平台申请编号
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
      */
-    public record AutoUnderwritingCommand(String applicationNo, String tenantCode, String insuredCertificateNo) {
+    public record AutoUnderwritingCommand(String claimApplicationNo, String tenantCode, String insuredCertificateNo) {
     }
 
     /**
@@ -224,13 +224,13 @@ public class MockUnderwritingStore {
     /**
      * 自动承保记录。
      *
-     * @param applicationNo          平台申请编号
+     * @param claimApplicationNo          平台申请编号
      * @param status                承保状态
      * @param notificationRequestId 完成通知的稳定请求标识
      * @param registeredAt          受理时间
      * @param completedAt           完成时间
      */
-    public record AutoUnderwritingRecord(String applicationNo, UnderwritingResult status, String notificationRequestId,
+    public record AutoUnderwritingRecord(String claimApplicationNo, UnderwritingResult status, String notificationRequestId,
                                          LocalDateTime registeredAt, LocalDateTime completedAt) {
     }
 }

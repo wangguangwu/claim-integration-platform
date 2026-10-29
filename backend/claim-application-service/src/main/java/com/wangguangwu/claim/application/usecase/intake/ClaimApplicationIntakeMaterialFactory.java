@@ -22,14 +22,14 @@ public class ClaimApplicationIntakeMaterialFactory {
     /**
      * 为同一次签收创建共用批次编号的材料记录。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @param materials     本次提交的材料
      * @return 待持久化材料
      */
-    public List<Material> createMaterials(String applicationNo, List<MaterialSubmission> materials) {
+    public List<Material> createMaterials(String claimApplicationNo, List<MaterialSubmission> materials) {
         String batchNo = materialBatchNoGenerator.nextBatchNo();
         return materials.stream()
-                .map(submission -> Material.createPending(applicationNo, batchNo, submission))
+                .map(submission -> Material.createPending(claimApplicationNo, batchNo, submission))
                 .toList();
     }
 }

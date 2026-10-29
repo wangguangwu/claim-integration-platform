@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolConverter;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolParser;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolValidator;
@@ -53,7 +53,7 @@ public abstract class AbstractTenantProtocolPipeline<R> implements TenantProtoco
         String plaintextPayload = decrypt(rawPayload);
         R request = parser.parse(plaintextPayload);
         if (request == null) {
-            throw ApplicationIntakeException.invalid("租户申请报文必须为 JSON 对象");
+            throw ClaimApplicationIntakeException.invalid("租户申请报文必须为 JSON 对象");
         }
         validator.validate(request);
         return converter.convert(tenantCode, request);

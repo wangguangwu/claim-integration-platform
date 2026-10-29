@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.material.messaging;
 
-import com.wangguangwu.claim.application.shared.contract.ApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import com.wangguangwu.claim.application.usecase.material.MaterialProcessingUseCase;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import java.util.Map;
@@ -22,7 +22,7 @@ import org.springframework.messaging.Message;
 @Configuration(proxyBeanMethods = false)
 public class MaterialProcessConsumer {
 
-    private static final String APPLICATION_ATTEMPT_FIELD = "applicationAttempt";
+    private static final String CLAIM_APPLICATION_ATTEMPT_FIELD = "claimApplicationAttempt";
 
     private final MaterialProcessingUseCase materialProcessingUseCase;
 
@@ -32,17 +32,17 @@ public class MaterialProcessConsumer {
      * @return 消息消费函数
      */
     @Bean
-    public Consumer<Message<ApplicationEventEnvelope>> materialProcess() {
+    public Consumer<Message<ClaimApplicationEventEnvelope>> materialProcess() {
         return message -> materialProcessingUseCase.process(toCommand(message.getPayload()));
     }
 
-    private MaterialProcessCommand toCommand(ApplicationEventEnvelope envelope) {
+    private MaterialProcessCommand toCommand(ClaimApplicationEventEnvelope envelope) {
         Map<String, Object> payload = envelope.payload();
-        Object applicationAttempt = payload == null ? null : payload.get(APPLICATION_ATTEMPT_FIELD);
-        if (!(applicationAttempt instanceof Number attemptNumber)) {
+        Object claimApplicationAttempt = payload == null ? null : payload.get(CLAIM_APPLICATION_ATTEMPT_FIELD);
+        if (!(claimApplicationAttempt instanceof Number attemptNumber)) {
             throw new IllegalArgumentException("材料处理事件缺少申请尝试次数，eventId=" + envelope.eventId());
         }
-        return new MaterialProcessCommand(envelope.applicationNo(), envelope.tenantCode(), envelope.eventId(),
+        return new MaterialProcessCommand(envelope.claimApplicationNo(), envelope.tenantCode(), envelope.eventId(),
                 envelope.traceId(), attemptNumber.intValue());
     }
 }

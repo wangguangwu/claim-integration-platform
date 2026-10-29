@@ -15,7 +15,7 @@
 
 ## 一、配置与启动形态
 
-现状：`application.yml` 只有一个文档分隔符，`claim.outbox/integration/compensation/mock` 全部落在 `on-profile: local` 之后，而 `OutboxRelayScheduler` 与 `ApplicationCompensationScheduler` 用无默认值的占位符读取调度间隔，非 local 启动即崩。
+现状：`application.yml` 只有一个文档分隔符，`claim.outbox/integration/compensation/mock` 全部落在 `on-profile: local` 之后，而 `OutboxRelayScheduler` 与 `ClaimApplicationCompensationScheduler` 用无默认值的占位符读取调度间隔，非 local 启动即崩。
 
 调整：拆成"基础文档 + local 覆盖文档"两段，与网关写法一致。
 
@@ -44,10 +44,10 @@
 
 ## 四、轨迹事务边界
 
-- 材料处理、自动承保分流、承保完成通知与滞留补偿四个入口的行为轨迹，开始与结束都由各自的事务服务在同一事务内一次性写入：材料走 `MaterialProcessingTransactionService`，分流走 `UnderwritingTransactionService.recordAttempt`，回调走 `UnderwritingCallbackTransactionService`，补偿新增 `ApplicationCompensationTransactionService`（补偿属于 `integration` 域，不借用承保域的事务服务，避免跨域用例内部互依赖）。
+- 材料处理、自动承保分流、承保完成通知与滞留补偿四个入口的行为轨迹，开始与结束都由各自的事务服务在同一事务内一次性写入：材料走 `MaterialProcessingTransactionService`，分流走 `UnderwritingTransactionService.recordAttempt`，回调走 `UnderwritingCallbackTransactionService`，补偿新增 `ClaimApplicationCompensationTransactionService`（补偿属于 `integration` 域，不借用承保域的事务服务，避免跨域用例内部互依赖）。
 - 外部调用仍在事务外执行，调用中断时不提交任何轨迹行，因此不会再出现只有开始的孤儿行为组。
 - 记录装配仍只有一个入口（`usecase/integration/record` 的生命周期记录装配工厂），本次只调整写入位置，不新增装配实现。
-- 材料上传循环保持在事务外，改为按材料批次幂等重传（以 `applicationNo + batchNo` 判重），避免消息重投造成重复上传。
+- 材料上传循环保持在事务外，改为按材料批次幂等重传（以 `claimApplicationNo + batchNo` 判重），避免消息重投造成重复上传。
 
 ## 五、租户接入去重
 
@@ -67,7 +67,7 @@
 | 项 | 依据 | 处置 |
 |---|---|---|
 | `TenantApplicationResponseRenderer` SPI + `Router` | `implements` 命中仅 1 且被 Router 构造时过滤，分支恒不可达 | 删除，控制器直接依赖统一渲染器 |
-| `ApplicationStatus.ISSUE/COMPLETED/REVOKED` | 限定引用计数 0 | 删除枚举值 |
+| `ClaimApplicationStatus.ISSUE/COMPLETED/REVOKED` | 限定引用计数 0 | 删除枚举值 |
 | `OutboxEvent.restore(...)` | 与规范构造器逐字等价，唯一调用点在仓储 | 删除，走构造器 |
 | `Material` 四参 `createPending` | 外部只调三参版 | 改 private |
 | `PolicySnapshot` | `policyNo` 无读取点 | 端口签名改 boolean 语义，删除该类 |
@@ -86,7 +86,7 @@
 - 逻辑删除统一 `@TableLogic`，删除仓储里手写的 `.eq(deleted, false)`。
 - `t_claim_application_issue`、`t_claim_case_relation` 两张零引用表随模块删除一并从 DDL 移除，不保留无主表。
 - 引入 Flyway：现有 DDL 切成 `V1__baseline.sql`（已有库用 `baselineOnMigrate` 纳管，保证幂等），compose 的 init 只做建库；口令与库名一律来自环境变量，`.env.example` 与 yml 占位符同名 1:1。
-- `findByApplicationNo` 维持不带租户条件：唯一约束 `uk_tenant_external_application` 保证申请号全局唯一，补一条注释说明该不变式来源。
+- `findByClaimApplicationNo` 维持不带租户条件：唯一约束 `uk_tenant_external_claim_application` 保证申请号全局唯一，补一条注释说明该不变式来源。
 
 ## 十、可观测性与验证机制
 

@@ -40,12 +40,12 @@ public class MyBatisMaterialRepository implements MaterialRepository {
     /**
      * 逻辑删除申请当前有效材料，并记录删除时间。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      */
     @Override
-    public void softDeleteByApplicationNo(String applicationNo) {
+    public void softDeleteByClaimApplicationNo(String claimApplicationNo) {
         materialMapper.update(null, Wrappers.lambdaUpdate(MaterialDO.class)
-                .eq(MaterialDO::getApplicationNo, applicationNo)
+                .eq(MaterialDO::getClaimApplicationNo, claimApplicationNo)
                 .eq(MaterialDO::getDeleted, NOT_DELETED)
                 .set(MaterialDO::getDeleted, DELETED)
                 .set(MaterialDO::getDeletedAt, LocalDateTime.now()));
@@ -54,13 +54,13 @@ public class MyBatisMaterialRepository implements MaterialRepository {
     /**
      * 查询申请当前有效材料，按创建顺序返回。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 未删除材料
      */
     @Override
-    public List<Material> findByApplicationNoAndDeletedFalse(String applicationNo) {
+    public List<Material> findByClaimApplicationNoAndDeletedFalse(String claimApplicationNo) {
         return materialMapper.selectList(Wrappers.lambdaQuery(MaterialDO.class)
-                        .eq(MaterialDO::getApplicationNo, applicationNo)
+                        .eq(MaterialDO::getClaimApplicationNo, claimApplicationNo)
                         .eq(MaterialDO::getDeleted, NOT_DELETED)
                         .orderByAsc(MaterialDO::getId))
                 .stream()

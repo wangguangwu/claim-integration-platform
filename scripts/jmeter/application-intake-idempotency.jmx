@@ -43,7 +43,7 @@
           <stringProp name="HTTPSampler.domain">${__P(HOST,127.0.0.1)}</stringProp>
           <stringProp name="HTTPSampler.port">${__P(PORT,8080)}</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
-          <stringProp name="HTTPSampler.path">/api/application/v1/applications</stringProp>
+          <stringProp name="HTTPSampler.path">/api/application/v1/claim-applications</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -91,28 +91,28 @@
           <hashTree/>
           <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="提取理赔申请编号" enabled="true">
             <stringProp name="JSONPostProcessor.referenceNames">claimApplicationNo</stringProp>
-            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.applicationNo</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.claimApplicationNo</stringProp>
             <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
           </JSONPostProcessor>
           <hashTree/>
           <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="同号幂等响应断言" enabled="true">
             <stringProp name="scriptLanguage">groovy</stringProp>
-            <stringProp name="script">String actualApplicationNo = vars.get(&quot;claimApplicationNo&quot;);
-if (actualApplicationNo == null || actualApplicationNo.isBlank()) {
+            <stringProp name="script">String actualClaimApplicationNo = vars.get(&quot;claimApplicationNo&quot;);
+if (actualClaimApplicationNo == null || actualClaimApplicationNo.isBlank()) {
     AssertionResult.setFailure(true);
-    AssertionResult.setFailureMessage(&quot;响应未返回 data.applicationNo&quot;);
+    AssertionResult.setFailureMessage(&quot;响应未返回 data.claimApplicationNo&quot;);
     return;
 }
 String propertyKey = &quot;claim.application.intake.idempotency.&quot;
         + props.getProperty(&quot;EXTERNAL_APPLICATION_NO&quot;, &quot;IDEMPOTENCY-001&quot;);
 synchronized (props) {
-    String expectedApplicationNo = props.getProperty(propertyKey);
-    if (expectedApplicationNo == null) {
-        props.setProperty(propertyKey, actualApplicationNo);
-    } else if (!expectedApplicationNo.equals(actualApplicationNo)) {
+    String expectedClaimApplicationNo = props.getProperty(propertyKey);
+    if (expectedClaimApplicationNo == null) {
+        props.setProperty(propertyKey, actualClaimApplicationNo);
+    } else if (!expectedClaimApplicationNo.equals(actualClaimApplicationNo)) {
         AssertionResult.setFailure(true);
-        AssertionResult.setFailureMessage(&quot;幂等响应编号不一致，expected=&quot; + expectedApplicationNo
-                + &quot;, actual=&quot; + actualApplicationNo);
+        AssertionResult.setFailureMessage(&quot;幂等响应编号不一致，expected=&quot; + expectedClaimApplicationNo
+                + &quot;, actual=&quot; + actualClaimApplicationNo);
     }
 }</stringProp>
             <stringProp name="parameters"></stringProp>

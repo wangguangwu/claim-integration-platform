@@ -8,17 +8,17 @@ import java.util.Arrays;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public enum ApplicationEventType {
+public enum ClaimApplicationEventType {
 
     /**
      * 首次签收完成，触发材料处理。
      */
-    APPLICATION_CREATED("materialProcess-out-0"),
+    CLAIM_APPLICATION_CREATED("materialProcess-out-0"),
 
     /**
      * 受理失败后重新申请，触发材料处理。
      */
-    APPLICATION_REAPPLIED("materialProcess-out-0"),
+    CLAIM_APPLICATION_REAPPLIED("materialProcess-out-0"),
 
     /**
      * 已具备审核条件，触发审核交付。
@@ -27,7 +27,7 @@ public enum ApplicationEventType {
 
     private final String bindingName;
 
-    ApplicationEventType(String bindingName) {
+    ClaimApplicationEventType(String bindingName) {
         this.bindingName = bindingName;
     }
 
@@ -46,9 +46,9 @@ public enum ApplicationEventType {
      * @param eventType 消息事件类型
      * @return 事件类型
      */
-    public static ApplicationEventType from(String eventType) {
+    public static ClaimApplicationEventType from(String eventType) {
         return Arrays.stream(values())
-                .filter(applicationEventType -> applicationEventType.name().equals(eventType))
+                .filter(claimApplicationEventType -> claimApplicationEventType.name().equals(eventType))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("未知的理赔申请事件类型，eventType=" + eventType));
     }

@@ -37,7 +37,7 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 `tenant-a` 租户报文要求申请人、被保险人、出险人、领款人四个人员节点与 `attachments` 材料数组，性别只支持 `M`、`F`。
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
+curl -sS -X POST http://127.0.0.1:8081/api/application/v1/claim-applications \
   -H 'Content-Type: application/json' \
   -H 'X-Tenant-Code: tenant-a' \
   -H 'X-Protocol-Version: v1' \
@@ -55,17 +55,17 @@ curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
   }'
 ```
 
-响应 `data.applicationNo` 即平台申请编号，后续命令用变量承接：
+响应 `data.claimApplicationNo` 即平台申请编号，后续命令用变量承接：
 
 ```bash
-APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
+APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/application/v1/claim-applications \
   -H 'Content-Type: application/json' -H 'X-Tenant-Code: tenant-a' -H 'X-Protocol-Version: v1' \
   -H 'X-Request-Id: verify-004-001' -H 'X-Trace-Id: trace-004-001' -d @request.json \
-  | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["applicationNo"])')
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["claimApplicationNo"])')
 echo "$APP_NO"
 ```
 
-同一租户外部申请号重复提交会返回同一个 `applicationNo`，不重复创建数据。
+同一租户外部申请号重复提交会返回同一个 `claimApplicationNo`，不重复创建数据。
 
 ## 场景一：无有效保单的黄金路径
 
@@ -75,7 +75,7 @@ echo "$APP_NO"
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
-  -e "SELECT application_no, status, application_attempt FROM t_claim_application WHERE application_no='$APP_NO';"
+  -e "SELECT claim_application_no, status, claim_application_attempt FROM t_claim_application WHERE claim_application_no='$APP_NO';"
 ```
 
 2. 默认模拟承保在 `claim.mock.underwriting.completion-delay`（默认 1 秒）后自动完成并发送通知；也可手工触发：
@@ -88,21 +88,21 @@ curl -sS -X POST "http://127.0.0.1:8081/mock/underwriting/auto-underwritings/$AP
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "
-  SELECT status FROM t_claim_application WHERE application_no='$APP_NO';
-  SELECT material_type, status, uploaded_file_url FROM t_claim_application_material WHERE application_no='$APP_NO';
+  SELECT status FROM t_claim_application WHERE claim_application_no='$APP_NO';
+  SELECT material_type, status, uploaded_file_url FROM t_claim_application_material WHERE claim_application_no='$APP_NO';
   SELECT interaction_no, interaction_type, action, result_status, error_code
-    FROM t_claim_interaction_log WHERE application_no='$APP_NO' ORDER BY id;
+    FROM t_claim_interaction_log WHERE claim_application_no='$APP_NO' ORDER BY id;
   SELECT event_type, status, retry_count, published_at
-    FROM t_claim_outbox_event WHERE application_no='$APP_NO' ORDER BY id;
-  SELECT consumer_group, event_id FROM t_claim_consumed_event WHERE application_no='$APP_NO';"
+    FROM t_claim_outbox_event WHERE claim_application_no='$APP_NO' ORDER BY id;
+  SELECT consumer_group, event_id FROM t_claim_consumed_event WHERE claim_application_no='$APP_NO';"
 ```
 
 预期：
 
 - `t_claim_application.status = WAIT_AUDIT`。
-- `t_claim_application_material.status = PROCESSED`，`uploaded_file_url` 形如 `mock://file-system/<applicationNo>/<batchNo>/<materialType>`。
+- `t_claim_application_material.status = PROCESSED`，`uploaded_file_url` 形如 `mock://file-system/<claimApplicationNo>/<batchNo>/<materialType>`。
 - `t_claim_interaction_log` 出现 `MATERIAL_PROCESS` 的 `STARTED`/`COMPLETED`、`UNDERWRITING` 的 `STARTED`/`COMPLETED` 与 `UNDERWRITING_CALLBACK` 的 `COMPLETED`，同一行为的 `interaction_no` 相同。
-- `t_claim_outbox_event` 中 `APPLICATION_CREATED` 与 `AUDIT_DELIVERY_REQUESTED` 均为 `PUBLISHED`。
+- `t_claim_outbox_event` 中 `CLAIM_APPLICATION_CREATED` 与 `AUDIT_DELIVERY_REQUESTED` 均为 `PUBLISHED`。
 - `t_claim_consumed_event` 只有一条材料处理消费记录。
 
 ## 场景二：存在有效保单直达待审核
@@ -122,7 +122,7 @@ curl -sS -X POST http://127.0.0.1:8081/mock/underwriting/policies \
 ```bash
 curl -sS "http://127.0.0.1:8081/mock/underwriting/v1/auto-underwritings/$APP_NO"
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
-  -e "SELECT interaction_type, action FROM t_claim_interaction_log WHERE application_no='$APP_NO' ORDER BY id;"
+  -e "SELECT interaction_type, action FROM t_claim_interaction_log WHERE claim_application_no='$APP_NO' ORDER BY id;"
 ```
 
 自动承保查询返回 `NOT_FOUND`，交互轨迹只有 `MATERIAL_PROCESS` 与 `UNDERWRITING` 的分流记录，没有 `UNDERWRITING_CALLBACK`。
@@ -141,7 +141,7 @@ curl -sS -X DELETE http://127.0.0.1:8081/mock/underwriting/policies/110101199001
 curl -sS -X POST http://127.0.0.1:8081/api/application/v1/callbacks/underwriting-completed \
   -H 'Content-Type: application/json' \
   -H 'X-Request-Id: verify-004-callback-dup' \
-  -d "{\"applicationNo\": \"$APP_NO\"}"
+  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
 ```
 
 预期返回 200，`data.disposition` 为 `REUSED`；`t_claim_outbox_event` 中 `AUDIT_DELIVERY_REQUESTED` 仍只有一条，申请状态不变。
@@ -159,14 +159,14 @@ java -jar backend/claim-application-service/target/claim-application-service-*.j
 ```
 
 1. 用新的外部申请号提交申请，申请停在 `UNDERWRITING`，模拟承保记录为 `PROCESSING`。
-2. 超过 `claim.compensation.underwriting-timeout`（默认 1 分钟）后，补偿任务查询承保结果；模拟承保到期自动完成后，补偿以 `compensation-<applicationNo>` 作为请求标识调用回调入口。
-3. 预期申请推进到 `WAIT_AUDIT`，`t_claim_interaction_log` 中 `UNDERWRITING_CALLBACK` 的 `request_id` 为 `compensation-<applicationNo>`。
+2. 超过 `claim.compensation.underwriting-timeout`（默认 1 分钟）后，补偿任务查询承保结果；模拟承保到期自动完成后，补偿以 `compensation-<claimApplicationNo>` 作为请求标识调用回调入口。
+3. 预期申请推进到 `WAIT_AUDIT`，`t_claim_interaction_log` 中 `UNDERWRITING_CALLBACK` 的 `request_id` 为 `compensation-<claimApplicationNo>`。
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "
-  SELECT status FROM t_claim_application WHERE application_no='$APP_NO';
+  SELECT status FROM t_claim_application WHERE claim_application_no='$APP_NO';
   SELECT interaction_type, action, request_id, result_status
-    FROM t_claim_interaction_log WHERE application_no='$APP_NO' ORDER BY id;"
+    FROM t_claim_interaction_log WHERE claim_application_no='$APP_NO' ORDER BY id;"
 ```
 
 ## 场景五：MQ 停机期间签收不受影响
@@ -186,7 +186,7 @@ docker stop claim-rocketmq-broker
 ```bash
 curl -fsS http://127.0.0.1:8081/actuator/health
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
-  -e "SELECT event_type, status, retry_count, next_retry_at FROM t_claim_outbox_event WHERE application_no='$APP_NO';"
+  -e "SELECT event_type, status, retry_count, next_retry_at FROM t_claim_outbox_event WHERE claim_application_no='$APP_NO';"
 ```
 
 3. 恢复 Broker：
@@ -205,7 +205,7 @@ docker start claim-rocketmq-broker
 {"type": "MATERIAL_TYPE_REJECTED", "sourceUrl": "https://files.example.com/rejected.pdf"}
 ```
 
-预期申请进入 `ACCEPT_FAILED`，命中失败名单的材料置为 `FAILED` 且不写上传地址，其余材料正常 `PROCESSED`，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 及错误码（模拟文件系统返回 `MOCK_UPLOAD_REJECTED`）。相同租户外部申请号可再次提交触发重新申请，走 `APPLICATION_REAPPLIED` 事件重新处理材料。
+预期申请进入 `ACCEPT_FAILED`，命中失败名单的材料置为 `FAILED` 且不写上传地址，其余材料正常 `PROCESSED`，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 及错误码（模拟文件系统返回 `MOCK_UPLOAD_REJECTED`）。相同租户外部申请号可再次提交触发重新申请，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料。
 
 注意：文件系统抛异常或超时与明确拒绝不同，此时异常向上抛出由 binder 重投，材料与申请保持原状态，`claim.mock.file-system.delay` 可用于验证该链路。
 

@@ -22,8 +22,8 @@ public interface ConsumedEventRepository {
      *
      * @param consumerGroup 消费者组
      * @param eventId       事件标识
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 首次登记时为 true
      */
-    boolean register(String consumerGroup, String eventId, String applicationNo);
+    boolean register(String consumerGroup, String eventId, String claimApplicationNo);
 }

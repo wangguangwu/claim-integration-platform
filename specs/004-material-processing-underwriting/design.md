@@ -23,7 +23,7 @@ flowchart LR
     MOCK -.延迟.-> CALLBACK["UnderwritingCallbackUseCase"]
     CALLBACK --> DB
     DB --> AUDIT["claim_application_audit_delivery_v1"]
-    COMPENSATION["ApplicationCompensationUseCase"] --> DB
+    COMPENSATION["ClaimApplicationCompensationUseCase"] --> DB
     COMPENSATION --> POLICY
 ```
 
@@ -49,7 +49,7 @@ sequenceDiagram
     MQ-->>S: 投递成功
     S->>O: status=PUBLISHED
 
-    MQ->>C: APPLICATION_CREATED 或 APPLICATION_REAPPLIED
+    MQ->>C: CLAIM_APPLICATION_CREATED 或 CLAIM_APPLICATION_REAPPLIED
     C->>DB: 读取理赔申请与未删除材料
     alt 状态或尝试次数不匹配
         C->>DB: 写 REUSED 交互事件
@@ -82,7 +82,7 @@ sequenceDiagram
         U->>DB: 事务：ACCEPTED → WAIT_AUDIT，写 AUDIT_DELIVERY_REQUESTED
     else 不存在有效保单
         U->>DB: 事务：ACCEPTED → UNDERWRITING
-        U->>A: 发起自动承保（按 applicationNo 幂等）
+        U->>A: 发起自动承保（按 claimApplicationNo 幂等）
         A->>M: 记录承保处理中
         M-->>CB: 延迟后触发完成通知
         CB->>DB: 事务：UNDERWRITING → WAIT_AUDIT，写 AUDIT_DELIVERY_REQUESTED
@@ -95,11 +95,11 @@ sequenceDiagram
 
 | 模块 | 改动内容 | 职责 |
 |---|---|---|
-| `domain/claim` | `ClaimApplication` 生命周期迁移方法、`ApplicationRepository` 查询与条件更新、`PrimaryInsured` 角色证件号读取 | 维护状态迁移前置条件，不依赖 Spring、MQ、Feign |
+| `domain/claim` | `ClaimApplication` 生命周期迁移方法、`ClaimApplicationRepository` 查询与条件更新、`PrimaryInsured` 角色证件号读取 | 维护状态迁移前置条件，不依赖 Spring、MQ、Feign |
 | `domain/material` + `usecase/material` + `interfaces/material` + `infrastructure/material` | `Material`、`MaterialRepository`、`MaterialStatus`、`MaterialFileProcessor` 端口；材料处理用例与事务服务；`MaterialProcessConsumer`；材料持久化与 Feign 文件客户端 | 材料聚合、消息接收与文件处理编排 |
 | `domain/underwriting` + `usecase/underwriting` + `interfaces/underwriting` + `infrastructure/underwriting` | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` 端口与 `PolicySnapshot`、`UnderwritingResult` 值对象；承保分流、回调用例与事务服务；回调 HTTP 接口；Feign 承保客户端 | 保单查询、自动承保发起与承保完成确认 |
-| `domain/integration` + `usecase/integration` + `interfaces/integration` + `infrastructure/integration` | `OutboxEventRepository`、`ConsumedEventRepository`、`InteractionLogRepository` 端口与实现；`ApplicationLifecycleRecordFactory` 记录装配；`OutboxRelayUseCase` 与 MQ 投递器；`ApplicationCompensationUseCase` 补偿调度；`OutboxRelayPolicy`、`ApplicationCompensationPolicy` 策略端口及其 `infrastructure/integration/config` 配置适配器 | 平台异步内核：投递、消费去重、交互轨迹与滞留补偿，允许编排业务域用例 |
-| `shared` | `ApplicationEventEnvelope`、`UnderwritingCompletedCommand` 跨域契约；统一响应模型与异步错误码、异常 | 多域复用的消息与协议构件，不含业务规则 |
+| `domain/integration` + `usecase/integration` + `interfaces/integration` + `infrastructure/integration` | `OutboxEventRepository`、`ConsumedEventRepository`、`InteractionLogRepository` 端口与实现；`ClaimApplicationLifecycleRecordFactory` 记录装配；`OutboxRelayUseCase` 与 MQ 投递器；`ClaimApplicationCompensationUseCase` 补偿调度；`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy` 策略端口及其 `infrastructure/integration/config` 配置适配器 | 平台异步内核：投递、消费去重、交互轨迹与滞留补偿，允许编排业务域用例 |
+| `shared` | `ClaimApplicationEventEnvelope`、`UnderwritingCompletedCommand` 跨域契约；统一响应模型与异步错误码、异常 | 多域复用的消息与协议构件，不含业务规则 |
 | `support` | 模拟文件系统与模拟承保存储及其 HTTP 接口 | 仅 `claim.mock.enabled` 打开时生效的外部系统模拟 |
 | `application.yml` | Feign 地址与超时、MQ 绑定、投递与补偿阈值、模拟外部能力开关 | 本地可运行、生产可覆盖 |
 | 根 POM 与理赔申请POM | 引入 `spring-cloud-starter-openfeign` | 声明式外部调用 |
@@ -118,8 +118,8 @@ sequenceDiagram
 | `UnderwritingUseCase` | 事务外查询保单，按结果推进到 `WAIT_AUDIT` 或 `UNDERWRITING` 并发起自动承保 |
 | `UnderwritingTransactionService` | 条件推进 `ACCEPTED → WAIT_AUDIT` 或 `ACCEPTED → UNDERWRITING`，需要时写入审核交付事件 |
 | `UnderwritingCallbackUseCase` | 承保完成通知幂等处理，推进 `UNDERWRITING → WAIT_AUDIT` |
-| `ApplicationCompensationUseCase` | 恢复投递滞留、`ACCEPTED` 滞留与 `UNDERWRITING` 超时 |
-| `ApplicationLifecycleRecordFactory` | 构建交互事件与 `AUDIT_DELIVERY_REQUESTED` 事件，不访问数据库 |
+| `ClaimApplicationCompensationUseCase` | 恢复投递滞留、`ACCEPTED` 滞留与 `UNDERWRITING` 超时 |
+| `ClaimApplicationLifecycleRecordFactory` | 构建交互事件与 `AUDIT_DELIVERY_REQUESTED` 事件，不访问数据库 |
 | `ClaimApplication` | 平台统一理赔申请模型，持有 `Applicant`、`PrimaryInsured`、`AccidentPerson`、`Payee` 四个人员角色值对象；保单查询通过 `primaryInsuredCertificateNo()` 读取主被保险人证件号 |
 | `MaterialFileProcessor` | 材料文件上传端口，返回上传后地址或失败原因 |
 | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` | 承保能力端口：保单查询、发起自动承保、查询承保结果，用例层只依赖这三个接口 |
@@ -129,7 +129,7 @@ sequenceDiagram
 | `MockFileSystemController` | 模拟文件系统接口，供联调与失败场景验证使用 |
 | `MockUnderwritingStore` | 内存保存保单列表与自动承保记录，仅模拟开关开启时启用 |
 | `MockUnderwritingController` | 模拟承保接口，供联调与验证使用 |
-| `ApplicationCompensationScheduler` | 定时触发补偿用例，单类补偿异常不中断其余补偿 |
+| `ClaimApplicationCompensationScheduler` | 定时触发补偿用例，单类补偿异常不中断其余补偿 |
 | `UnderwritingCallbackController` | 承保系统回调入口，只做报文解析与结果渲染 |
 | `ConsumedEventRepository` | 消费登记端口，按消费者组与事件标识去重 |
 
@@ -145,7 +145,7 @@ sequenceDiagram
 | `t_claim_application_material.status` | `PENDING_PROCESS → PROCESSED`、`PENDING_PROCESS → FAILED` | 只更新当前未删除的材料，`uploaded_file_url` 在处理成功时写入 |
 | `t_claim_outbox_event.status` | `PENDING → SENDING → PUBLISHED`；发送失败回到 `PENDING` 并累加 `retry_count`、写入 `next_retry_at`；超过上限置 `FAILED` | `published_at` 记录投递成功时间；`SENDING` 超时由补偿重置为 `PENDING` |
 | `t_claim_consumed_event` | 一次消费成功写一行 | `(consumer_group, event_id)` 唯一，重复插入视为已处理 |
-| 模拟外部能力数据 | 仅进程内存 | 保单按被保人证件号存储，承保记录按 `applicationNo` 存储，上传结果按源地址存储，重启即失效 |
+| 模拟外部能力数据 | 仅进程内存 | 保单按被保人证件号存储，承保记录按 `claimApplicationNo` 存储，上传结果按源地址存储，重启即失效 |
 
 `t_claim_outbox_event.payload` 需要携带 `traceId`，否则投递器无法按 002 信封契约组装消息。003 在构建事件时已持有 `traceId`，本 Spec 在 003 的事件构建中补充该字段，不改变表结构。
 
@@ -155,8 +155,8 @@ sequenceDiagram
 |---|---|
 | 消费绑定 | `materialProcess-in-0`，目标 `claim_application_material_process_v1`，消费组 `claim-application-material-processor-v1` |
 | 审核交付 Topic | `claim_application_audit_delivery_v1`，消费组 `claim-application-audit-delivery-v1`，本 Spec 只生产不消费 |
-| 信封 | 严格使用 002 定义的 `eventId`、`eventType`、`eventVersion`、`applicationNo`、`tenantCode`、`occurredAt`、`traceId`、`payload` |
-| 事件类型路由 | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` → 材料处理 Topic；`AUDIT_DELIVERY_REQUESTED` → 审核交付 Topic |
+| 信封 | 严格使用 002 定义的 `eventId`、`eventType`、`eventVersion`、`claimApplicationNo`、`tenantCode`、`occurredAt`、`traceId`、`payload` |
+| 事件类型路由 | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` → 材料处理 Topic；`AUDIT_DELIVERY_REQUESTED` → 审核交付 Topic |
 | 发送语义 | 至少一次；幂等由 `t_claim_consumed_event` 与条件更新共同保证 |
 | 消费异常 | 抛出异常交由 binder 重试，不做本地无限重试，也不吞掉异常 |
 
@@ -176,11 +176,11 @@ sequenceDiagram
 
 | 接口 | 用途 | 行为 |
 |---|---|---|
-| `POST /mock/file-system/v1/uploads` | 文件上传（业务链路） | 入参 `applicationNo`、`batchNo`、`materialType`、`sourceUrl`，按源地址幂等，返回 `uploadedFileUrl` 与文件标识 |
+| `POST /mock/file-system/v1/uploads` | 文件上传（业务链路） | 入参 `claimApplicationNo`、`batchNo`、`materialType`、`sourceUrl`，按源地址幂等，返回 `uploadedFileUrl` 与文件标识 |
 | `GET /mock/file-system/v1/uploads` | 查看已模拟的上传记录 | 只返回申请编号、批次、材料类型、模拟地址和登记时间 |
 | `DELETE /mock/file-system/v1/uploads` | 清空模拟上传记录 | 供联调与测试重置，不涉及磁盘文件 |
 
-- 模拟地址固定形如 `mock://file-system/{applicationNo}/{batchNo}/{materialType}`，不下载、不转存真实文件，也不落库。
+- 模拟地址固定形如 `mock://file-system/{claimApplicationNo}/{batchNo}/{materialType}`，不下载、不转存真实文件，也不落库。
 - 失败模拟按材料类型配置：命中 `claim.mock.file-system.fail-material-types` 的材料返回失败，用于验证 `ACCEPT_FAILED` 链路。
 - 延迟模拟由 `claim.mock.file-system.delay` 控制，用于验证外部调用超时与消息重投。
 - 真实文件系统接入时替换 Feign 适配器的地址即可，端口与事务编排不变。
@@ -193,9 +193,9 @@ sequenceDiagram
 | `DELETE /mock/underwriting/policies/{certificateNo}` | 清除保单 | 移除后查询返回无有效保单 |
 | `GET /mock/underwriting/policies` | 查看当前保单 | 只返回证件号、保单号和登记时间，不返回人员姓名 |
 | `POST /mock/underwriting/v1/policy-queries` | 保单查询（业务链路） | 入参 `tenantCode`、`insuredCertificateNo`，返回 `hasValidPolicy` 与 `policyNo` |
-| `POST /mock/underwriting/v1/auto-underwritings` | 发起自动承保（业务链路） | 按 `applicationNo` 幂等，记录为处理中，并延迟完成 |
-| `GET /mock/underwriting/v1/auto-underwritings/{applicationNo}` | 查询承保结果（补偿使用） | 返回 `PROCESSING`、`COMPLETED` 或 `NOT_FOUND` |
-| `POST /mock/underwriting/auto-underwritings/{applicationNo}/complete` | 手工触发完成 | 立即完成并触发承保完成通知，供联调使用 |
+| `POST /mock/underwriting/v1/auto-underwritings` | 发起自动承保（业务链路） | 按 `claimApplicationNo` 幂等，记录为处理中，并延迟完成 |
+| `GET /mock/underwriting/v1/auto-underwritings/{claimApplicationNo}` | 查询承保结果（补偿使用） | 返回 `PROCESSING`、`COMPLETED` 或 `NOT_FOUND` |
+| `POST /mock/underwriting/auto-underwritings/{claimApplicationNo}/complete` | 手工触发完成 | 立即完成并触发承保完成通知，供联调使用 |
 
 - 自动完成后是否发送通知由 `claim.mock.underwriting.notify-on-complete` 控制，默认发送；关闭后用于验证补偿查询链路。
 - 完成通知直接在进程内调用 `UnderwritingCallbackUseCase`，与 HTTP 回调入口使用同一套幂等规则；HTTP 入口保留给真实承保系统与手工验证。
@@ -207,24 +207,24 @@ sequenceDiagram
 |---|---|
 | 承保完成回调 | `POST /api/application/v1/callbacks/underwriting-completed` |
 | 必填请求头 | `X-Request-Id`（回调发送方生成，重试保持不变）、`X-Trace-Id`（可选） |
-| 请求体 | `applicationNo` |
+| 请求体 | `claimApplicationNo` |
 | 成功响应 | 统一结构 `code=SUCCESS`；重复、迟到或状态不匹配同样返回成功 |
 | 业务错误 | `CALLBACK_INVALID`（400）、`APPLICATION_NOT_FOUND`（404） |
 | 系统错误 | `APPLICATION_ASYNC_SYSTEM_ERROR`（500） |
 
 回调处理规则：
 
-- 报文缺少 `applicationNo` 或请求头缺少 `X-Request-Id` 返回 `CALLBACK_INVALID`。
+- 报文缺少 `claimApplicationNo` 或请求头缺少 `X-Request-Id` 返回 `CALLBACK_INVALID`。
 - 申请不存在返回 `APPLICATION_NOT_FOUND`。
 - 申请存在但不在 `UNDERWRITING`：返回成功，写一条 `REUSED` 交互事件。
 - 申请在 `UNDERWRITING`：同一事务推进到 `WAIT_AUDIT`、写 `AUDIT_DELIVERY_REQUESTED` 事件和 `COMPLETED` 交互事件。
 
 ## 并发控制、事务与异常处理
 
-- 状态迁移一律使用条件更新：`WHERE application_no = ? AND status = ? AND application_attempt = ?`；影响行数为 0 表示已被其他执行者推进，按重复处理并记录轨迹。
+- 状态迁移一律使用条件更新：`WHERE claim_application_no = ? AND status = ? AND claim_application_attempt = ?`；影响行数为 0 表示已被其他执行者推进，按重复处理并记录轨迹。
 - 材料处理结果、理赔申请状态、交互事件与消费登记写入同一本地事务，避免出现"材料已处理但状态未推进"。
 - 文件处理、保单查询、自动承保请求都在事务外执行；外部调用失败不进入失败状态，只保留原状态等待重试。
-- 文件上传与自动承保请求必须幂等：上传按 `applicationNo + batchNo + materialType + originalFileUrl` 去重，自动承保按 `applicationNo` 去重；进程崩溃后消息重投不得产生重复数据或覆盖已完成结果。
+- 文件上传与自动承保请求必须幂等：上传按 `claimApplicationNo + batchNo + materialType + originalFileUrl` 去重，自动承保按 `claimApplicationNo` 去重；进程崩溃后消息重投不得产生重复数据或覆盖已完成结果。
 - 所有外部调用收紧超时：Feign 连接 1 秒、读取 2 秒，避免消费线程长时间占用。
 - 消费侧不做吞异常处理，数据库或外部系统异常交由 binder 重试；达到重试上限的情况依赖补偿任务恢复，不修改业务状态。
 - 补偿任务只按状态和超时时间筛选记录，不扫描全表；状态已变化的记录跳过并记录日志。
@@ -233,7 +233,7 @@ sequenceDiagram
 ## 对现有功能的影响
 
 - 003 的事件构建需要把 `traceId` 写入 Outbox 载荷，用于组装信封；其余签收逻辑不变。
-- `ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 新增查询与条件更新方法，已有方法签名不变。
+- `ClaimApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 新增查询与条件更新方法，已有方法签名不变。
 - `claim-application-service` 新增 Feign 依赖与定时调度；就绪探针仍只依赖数据库，MQ 与承保系统故障不摘除实例。
 - 002 冻结的 Topic、消费者组、信封和回调路径保持不变；本 Spec 不新增 Topic。
 - 材料处理失败会推进到 `ACCEPT_FAILED`，与 003 的重新申请规则衔接；重新申请产生的新批次由本 Spec 的消费链路重新处理。

@@ -21,7 +21,7 @@ public class Material {
     private Long id;
 
     /** 所属理赔申请的平台申请编号。 */
-    private String applicationNo;
+    private String claimApplicationNo;
 
     /** 同一次申请提交生成的材料批次编号。 */
     private String batchNo;
@@ -44,35 +44,35 @@ public class Material {
     /**
      * 创建待处理的首次或补充材料。
      *
-     * @param applicationNo   平台申请编号
+     * @param claimApplicationNo   平台申请编号
      * @param batchNo         材料批次编号
      * @param materialType    材料类型
      * @param originalFileUrl 租户提交的初始文件地址
      * @return 待处理材料
      */
-    private static Material createPending(String applicationNo, String batchNo, String materialType,
+    private static Material createPending(String claimApplicationNo, String batchNo, String materialType,
                                          String originalFileUrl) {
-        return Material.builder().applicationNo(applicationNo).batchNo(batchNo).materialType(materialType)
+        return Material.builder().claimApplicationNo(claimApplicationNo).batchNo(batchNo).materialType(materialType)
                 .originalFileUrl(originalFileUrl).status(MaterialStatus.PENDING_PROCESS).build();
     }
 
     /**
      * 把理赔申请随单提交的一份材料转成待处理材料，材料状态由本域决定。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @param batchNo       本次提交共用的材料批次编号
      * @param submission    申请提交的材料
      * @return 待处理材料
      */
-    public static Material createPending(String applicationNo, String batchNo, MaterialSubmission submission) {
-        return createPending(applicationNo, batchNo, submission.materialType(), submission.originalFileUrl());
+    public static Material createPending(String claimApplicationNo, String batchNo, MaterialSubmission submission) {
+        return createPending(claimApplicationNo, batchNo, submission.materialType(), submission.originalFileUrl());
     }
 
     /**
      * 从已落库的数据重建材料聚合，仅供持久化层反水化使用。
      *
      * @param id              数据库主键
-     * @param applicationNo   平台申请编号
+     * @param claimApplicationNo   平台申请编号
      * @param batchNo         材料批次编号
      * @param materialType    材料类型
      * @param originalFileUrl 租户提交的初始文件地址
@@ -81,10 +81,10 @@ public class Material {
      * @param deleted         是否为重新申请后的历史材料
      * @return 已落库的材料
      */
-    public static Material restore(Long id, String applicationNo, String batchNo, String materialType,
+    public static Material restore(Long id, String claimApplicationNo, String batchNo, String materialType,
                                    String originalFileUrl, String uploadedFileUrl, MaterialStatus status,
                                    boolean deleted) {
-        return Material.builder().id(id).applicationNo(applicationNo).batchNo(batchNo).materialType(materialType)
+        return Material.builder().id(id).claimApplicationNo(claimApplicationNo).batchNo(batchNo).materialType(materialType)
                 .originalFileUrl(originalFileUrl).uploadedFileUrl(uploadedFileUrl).status(status).deleted(deleted)
                 .build();
     }
@@ -96,7 +96,7 @@ public class Material {
      */
     public void markProcessed(String uploadedFileUrl) {
         if (status != MaterialStatus.PENDING_PROCESS) {
-            throw new IllegalStateException("仅待处理材料允许写入处理结果，applicationNo=" + applicationNo
+            throw new IllegalStateException("仅待处理材料允许写入处理结果，claimApplicationNo=" + claimApplicationNo
                     + "，materialType=" + materialType);
         }
         this.uploadedFileUrl = uploadedFileUrl;
@@ -108,7 +108,7 @@ public class Material {
      */
     public void markFailed() {
         if (status != MaterialStatus.PENDING_PROCESS) {
-            throw new IllegalStateException("仅待处理材料允许写入处理结果，applicationNo=" + applicationNo
+            throw new IllegalStateException("仅待处理材料允许写入处理结果，claimApplicationNo=" + claimApplicationNo
                     + "，materialType=" + materialType);
         }
         this.status = MaterialStatus.FAILED;

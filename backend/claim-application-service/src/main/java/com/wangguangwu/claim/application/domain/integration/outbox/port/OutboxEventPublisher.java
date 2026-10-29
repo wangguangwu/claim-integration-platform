@@ -1,5 +1,5 @@
 package com.wangguangwu.claim.application.domain.integration.outbox.port;
-import com.wangguangwu.claim.application.shared.contract.ApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 
 /**
  * Outbox 事件投递端口，由基础设施按事件类型路由到对应 Topic。
@@ -14,5 +14,5 @@ public interface OutboxEventPublisher {
      *
      * @param envelope 消息信封
      */
-    void publish(ApplicationEventEnvelope envelope);
+    void publish(ClaimApplicationEventEnvelope envelope);
 }

@@ -6,7 +6,7 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLog;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
-import com.wangguangwu.claim.application.domain.integration.outbox.ApplicationEventType;
+import com.wangguangwu.claim.application.domain.integration.outbox.ClaimApplicationEventType;
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEvent;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
  */
 @RequiredArgsConstructor
 @Service
-public class ApplicationLifecycleRecordFactory {
+public class ClaimApplicationLifecycleRecordFactory {
 
     private static final String TRACE_ID_FIELD = "traceId";
     private static final int EVENT_VERSION = 1;
@@ -45,46 +45,46 @@ public class ApplicationLifecycleRecordFactory {
     /**
      * 构建审核交付事件，载荷不包含人员敏感信息。
      *
-     * @param application 已进入等待审核签收的申请
+     * @param claimApplication 已进入等待审核签收的申请
      * @param traceId     链路标识
      * @return 待投递事件
      */
-    public OutboxEvent auditDeliveryRequestedEvent(ClaimApplication application, String traceId) {
+    public OutboxEvent auditDeliveryRequestedEvent(ClaimApplication claimApplication, String traceId) {
         Map<String, Object> payload = Map.of(
-                "applicationNo", application.getApplicationNo(),
-                "tenantCode", application.getTenantCode(),
-                "applicationAttempt", application.getApplicationAttempt(),
+                "claimApplicationNo", claimApplication.getClaimApplicationNo(),
+                "tenantCode", claimApplication.getTenantCode(),
+                "claimApplicationAttempt", claimApplication.getClaimApplicationAttempt(),
                 TRACE_ID_FIELD, traceId);
-        return newOutboxEvent(application, ApplicationEventType.AUDIT_DELIVERY_REQUESTED, payload);
+        return newOutboxEvent(claimApplication, ClaimApplicationEventType.AUDIT_DELIVERY_REQUESTED, payload);
     }
 
     /**
      * 构建首次签收事件，触发材料处理，载荷不包含人员敏感信息。
      *
-     * @param application 已完成签收的申请
+     * @param claimApplication 已完成签收的申请
      * @param traceId     链路标识
      * @return 待投递事件
      */
-    public OutboxEvent applicationCreatedEvent(ClaimApplication application, String traceId) {
-        return applicationProcessEvent(application, ApplicationEventType.APPLICATION_CREATED, traceId);
+    public OutboxEvent claimApplicationCreatedEvent(ClaimApplication claimApplication, String traceId) {
+        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_CREATED, traceId);
     }
 
     /**
      * 构建重新申请事件，触发材料重新处理，载荷不包含人员敏感信息。
      *
-     * @param application 已重新申请的申请
+     * @param claimApplication 已重新申请的申请
      * @param traceId     链路标识
      * @return 待投递事件
      */
-    public OutboxEvent applicationReappliedEvent(ClaimApplication application, String traceId) {
-        return applicationProcessEvent(application, ApplicationEventType.APPLICATION_REAPPLIED, traceId);
+    public OutboxEvent claimApplicationReappliedEvent(ClaimApplication claimApplication, String traceId) {
+        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_REAPPLIED, traceId);
     }
 
     /**
      * 构建一条交互事件。
      *
      * @param interactionType 交互类型
-     * @param applicationNo   平台申请编号
+     * @param claimApplicationNo   平台申请编号
      * @param interactionNo   行为组编号
      * @param action          阶段动作
      * @param requestId       请求标识
@@ -93,31 +93,31 @@ public class ApplicationLifecycleRecordFactory {
      * @param errorMessage    失败说明，非失败场景为 null
      * @return 交互事件
      */
-    public InteractionLog interaction(InteractionType interactionType, String applicationNo, String interactionNo,
+    public InteractionLog interaction(InteractionType interactionType, String claimApplicationNo, String interactionNo,
                                       InteractionAction action, String requestId, String traceId,
                                       String errorCode, String errorMessage) {
-        return InteractionLog.of(interactionType, applicationNo, interactionNo, action, requestId, traceId,
+        return InteractionLog.of(interactionType, claimApplicationNo, interactionNo, action, requestId, traceId,
                 errorCode, errorMessage, now());
     }
 
     /**
      * 签收与重新申请事件需要把事件类型也写进载荷，供消费侧自校验。
      */
-    private OutboxEvent applicationProcessEvent(ClaimApplication application, ApplicationEventType eventType,
+    private OutboxEvent claimApplicationProcessEvent(ClaimApplication claimApplication, ClaimApplicationEventType eventType,
                                                 String traceId) {
         Map<String, Object> payload = Map.of(
-                "applicationNo", application.getApplicationNo(),
-                "tenantCode", application.getTenantCode(),
+                "claimApplicationNo", claimApplication.getClaimApplicationNo(),
+                "tenantCode", claimApplication.getTenantCode(),
                 "eventType", eventType.name(),
-                "applicationAttempt", application.getApplicationAttempt(),
+                "claimApplicationAttempt", claimApplication.getClaimApplicationAttempt(),
                 TRACE_ID_FIELD, traceId);
-        return newOutboxEvent(application, eventType, payload);
+        return newOutboxEvent(claimApplication, eventType, payload);
     }
 
-    private OutboxEvent newOutboxEvent(ClaimApplication application, ApplicationEventType eventType,
+    private OutboxEvent newOutboxEvent(ClaimApplication claimApplication, ClaimApplicationEventType eventType,
                                        Map<String, Object> payload) {
         return OutboxEvent.pending(UUID.randomUUID().toString(), eventType.name(), EVENT_VERSION,
-                application.getApplicationNo(), application.getTenantCode(), serialize(payload));
+                claimApplication.getClaimApplicationNo(), claimApplication.getTenantCode(), serialize(payload));
     }
 
     private String serialize(Object value) {

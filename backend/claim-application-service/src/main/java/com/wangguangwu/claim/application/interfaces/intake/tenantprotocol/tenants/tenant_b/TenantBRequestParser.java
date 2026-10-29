@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.tenan
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ public class TenantBRequestParser implements TenantProtocolParser<TenantBIntakeR
         } catch (JsonProcessingException exception) {
             // 只记录异常类型：报文原文含证件号，不允许进日志。
             log.warn("B 租户申请报文解析失败，原因类型={}", exception.getClass().getSimpleName());
-            throw ApplicationIntakeException.invalid("租户申请报文不是合法的 B 租户协议 JSON", exception);
+            throw ClaimApplicationIntakeException.invalid("租户申请报文不是合法的 B 租户协议 JSON", exception);
         }
     }
 }

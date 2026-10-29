@@ -116,7 +116,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.wangguangwu.claim.application.ApplicationServiceApplication</mainClass>
+                    <mainClass>com.wangguangwu.claim.application.ClaimApplicationServiceApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

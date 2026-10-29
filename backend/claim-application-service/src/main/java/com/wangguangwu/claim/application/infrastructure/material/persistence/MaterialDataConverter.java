@@ -38,7 +38,7 @@ public interface MaterialDataConverter {
         if (materialDO == null) {
             return null;
         }
-        return Material.restore(materialDO.getId(), materialDO.getApplicationNo(), materialDO.getBatchNo(),
+        return Material.restore(materialDO.getId(), materialDO.getClaimApplicationNo(), materialDO.getBatchNo(),
                 materialDO.getMaterialType(), materialDO.getOriginalFileUrl(), materialDO.getUploadedFileUrl(),
                 MaterialStatus.valueOf(materialDO.getStatus()), Boolean.TRUE.equals(materialDO.getDeleted()));
     }

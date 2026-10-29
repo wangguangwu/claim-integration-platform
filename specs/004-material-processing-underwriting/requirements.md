@@ -18,7 +18,7 @@
 
 ### 材料处理
 
-- 消费 `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` 事件时，只处理该理赔申请**当前未删除** 且状态为 `PENDING_PROCESS` 的材料。
+- 消费 `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` 事件时，只处理该理赔申请**当前未删除** 且状态为 `PENDING_PROCESS` 的材料。
 - 处理前必须校验事件载荷中的申请尝试次数与理赔申请当前尝试次数一致，且理赔申请状态为 `PENDING_ACCEPT`；不满足时只记录交互轨迹，不改变任何业务数据。
 - 当前批次全部材料处理成功：材料置为 `PROCESSED` 并写入上传后地址，理赔申请推进到 `ACCEPTED`。
 - 当前批次任一材料处理失败：该材料置为 `FAILED`，理赔申请推进到 `ACCEPT_FAILED`，本次尝试结束，由租户重新申请恢复。
@@ -34,7 +34,7 @@
 - 保单查询失败或超时：理赔申请保持 `ACCEPTED`，由补偿任务重试分流，不判定为受理失败。
 - 承保完成通知只允许把 `UNDERWRITING` 推进到 `WAIT_AUDIT`，并写入 `AUDIT_DELIVERY_REQUESTED` 事件。
 - 重复、迟到或状态不匹配的承保完成通知只记录交互轨迹，返回成功，不改变业务数据。
-- 自动承保请求按 `applicationNo` 幂等；重复发起不得产生多份承保记录。
+- 自动承保请求按 `claimApplicationNo` 幂等；重复发起不得产生多份承保记录。
 - 自动承保不定义业务失败状态：通知缺失时由补偿任务查询承保结果，在取得结果前保持 `UNDERWRITING`。
 
 ### 补偿
@@ -52,11 +52,11 @@
 
 ## 正常场景
 
-1. 签收事务提交后，`APPLICATION_CREATED` 事件被投递到材料处理 Topic，并标记为已投递。
+1. 签收事务提交后，`CLAIM_APPLICATION_CREATED` 事件被投递到材料处理 Topic，并标记为已投递。
 2. 消费者收到事件，处理当前批次全部材料，材料置为 `PROCESSED` 并写入上传后地址，理赔申请推进到 `ACCEPTED`。
 3. `ACCEPTED` 后查询到有效保单，理赔申请推进到 `WAIT_AUDIT`，并写入 `AUDIT_DELIVERY_REQUESTED` 事件。
 4. `ACCEPTED` 后未查询到有效保单，理赔申请推进到 `UNDERWRITING` 并发起自动承保；承保完成通知到达后推进到 `WAIT_AUDIT`，同时写入 `AUDIT_DELIVERY_REQUESTED` 事件。
-5. `ACCEPT_FAILED` 的申请重新申请后产生 `APPLICATION_REAPPLIED` 事件，新材料批次按同一规则处理，旧的已软删材料不参与处理。
+5. `ACCEPT_FAILED` 的申请重新申请后产生 `CLAIM_APPLICATION_REAPPLIED` 事件，新材料批次按同一规则处理，旧的已软删材料不参与处理。
 6. `UNDERWRITING` 停留超时且承保记录已完成但通知丢失，补偿任务查询到完成结果后推进到 `WAIT_AUDIT`。
 
 ## 异常场景
@@ -81,7 +81,7 @@
 
 - 材料处理以"当前未删除材料"为范围：同一理赔申请可能存在多个历史批次，仅处理未删除批次。
 - 单次投递批量大小、重试次数、退避上限、各类补偿阈值通过配置项确定，不硬编码。
-- 承保完成通知、自动承保请求和保单查询均以 `applicationNo` 为幂等键。
+- 承保完成通知、自动承保请求和保单查询均以 `claimApplicationNo` 为幂等键。
 - 本 Spec 不改变 002 已冻结的 Topic、消费者组、消息信封和回调路径。
 - 本 Spec 不新增数据库表，也不修改既有表结构。
 

@@ -6,9 +6,9 @@ package com.wangguangwu.claim.application.shared.contract;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public enum ApplicationAsyncErrorCode {
+public enum ClaimApplicationAsyncErrorCode {
 
     CALLBACK_INVALID,
-    APPLICATION_NOT_FOUND,
-    APPLICATION_ASYNC_SYSTEM_ERROR
+    CLAIM_APPLICATION_NOT_FOUND,
+    CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR
 }

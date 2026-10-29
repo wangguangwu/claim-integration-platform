@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.usecase.material;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
@@ -9,7 +9,7 @@ import com.wangguangwu.claim.application.domain.integration.interaction.Interact
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.domain.material.Material;
 import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
-import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
+import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import com.wangguangwu.claim.application.usecase.material.result.MaterialProcessOutcome;
 import java.util.List;
@@ -35,10 +35,10 @@ public class MaterialProcessingTransactionService {
     public static final String CONSUMER_GROUP = "claim-application-material-processor-v1";
 
     private final ConsumedEventRepository consumedEventRepository;
-    private final ApplicationRepository applicationRepository;
+    private final ClaimApplicationRepository claimApplicationRepository;
     private final MaterialRepository materialRepository;
     private final InteractionLogRepository interactionLogRepository;
-    private final ApplicationLifecycleRecordFactory recordFactory;
+    private final ClaimApplicationLifecycleRecordFactory recordFactory;
 
     /**
      * 记录状态或尝试次数不匹配的复用轨迹并登记消费。
@@ -49,7 +49,7 @@ public class MaterialProcessingTransactionService {
      */
     @Transactional
     public MaterialProcessOutcome recordReused(MaterialProcessCommand command, String interactionNo) {
-        if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.applicationNo())) {
+        if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.claimApplicationNo())) {
             return MaterialProcessOutcome.SKIPPED;
         }
         recordStarted(command, interactionNo);
@@ -65,7 +65,7 @@ public class MaterialProcessingTransactionService {
      *
      * @param command       材料处理命令
      * @param interactionNo 行为组编号
-     * @param application   已读取的申请
+     * @param claimApplication   已读取的申请
      * @param materials     已写入处理结果的材料
      * @param allSucceeded  是否全部处理成功
      * @param errorCode     失败错误码，全部成功时为 null
@@ -74,24 +74,24 @@ public class MaterialProcessingTransactionService {
      */
     @Transactional
     public MaterialProcessOutcome recordProcessed(MaterialProcessCommand command, String interactionNo,
-                                                  ClaimApplication application, List<Material> materials,
+                                                  ClaimApplication claimApplication, List<Material> materials,
                                                   boolean allSucceeded, String errorCode, String errorMessage) {
-        if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.applicationNo())) {
+        if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.claimApplicationNo())) {
             return MaterialProcessOutcome.SKIPPED;
         }
         recordStarted(command, interactionNo);
         for (Material material : materials) {
             if (!materialRepository.updateProcessResult(material)) {
-                log.warn("材料处理结果未写入，材料已不是待处理状态，applicationNo={}，materialType={}",
-                        material.getApplicationNo(), material.getMaterialType());
+                log.warn("材料处理结果未写入，材料已不是待处理状态，claimApplicationNo={}，materialType={}",
+                        material.getClaimApplicationNo(), material.getMaterialType());
             }
         }
         if (allSucceeded) {
-            application.accept();
+            claimApplication.accept();
         } else {
-            application.failAccept();
+            claimApplication.failAccept();
         }
-        if (!applicationRepository.updateStatus(application, ApplicationStatus.PENDING_ACCEPT)) {
+        if (!claimApplicationRepository.updateStatus(claimApplication, ClaimApplicationStatus.PENDING_ACCEPT)) {
             recordFinished(command, interactionNo, InteractionAction.REUSED, null, null);
             return MaterialProcessOutcome.REUSED;
         }
@@ -102,14 +102,14 @@ public class MaterialProcessingTransactionService {
 
     private void recordStarted(MaterialProcessCommand command, String interactionNo) {
         interactionLogRepository.insert(recordFactory.interaction(InteractionType.MATERIAL_PROCESS,
-                command.applicationNo(), interactionNo, InteractionAction.STARTED, command.eventId(),
+                command.claimApplicationNo(), interactionNo, InteractionAction.STARTED, command.eventId(),
                 command.traceId(), null, null));
     }
 
     private void recordFinished(MaterialProcessCommand command, String interactionNo, InteractionAction action,
                                 String errorCode, String errorMessage) {
         interactionLogRepository.insert(recordFactory.interaction(InteractionType.MATERIAL_PROCESS,
-                command.applicationNo(), interactionNo, action, command.eventId(), command.traceId(), errorCode,
+                command.claimApplicationNo(), interactionNo, action, command.eventId(), command.traceId(), errorCode,
                 errorMessage));
     }
 }

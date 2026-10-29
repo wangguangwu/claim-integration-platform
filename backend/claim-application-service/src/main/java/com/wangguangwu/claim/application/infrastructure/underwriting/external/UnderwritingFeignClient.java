@@ -36,11 +36,11 @@ public interface UnderwritingFeignClient {
     /**
      * 查询自动承保结果。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保结果
      */
-    @GetMapping("/mock/underwriting/v1/auto-underwritings/{applicationNo}")
-    AutoUnderwritingResponse queryAutoUnderwriting(@PathVariable("applicationNo") String applicationNo);
+    @GetMapping("/mock/underwriting/v1/auto-underwritings/{claimApplicationNo}")
+    AutoUnderwritingResponse queryAutoUnderwriting(@PathVariable("claimApplicationNo") String claimApplicationNo);
 
     /**
      * 保单查询请求。
@@ -63,19 +63,19 @@ public interface UnderwritingFeignClient {
     /**
      * 自动承保请求。
      *
-     * @param applicationNo        平台申请编号
+     * @param claimApplicationNo        平台申请编号
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
      */
-    record AutoUnderwritingRequest(String applicationNo, String tenantCode, String insuredCertificateNo) {
+    record AutoUnderwritingRequest(String claimApplicationNo, String tenantCode, String insuredCertificateNo) {
     }
 
     /**
      * 自动承保受理与查询结果。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @param status        承保状态：PROCESSING、COMPLETED 或 NOT_FOUND
      */
-    record AutoUnderwritingResponse(String applicationNo, String status) {
+    record AutoUnderwritingResponse(String claimApplicationNo, String status) {
     }
 }

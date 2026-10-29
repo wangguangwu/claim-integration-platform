@@ -10,7 +10,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 1. **层的职责**：每一层放什么类型、不放什么类型，有明确定义。展开成三条最容易被漏掉的硬规则：
    - **聚合自己守不变式**：聚合根不得对层外暴露公开 setter，构造器私有，状态只能经命名领域方法迁移；从数据库重建聚合走 owning 域的反水化工厂，不能"先构造再逐字段 set"。写了状态机又开着 `setStatus`，等于没有状态机。
    - **创建知识只留在 owning 域**：其他层不得 `new` 本域聚合或逐字段拼装其状态，只能调用该域 `domain` 暴露的工厂方法；入站适配器也不得组装聚合——租户协议流水线的产物是 `ClaimApplicationIntakeCommand` 命令，聚合由签收用例调用 `ClaimApplication.submit(...)` 创建，否则聚合的组装知识在 `interfaces` 又有第二份；同一类记录（如异步 Outbox 事件与交互日志）只允许一个装配入口，且装配入口不得自行推断领域词汇——方向、目标系统、结果状态这类固定映射挂在说出它们的枚举上（`InteractionType.direction()`、`InteractionAction.resultStatus()`），否则用例层就成了第二套业务定义。
-   - **业务性拒绝说业务的语言**：不变式违反应抛本域业务异常与错误码，常见拒绝走异常类上的命名静态工厂（`ApplicationIntakeException.invalid(...)`）统一构造，`IllegalStateException` 这类 JDK 异常留给真正的编程错误；否则入站层只能靠兜底 handler 把业务拒绝上报成系统错误。
+   - **业务性拒绝说业务的语言**：不变式违反应抛本域业务异常与错误码，常见拒绝走异常类上的命名静态工厂（`ClaimApplicationIntakeException.invalid(...)`）统一构造，`IllegalStateException` 这类 JDK 异常留给真正的编程错误；否则入站层只能靠兜底 handler 把业务拒绝上报成系统错误。
 2. **依赖方向**：`interfaces → usecase → domain ← infrastructure`，且 `domain` 不依赖任何框架。这是"依赖倒置"，是标准，不是风格。配置阈值同样是实现细节：用例需要批量、退避与滞留阈值时，在 `domain` 声明 `*Policy` 端口，由 `infrastructure/<域>/config` 的 `*Properties` 绑定配置实现；把 `@ConfigurationProperties` 挨着用例放，用例层就带上了 Spring，换配置中心要改用例。
 3. **对象角色命名**：一个类的后缀要能说明它在模式里的角色——`DO`、ORM 映射、转换器、仓储实现、端口、值对象各不相同。Fowler 的 Data Mapper 定义决定了 `*Mapper` 只能是 ORM，这就是为什么 DO↔领域对象的转换器不能叫 `Mapper`。同一后缀在整棵树上只能有一种含义：`*UseCase` 一律是用例入口具体类（不为它保留单实现接口），`*TransactionService` 一律是事务边界；两个名字只差一个词（`*Validation` 与 `*Validator`）视为职责未说清，必须改名拆分。
 
@@ -35,7 +35,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 - **端口在 `domain`，实现留在 `infrastructure`。** 领域决定"我需要什么能力"（保存申请、生成编号、加幂等锁、投递事件），实现是被替换的技术细节。只有方向反过来才成立：`infrastructure` 依赖 `domain`，绝不依赖 `usecase`。这也是本项目最近一次修正的内容——把 `OutboxEventPublisher`、业务异常从 `usecase` 移回 `domain`，否则实现类只能反向 import。
 - **DO 永远不进 `domain`。** DO 是表结构的影子，进领域层就等于让数据库形状决定业务模型。DO 只允许出现在 `infrastructure`，跨层传的一律是领域对象。
-- **`*Converter` 与 `*Mapper` 是两种东西。** `ApplicationDOMapper extends BaseMapper<ApplicationDO>` 是 ORM；`ApplicationDataConverter` 是 DO↔领域对象的映射器（MapStruct 的 `@Mapper` 注解是框架 API，不是类名，可以保留）。
+- **`*Converter` 与 `*Mapper` 是两种东西。** `ClaimApplicationDOMapper extends BaseMapper<ClaimApplicationDO>` 是 ORM；`ClaimApplicationDataConverter` 是 DO↔领域对象的映射器（MapStruct 的 `@Mapper` 注解是框架 API，不是类名，可以保留）。
 
 ## 3. 对象角色词典
 
@@ -43,24 +43,24 @@ DDD 的标准约束只有三条，其余都是项目方言：
 |---|---|---|---|
 | 聚合根 | 业务名词，record/class，构造器私有或只暴露命名工厂 | `domain/<聚合>` | `domain/claim/ClaimApplication`、`domain/material/Material`、`domain/integration/interaction/InteractionLog`、`domain/integration/outbox/OutboxEvent` |
 | 值对象 | 业务名词 | `domain`，人员角色另入 `domain/claim/person` | `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`MaterialSubmission` |
-| 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | `domain` | `ApplicationStatus`、`OutboxEventStatus`、`ApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
+| 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | `domain` | `ClaimApplicationStatus`、`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
 | 枚举自带的业务映射 | 枚举字段与方法 | `domain` | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
-| 仓储端口 | `*Repository` | `domain/<聚合>/port`（该域只有一个端口时直接放聚合包） | `ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` |
-| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ApplicationNoGenerator`、`ApplicationIntakeLock`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ApplicationCompensationPolicy`（16 个端口，其中 13 个在 `port` 子包） |
-| 配置适配器 | `*Properties`（实现 `domain` 的 `*Policy` 端口） | `infrastructure/<域>/config` | `OutboxRelayProperties`、`ApplicationCompensationProperties` |
-| 仓储实现 | `MyBatis*Repository` | `infrastructure/<域>/persistence` | `infrastructure/intake/persistence/MyBatisApplicationRepository` |
-| 持久化对象 | `*DO` | `infrastructure/<域>/persistence` | `ApplicationDO`、`MaterialDO`、`OutboxEventDO` |
-| ORM 映射 | `*DOMapper` | `infrastructure/<域>/persistence` | `ApplicationDOMapper` |
-| DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ApplicationDataConverter`、`MaterialDataConverter` |
+| 仓储端口 | `*Repository` | `domain/<聚合>/port`（该域只有一个端口时直接放聚合包） | `ClaimApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` |
+| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`（16 个端口，其中 13 个在 `port` 子包） |
+| 配置适配器 | `*Properties`（实现 `domain` 的 `*Policy` 端口） | `infrastructure/<域>/config` | `OutboxRelayProperties`、`ClaimApplicationCompensationProperties` |
+| 仓储实现 | `MyBatis*Repository` | `infrastructure/<域>/persistence` | `infrastructure/intake/persistence/MyBatisClaimApplicationRepository` |
+| 持久化对象 | `*DO` | `infrastructure/<域>/persistence` | `ClaimApplicationDO`、`MaterialDO`、`OutboxEventDO` |
+| ORM 映射 | `*DOMapper` | `infrastructure/<域>/persistence` | `ClaimApplicationDOMapper` |
+| DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
 | 外部系统适配器 | `Feign*` + `*FeignClient` | `infrastructure/<域>/external` | `FeignAutoUnderwritingRequester`、`UnderwritingFeignClient` |
-| 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging}` | `RedisApplicationExistenceQuery`、`RedissonApplicationIntakeLock`、`RocketMqOutboxPublisher` |
-| 业务异常与错误码 | `*Exception`、`*ErrorCode`，常见错误用枚举命名的静态工厂 | `domain/<聚合>/exception`（跨域的进 `shared/contract`） | `ApplicationIntakeException`、`ApplicationIntakeException.invalid(...)`、`ApplicationAsyncException` |
-| 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ApplicationLifecycleRecordFactory` |
+| 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging}` | `RedisClaimApplicationExistenceQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher` |
+| 业务异常与错误码 | `*Exception`、`*ErrorCode`，常见错误用枚举命名的静态工厂 | `domain/<聚合>/exception`（跨域的进 `shared/contract`） | `ClaimApplicationIntakeException`、`ClaimApplicationIntakeException.invalid(...)`、`ClaimApplicationAsyncException` |
+| 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
-| 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
+| 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
 | 报文防腐组件 | `*Parser`、`*Validator`、`*Converter`、`*FieldGuard` | `interfaces/<域>/tenantprotocol/core/stage`（端口）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/校验/转换） | `TenantARequestParser`、`TenantBRequestValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`）、`TenantProtocolFieldGuard` |
-| 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ApplicationResponseRenderer` |
-| 跨域契约 | 信封、命令 DTO | `shared/contract` | `ApplicationEventEnvelope`、`UnderwritingCompletedCommand` |
+| 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ClaimApplicationResponseRenderer` |
+| 跨域契约 | 信封、命令 DTO | `shared/contract` | `ClaimApplicationEventEnvelope`、`UnderwritingCompletedCommand` |
 
 ## 4. 本项目的落位
 
@@ -74,13 +74,13 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 异步集成（`integration`） | 2 | 3 | 14 | 12 |
 | `shared` | 1 | — | — | 1（另有 `contract` 4） |
 | `support` | 2 | — | — | 4（另有 `config` 2） |
-| 根包 | — | — | — | 1（`ApplicationServiceApplication`） |
+| 根包 | — | — | — | 1（`ClaimApplicationServiceApplication`） |
 
 - `interfaces/intake` 的 24 个类里有 18 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务异常，共 12 个文件。
 - 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `domain/<聚合>/port`（理赔申请另有 `domain/claim/person` 放人员基类与四个角色）、`interfaces/intake/tenantprotocol/core/{pipeline,stage}`、`tenants/{tenant_a,tenant_b}`、`interfaces/intake/web/render`。一个域只剩一个端口时端口留在聚合包（现为 `interaction`、`consumption`、`compensation`），不建只挂一个子目录的中转层。
 - `integration` 是平台异步内核：Outbox 投递、消费去重、交互轨迹装配、滞留补偿。业务域允许调用它的记录装配工厂（`usecase/integration/record`），允许它的补偿重放业务用例，这两条是显式写进 005 的例外，不是默认规则。记录装配工厂只做载荷序列化与标识生成，交互事件本身由 `domain/integration/interaction/InteractionLog.of(...)` 装配。
-- 异步链路的批量、退避与滞留阈值由 `domain` 的 `OutboxRelayPolicy`、`ApplicationCompensationPolicy` 声明，`infrastructure/integration/config` 的 `*Properties` 绑定配置实现；调度间隔由 `@Scheduled` 占位符读取，不进入策略端口。
+- 异步链路的批量、退避与滞留阈值由 `domain` 的 `OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy` 声明，`infrastructure/integration/config` 的 `*Properties` 绑定配置实现；调度间隔由 `@Scheduled` 占位符读取，不进入策略端口。
 - 两个 `@RestControllerAdvice` 都限定 `basePackages` 到各自的 `interfaces/<域>/web`：无作用域限制的兜底 advice 会接管其他入站通道的异常，与限定作用域的 advice 优先级不确定。
 - `shared` 不含用例：只含跨域契约、统一响应与摘要工具，因此没有 `usecase` 子包。
 - `support` 不属业务域，放 Spring 配置和受 `claim.mock.enabled` 控制的本地 Mock；内部仍按层名分子包（`support/mock/interfaces/web`、`support/mock/infrastructure`），避免一棵树里混用 `adapter` 与 `interfaces` 两个词。

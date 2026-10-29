@@ -4,6 +4,23 @@
 
 本文档定义 `claim-application-service` 在 `v1` 阶段使用的 HTTP 与 RocketMQ 公共契约。业务报文字段由后续理赔申请业务 Spec 补充；本文档固定地址、方法、公共请求头、关联标识、Topic、消费者组和消息信封。
 
+## 契约变更（breaking）
+
+007 理赔申请命名全链路收敛把指代业务对象的名称统一加上 `claim` 限定，对接收方有以下破坏性影响，对接方需同步调整：
+
+| 类别 | 旧 | 新 |
+|---|---|---|
+| HTTP 资源段 | `/api/application/v1/applications` | `/api/application/v1/claim-applications` |
+| 签收响应字段 | `data.applicationNo` | `data.claimApplicationNo` |
+| 回调与出站报文字段 | `applicationNo`、`externalApplicationNo`、`applicationAttempt` | `claimApplicationNo`、`externalClaimApplicationNo`、`claimApplicationAttempt` |
+| MQ 信封与载荷字段 | `applicationNo` | `claimApplicationNo` |
+| 事件类型 | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` |
+| 交互类型 | `APPLICATION_INTAKE` | `CLAIM_APPLICATION_INTAKE` |
+| 错误码 | `APPLICATION_INTAKE_INVALID`、`APPLICATION_INTAKE_BUSY`、`APPLICATION_INTAKE_SYSTEM_ERROR` | `CLAIM_APPLICATION_INTAKE_INVALID`、`CLAIM_APPLICATION_INTAKE_BUSY`、`CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR` |
+
+REST 前缀 `/api/application/v1`、网关路由 `Path=/api/application/**`、MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；租户私有入参字段名不受影响。
+
+
 ## HTTP 契约
 
 ### 公共请求头
@@ -19,12 +36,12 @@
 
 | 接口 | 方法 | 调用方 | 用途 | 关联字段 |
 |---|---|---|---|---|
-| `/api/application/v1/applications` | `POST` | 租户系统 | 提交理赔申请| `externalApplicationNo` |
-| `/api/application/v1/applications/{applicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `applicationNo`、`batchNo` |
-| `/api/application/v1/applications/{applicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `applicationNo` |
-| `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `applicationNo`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `applicationNo`、`caseNos`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `applicationNo`、`issueNo`、`X-Request-Id` |
+| `/api/application/v1/claim-applications` | `POST` | 租户系统 | 提交理赔申请| `externalClaimApplicationNo` |
+| `/api/application/v1/claim-applications/{claimApplicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `claimApplicationNo`、`batchNo` |
+| `/api/application/v1/claim-applications/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `claimApplicationNo` |
+| `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
+| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `claimApplicationNo`、`caseNos`、`X-Request-Id` |
+| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
 
 成功响应：
 
@@ -52,7 +69,7 @@
 
 | Topic | 事件类型 | 消费者组 | 职责 |
 |---|---|---|---|
-| `claim_application_material_process_v1` | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请或重新申请的材料 |
+| `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请或重新申请的材料 |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` | 将已具备审核条件的申请交付审核系统 |
 
 消息信封：
@@ -60,9 +77,9 @@
 ```json
 {
   "eventId": "019a9c8c-4d02-7d19-9f16-32d447d4ee66",
-  "eventType": "APPLICATION_CREATED",
+  "eventType": "CLAIM_APPLICATION_CREATED",
   "eventVersion": 1,
-  "applicationNo": "AP202610270001",
+  "claimApplicationNo": "AP202610270001",
   "tenantCode": "tenant-a",
   "occurredAt": "2026-10-27T10:00:00+08:00",
   "traceId": "5bba2a7f468c4efe",
@@ -70,7 +87,7 @@
 }
 ```
 
-`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `applicationNo` 读取理赔申请私有数据。
+`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `claimApplicationNo` 读取理赔申请私有数据。
 
 ## InteractionLog 行为分组
 

@@ -6,11 +6,11 @@ package com.wangguangwu.claim.application.domain.claim.exception;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public enum ApplicationIntakeErrorCode {
+public enum ClaimApplicationIntakeErrorCode {
 
     TENANT_PROTOCOL_UNSUPPORTED,
     TENANT_PROTOCOL_AMBIGUOUS,
-    APPLICATION_INTAKE_INVALID,
-    APPLICATION_INTAKE_BUSY,
-    APPLICATION_INTAKE_SYSTEM_ERROR
+    CLAIM_APPLICATION_INTAKE_INVALID,
+    CLAIM_APPLICATION_INTAKE_BUSY,
+    CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR
 }

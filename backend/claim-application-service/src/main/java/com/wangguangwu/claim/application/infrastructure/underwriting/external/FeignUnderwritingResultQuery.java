@@ -20,13 +20,13 @@ public class FeignUnderwritingResultQuery implements UnderwritingResultQuery {
     /**
      * 按平台申请编号查询承保结果。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保结果
      */
     @Override
-    public UnderwritingResult query(String applicationNo) {
+    public UnderwritingResult query(String claimApplicationNo) {
         UnderwritingFeignClient.AutoUnderwritingResponse response =
-                underwritingFeignClient.queryAutoUnderwriting(applicationNo);
+                underwritingFeignClient.queryAutoUnderwriting(claimApplicationNo);
         return UnderwritingResult.valueOf(response.status());
     }
 }

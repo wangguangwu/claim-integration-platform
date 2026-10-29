@@ -24,7 +24,7 @@ public class MyBatisInteractionLogRepository implements InteractionLogRepository
      */
     @Override
     public void insert(InteractionLog interactionLog) {
-        InteractionLogDO interactionLogDO = InteractionLogDO.builder().applicationNo(interactionLog.applicationNo())
+        InteractionLogDO interactionLogDO = InteractionLogDO.builder().claimApplicationNo(interactionLog.claimApplicationNo())
                 .interactionNo(interactionLog.interactionNo()).interactionType(interactionLog.interactionType())
                 .action(interactionLog.action()).direction(interactionLog.direction())
                 .targetSystem(interactionLog.targetSystem()).requestId(interactionLog.requestId())

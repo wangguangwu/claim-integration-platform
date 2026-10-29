@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import org.springframework.util.StringUtils;
 
 /**
@@ -22,7 +22,7 @@ public final class TenantProtocolFieldGuard {
      */
     public static void requireText(String value, String fieldPath) {
         if (!StringUtils.hasText(value)) {
-            throw ApplicationIntakeException.invalid("租户申请报文缺少字段：" + fieldPath);
+            throw ClaimApplicationIntakeException.invalid("租户申请报文缺少字段：" + fieldPath);
         }
     }
 
@@ -34,7 +34,7 @@ public final class TenantProtocolFieldGuard {
      */
     public static void requirePresent(Object value, String fieldPath) {
         if (value == null) {
-            throw ApplicationIntakeException.invalid("租户申请报文缺少字段：" + fieldPath);
+            throw ClaimApplicationIntakeException.invalid("租户申请报文缺少字段：" + fieldPath);
         }
     }
 }

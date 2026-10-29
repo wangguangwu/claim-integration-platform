@@ -11,7 +11,7 @@ package com.wangguangwu.claim.application.domain.integration.interaction;
  */
 public enum InteractionType {
 
-    APPLICATION_INTAKE(InteractionDirection.INBOUND, "CLAIM_APPLICATION_SERVICE"),
+    CLAIM_APPLICATION_INTAKE(InteractionDirection.INBOUND, "CLAIM_APPLICATION_SERVICE"),
     MATERIAL_PROCESS(InteractionDirection.INBOUND, "MATERIAL_PROCESSOR"),
     UNDERWRITING(InteractionDirection.OUTBOUND, "UNDERWRITING_SYSTEM"),
     UNDERWRITING_CALLBACK(InteractionDirection.INBOUND, "UNDERWRITING_SYSTEM");

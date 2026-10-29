@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.intake.number;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationNoGenerator;
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -23,11 +23,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator {
+public class RedisMySqlClaimApplicationNoGenerator implements ClaimApplicationNoGenerator {
 
-    private static final String NUMBER_KEY_PREFIX = "claim:application:number:";
-    private static final String INITIALIZE_LOCK_KEY_PREFIX = "claim:application:number:initialize:";
-    private static final String APPLICATION_NO_PREFIX = "A";
+    private static final String NUMBER_KEY_PREFIX = "claim-applicationnumber:";
+    private static final String INITIALIZE_LOCK_KEY_PREFIX = "claim-applicationnumber:initialize:";
+    private static final String CLAIM_APPLICATION_NO_PREFIX = "A";
     private static final int SERIAL_NUMBER_LENGTH = 8;
     private static final long MAX_DAILY_SEQUENCE = 99_999_999L;
     private static final long INITIALIZE_LOCK_WAIT_SECONDS = 30L;
@@ -35,7 +35,7 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     private final RedissonClient redissonClient;
-    private final ApplicationRepository applicationRepository;
+    private final ClaimApplicationRepository claimApplicationRepository;
 
     /**
      * 生成 A 加日期加八位序列的理赔申请编号。
@@ -43,17 +43,17 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
      * @return 全局唯一理赔申请编号
      */
     @Override
-    public String nextApplicationNo() {
+    public String nextClaimApplicationNo() {
         LocalDate sequenceDate = LocalDate.now(BUSINESS_ZONE_ID);
         String formattedDate = sequenceDate.format(DATE_FORMATTER);
         try {
             RAtomicLong counter = redissonClient.getAtomicLong(NUMBER_KEY_PREFIX + formattedDate);
             if (!initializeCounterIfAbsent(formattedDate, counter)) {
-                return nextApplicationNoFromMySql(formattedDate);
+                return nextClaimApplicationNoFromMySql(formattedDate);
             }
-            return formatApplicationNo(formattedDate, counter.incrementAndGet());
+            return formatClaimApplicationNo(formattedDate, counter.incrementAndGet());
         } catch (RedisException exception) {
-            return nextApplicationNoFromMySql(formattedDate);
+            return nextClaimApplicationNoFromMySql(formattedDate);
         }
     }
 
@@ -136,8 +136,8 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
      * @param formattedDate 格式化后的序列日期
      * @return 待持久化的理赔申请编号
      */
-    private String nextApplicationNoFromMySql(String formattedDate) {
-        return formatApplicationNo(formattedDate, currentDailySequence(formattedDate) + 1);
+    private String nextClaimApplicationNoFromMySql(String formattedDate) {
+        return formatClaimApplicationNo(formattedDate, currentDailySequence(formattedDate) + 1);
     }
 
     /**
@@ -147,9 +147,9 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
      * @return 当前最大尾号；当天无数据时为 0
      */
     private long currentDailySequence(String formattedDate) {
-        String numberPrefix = APPLICATION_NO_PREFIX + formattedDate;
-        return applicationRepository.findMaxApplicationNoByPrefix(numberPrefix)
-                .map(maximumApplicationNo -> Long.parseLong(maximumApplicationNo.substring(numberPrefix.length())))
+        String numberPrefix = CLAIM_APPLICATION_NO_PREFIX + formattedDate;
+        return claimApplicationRepository.findMaxClaimApplicationNoByPrefix(numberPrefix)
+                .map(maximumClaimApplicationNo -> Long.parseLong(maximumClaimApplicationNo.substring(numberPrefix.length())))
                 .orElse(0L);
     }
 
@@ -160,10 +160,10 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
      * @param sequence      当天序列
      * @return 理赔申请编号
      */
-    private String formatApplicationNo(String formattedDate, long sequence) {
+    private String formatClaimApplicationNo(String formattedDate, long sequence) {
         if (sequence < 1 || sequence > MAX_DAILY_SEQUENCE) {
             throw new IllegalStateException("理赔申请当日编号序列超出八位上限，日期=" + formattedDate);
         }
-        return APPLICATION_NO_PREFIX + formattedDate + String.format("%0" + SERIAL_NUMBER_LENGTH + "d", sequence);
+        return CLAIM_APPLICATION_NO_PREFIX + formattedDate + String.format("%0" + SERIAL_NUMBER_LENGTH + "d", sequence);
     }
 }

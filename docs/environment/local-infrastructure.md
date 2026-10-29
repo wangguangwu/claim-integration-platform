@@ -82,7 +82,7 @@ MySQL 初始化脚本仅在空数据卷时自动执行。已有数据卷需要�
 
 | Topic | 生产事件 | 消费者组 |
 |---|---|---|
-| `claim_application_material_process_v1` | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` |
+| `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` |
 
 Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动脚本可直接查看 `mqadmin` 的错误上下文：

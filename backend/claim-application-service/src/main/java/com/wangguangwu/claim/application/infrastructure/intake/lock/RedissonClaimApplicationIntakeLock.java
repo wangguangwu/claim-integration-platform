@@ -1,8 +1,8 @@
 package com.wangguangwu.claim.application.infrastructure.intake.lock;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationIntakeLock;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -24,9 +24,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
+public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntakeLock {
 
-    private static final String LOCK_KEY_PREFIX = "claim:application:intake:";
+    private static final String LOCK_KEY_PREFIX = "claim-applicationintake:";
     private static final long WAIT_SECONDS = 30L;
 
     private final RedissonClient redissonClient;
@@ -35,15 +35,15 @@ public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
      * 最多等待 30 秒获取锁，不指定 leaseTime，由 watchdog 每 30 秒续期。
      *
      * @param tenantCode            租户编码
-     * @param externalApplicationNo 外部申请编号
+     * @param externalClaimApplicationNo 外部申请编号
      * @param action                受锁保护的操作
      * @param <T>                   返回类型
      * @return 操作结果
      */
     @Override
-    public <T> T execute(String tenantCode, String externalApplicationNo, Supplier<T> action) {
+    public <T> T execute(String tenantCode, String externalClaimApplicationNo, Supplier<T> action) {
         RLock lock = redissonClient.getLock(
-                LOCK_KEY_PREFIX + Sha256Digest.hex(tenantCode + ':' + externalApplicationNo));
+                LOCK_KEY_PREFIX + Sha256Digest.hex(tenantCode + ':' + externalClaimApplicationNo));
         if (!acquireOrDegrade(lock)) {
             return action.get();
         }
@@ -65,11 +65,11 @@ public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
             if (lock.tryLock(WAIT_SECONDS, TimeUnit.SECONDS)) {
                 return true;
             }
-            throw new ApplicationIntakeException(ApplicationIntakeErrorCode.APPLICATION_INTAKE_BUSY,
+            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
                     "同一申请的签收请求正在处理中，请稍后重试");
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new ApplicationIntakeException(ApplicationIntakeErrorCode.APPLICATION_INTAKE_BUSY,
+            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
                     "申请签收等待锁被中断，请稍后重试");
         } catch (RedisException exception) {
             log.warn("申请签收锁不可用，降级为无锁执行并依赖数据库唯一约束", exception);

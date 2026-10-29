@@ -6,7 +6,7 @@
 
 - 状态：已完成
 - 对应 design：§数据模型、§并发控制、事务与异常处理
-- 产物：`ClaimApplication` 生命周期迁移方法、`Material` 结果写入方法；`ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 的查询与条件更新方法；`ConsumedEventRepository` 端口与 MyBatis-Plus 实现；`ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery`、`MaterialFileProcessor` 端口；`PolicySnapshot`、`UnderwritingResult` 值对象；003 事件载荷补充 `traceId`
+- 产物：`ClaimApplication` 生命周期迁移方法、`Material` 结果写入方法；`ClaimApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 的查询与条件更新方法；`ConsumedEventRepository` 端口与 MyBatis-Plus 实现；`ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery`、`MaterialFileProcessor` 端口；`PolicySnapshot`、`UnderwritingResult` 值对象；003 事件载荷补充 `traceId`
 - 完成条件：状态迁移均为带期望状态与尝试次数的条件更新，影响行数 0 表示重复推进；材料结果只作用于未删除且处于 `PENDING_PROCESS` 的记录；持久化实现只使用 BaseMapper 与 Wrapper，不出现手写 SQL；不新增表和列
 
 ## T2 Outbox 投递器与 MQ 生产者
@@ -21,13 +21,13 @@
 - 状态：已完成
 - 对应 design：§本地模拟外部能力设计、§主要类职责
 - 产物：`MockFileSystemStore`、`MockFileSystemController`、`MockUnderwritingStore`、`MockUnderwritingController`、`FileSystemFeignClient`、`UnderwritingFeignClient`、`FeignMaterialFileProcessor`/`FeignValidPolicyQuery`/`FeignAutoUnderwritingRequester`/`FeignUnderwritingResultQuery` 适配器、Feign 超时与模拟开关配置（`claim.mock.enabled`、`claim.mock.file-system`、`claim.mock.underwriting`）
-- 完成条件：文件上传接口按源地址幂等并返回 `mock://` 模拟地址，可按材料类型模拟失败、按配置模拟延迟；保单登记、清除、查询、自动承保发起、承保结果查询、手工触发完成六类接口可用；承保数据与上传记录只存在于内存且不落库；自动承保按 `applicationNo` 幂等；Feign 连接与读取超时生效；模拟开关关闭时不注册任何模拟接口
+- 完成条件：文件上传接口按源地址幂等并返回 `mock://` 模拟地址，可按材料类型模拟失败、按配置模拟延迟；保单登记、清除、查询、自动承保发起、承保结果查询、手工触发完成六类接口可用；承保数据与上传记录只存在于内存且不落库；自动承保按 `claimApplicationNo` 幂等；Feign 连接与读取超时生效；模拟开关关闭时不注册任何模拟接口
 
 ## T4 材料处理消费者与事务
 
 - 状态：已完成
 - 对应 design：§核心链路设计、§并发控制、事务与异常处理
-- 产物：`MaterialProcessConsumer`、消息信封模型、`MaterialProcessingUseCase`、`MaterialProcessingTransactionService`、`ApplicationLifecycleRecordFactory`
+- 产物：`MaterialProcessConsumer`、消息信封模型、`MaterialProcessingUseCase`、`MaterialProcessingTransactionService`、`ClaimApplicationLifecycleRecordFactory`
 - 完成条件：消费前校验尝试次数与 `PENDING_ACCEPT` 状态，不匹配只记录 `REUSED` 轨迹并确认消息；全部材料成功推进 `ACCEPTED`，任一失败推进 `ACCEPT_FAILED`；外部失败保持 `PENDING_ACCEPT`；材料结果、状态、交互事件与消费登记同事务；重复消息不重复处理材料
 
 ## T5 承保分流与自动承保
@@ -42,13 +42,13 @@
 - 状态：已完成
 - 对应 design：§接口设计
 - 产物：`UnderwritingCallbackController`、`UnderwritingCallbackUseCase`、回调专用错误码与异常处理器
-- 完成条件：缺少 `applicationNo` 或 `X-Request-Id` 返回 400；申请不存在返回 404；申请不在 `UNDERWRITING` 返回成功并记录 `REUSED`；申请在 `UNDERWRITING` 时同一事务推进 `WAIT_AUDIT`、写审核交付事件与 `COMPLETED` 轨迹；重复回调不新增事件
+- 完成条件：缺少 `claimApplicationNo` 或 `X-Request-Id` 返回 400；申请不存在返回 404；申请不在 `UNDERWRITING` 返回成功并记录 `REUSED`；申请在 `UNDERWRITING` 时同一事务推进 `WAIT_AUDIT`、写审核交付事件与 `COMPLETED` 轨迹；重复回调不新增事件
 
 ## T7 补偿任务
 
 - 状态：已完成
 - 对应 design：§MQ 与投递设计、§并发控制、事务与异常处理
-- 产物：`ApplicationCompensationUseCase`、补偿调度器与阈值配置
+- 产物：`ClaimApplicationCompensationUseCase`、补偿调度器与阈值配置
 - 完成条件：`SENDING` 超时事件被重置为 `PENDING`；`ACCEPTED` 滞留超过阈值重试承保分流；`UNDERWRITING` 超时查询承保结果，`COMPLETED` 时推进 `WAIT_AUDIT`，查不到记录时重发自动承保请求并保持 `UNDERWRITING`；状态已变化的记录只记录日志，不改变数据
 
 ## T8 单元测试与集成测试
@@ -63,4 +63,4 @@
 - 状态：已完成
 - 对应 design：§对现有功能的影响
 - 产物：构建与本地验证记录
-- 完成条件：已通过 JDK 21 下 `mvn -B -pl backend/claim-application-service -am test`（86 个测试）与 `mvn -B -q -DskipTests package`；本地验证签收后事件自动投递、材料处理、有效保单直达 `WAIT_AUDIT`、无保单进入 `UNDERWRITING` 并由模拟承保通知推进到 `WAIT_AUDIT`、关闭通知后补偿以 `compensation-<applicationNo>` 请求标识推进、MQ 停机期间签收返回成功且就绪探针保持 UP、Broker 恢复后 Outbox 事件补齐投递、重复回调返回 `REUSED` 且不产生重复审核交付事件
+- 完成条件：已通过 JDK 21 下 `mvn -B -pl backend/claim-application-service -am test`（86 个测试）与 `mvn -B -q -DskipTests package`；本地验证签收后事件自动投递、材料处理、有效保单直达 `WAIT_AUDIT`、无保单进入 `UNDERWRITING` 并由模拟承保通知推进到 `WAIT_AUDIT`、关闭通知后补偿以 `compensation-<claimApplicationNo>` 请求标识推进、MQ 停机期间签收返回成功且就绪探针保持 UP、Broker 恢复后 Outbox 事件补齐投递、重复回调返回 `REUSED` 且不产生重复审核交付事件

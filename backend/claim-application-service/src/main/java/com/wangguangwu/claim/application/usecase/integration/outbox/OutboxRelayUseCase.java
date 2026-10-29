@@ -8,7 +8,7 @@ import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEvent;
 import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventPublisher;
 import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxRelayPolicy;
-import com.wangguangwu.claim.application.shared.contract.ApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -82,15 +82,15 @@ public class OutboxRelayUseCase {
         int retryCount = currentRetryCount(outboxEvent) + 1;
         if (retryCount >= outboxRelayPolicy.maxRetryCount()) {
             outboxEventRepository.markFailed(outboxEvent.eventId(), retryCount);
-            log.error("Outbox 事件投递次数超限，标记失败，eventId={}, eventType={}, applicationNo={}, retryCount={}",
-                    outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.applicationNo(), retryCount,
+            log.error("Outbox 事件投递次数超限，标记失败，eventId={}, eventType={}, claimApplicationNo={}, retryCount={}",
+                    outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.claimApplicationNo(), retryCount,
                     exception);
             return;
         }
         LocalDateTime nextRetryAt = LocalDateTime.now(BUSINESS_ZONE_ID).plus(outboxRelayPolicy.retryDelay(retryCount));
         outboxEventRepository.markPendingForRetry(outboxEvent.eventId(), retryCount, nextRetryAt);
-        log.warn("Outbox 事件投递失败，等待退避重试，eventId={}, eventType={}, applicationNo={}, retryCount={}, "
-                        + "nextRetryAt={}", outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.applicationNo(),
+        log.warn("Outbox 事件投递失败，等待退避重试，eventId={}, eventType={}, claimApplicationNo={}, retryCount={}, "
+                        + "nextRetryAt={}", outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.claimApplicationNo(),
                 retryCount, nextRetryAt, exception);
     }
 
@@ -98,10 +98,10 @@ public class OutboxRelayUseCase {
         return outboxEvent.retryCount() == null ? 0 : outboxEvent.retryCount();
     }
 
-    private ApplicationEventEnvelope toEnvelope(OutboxEvent outboxEvent) {
+    private ClaimApplicationEventEnvelope toEnvelope(OutboxEvent outboxEvent) {
         JsonNode payload = readPayload(outboxEvent);
-        return new ApplicationEventEnvelope(outboxEvent.eventId(), outboxEvent.eventType(),
-                outboxEvent.eventVersion(), outboxEvent.applicationNo(), outboxEvent.tenantCode(),
+        return new ClaimApplicationEventEnvelope(outboxEvent.eventId(), outboxEvent.eventType(),
+                outboxEvent.eventVersion(), outboxEvent.claimApplicationNo(), outboxEvent.tenantCode(),
                 formatOccurredAt(outboxEvent), traceId(outboxEvent, payload), toPayloadMap(payload));
     }
 

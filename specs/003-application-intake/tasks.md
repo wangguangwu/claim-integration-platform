@@ -28,21 +28,21 @@
 - 状态：已完成
 - 对应 design：§核心数据模型、§并发控制与旁路缓存设计、§并发控制、事务与异常处理
 - 产物：理赔申请、Material、InteractionLog、OutboxEvent Repository 端口与 MyBatis-Plus BaseMapper + Wrapper 实现，Redis 编号缓存及 MySQL 最大申请号兜底、冲突后计数器校准、Redisson 锁（30 秒等待、watchdog、故障降级）、Redisson 延迟连接与超时配置、旁路缓存查询和批次编号生成器
-- 完成条件：可创建、状态条件更新重新申请、逻辑删除旧材料、创建新批次、写入交互事件和 OutboxEvent；Mapper 只继承 BaseMapper，不保留 `@Select`/`@Update` 手写 SQL；Redis 正常和降级路径的日序列均不重复；锁等待超时返回 `APPLICATION_INTAKE_BUSY`；Redis 停机时锁、存在查询和编号生成均走 MySQL 降级路径，单次降级调用在 2 秒内完成；Redis 恢复后计数器自动抬升到 MySQL 最大尾号
+- 完成条件：可创建、状态条件更新重新申请、逻辑删除旧材料、创建新批次、写入交互事件和 OutboxEvent；Mapper 只继承 BaseMapper，不保留 `@Select`/`@Update` 手写 SQL；Redis 正常和降级路径的日序列均不重复；锁等待超时返回 `CLAIM_APPLICATION_INTAKE_BUSY`；Redis 停机时锁、存在查询和编号生成均走 MySQL 降级路径，单次降级调用在 2 秒内完成；Redis 恢复后计数器自动抬升到 MySQL 最大尾号
 
 ## T5 申请签收用例
 
 - 状态：已完成
 - 对应 design：§核心链路设计、§并发控制、事务与异常处理
-- 产物：ClaimApplicationIntakeUseCase（锁与事务外准备，原单实现接口与应用类已在 005 T8 合并为同名具体类）、ClaimApplicationIntakeMaterialFactory（材料批次装配）、ApplicationLifecycleRecordFactory（交互与 Outbox 记录装配，005 收敛后的单一入口）、ClaimApplicationIntakeTransactionService（数据库事务）、首次申请、重复请求、重新申请与冲突重试编排
+- 产物：ClaimApplicationIntakeUseCase（锁与事务外准备，原单实现接口与应用类已在 005 T8 合并为同名具体类）、ClaimApplicationIntakeMaterialFactory（材料批次装配）、ClaimApplicationLifecycleRecordFactory（交互与 Outbox 记录装配，005 收敛后的单一入口）、ClaimApplicationIntakeTransactionService（数据库事务）、首次申请、重复请求、重新申请与冲突重试编排
 - 完成条件：事务内不访问 Redis；存在性判断和编号生成在锁内事务外完成；首次创建、重复复用、失败后重申请完全符合 requirements；理赔申请、Material、InteractionLog、OutboxEvent 的核心数据保持事务一致
 
 ## T6 统一接入接口
 
 - 状态：已完成
 - 对应 design：§接口设计
-- 产物：ApplicationIntakeController、租户响应渲染 SPI 与路由、统一结构渲染器、请求响应模型、统一错误映射
-- 完成条件：接口正确传递租户上下文和原始协议至适配器，不在 Controller 中实现幂等、状态或数据库逻辑；未定制响应协议的租户返回统一结构并携带 `applicationNo`；错误码按统一映射返回 400、500、503
+- 产物：ClaimApplicationIntakeController、租户响应渲染 SPI 与路由、统一结构渲染器、请求响应模型、统一错误映射
+- 完成条件：接口正确传递租户上下文和原始协议至适配器，不在 Controller 中实现幂等、状态或数据库逻辑；未定制响应协议的租户返回统一结构并携带 `claimApplicationNo`；错误码按统一映射返回 400、500、503
 
 ## T7 单元测试与集成测试
 

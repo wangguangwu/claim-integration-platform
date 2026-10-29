@@ -33,7 +33,7 @@ public class MyBatisOutboxEventRepository implements OutboxEventRepository {
     public void insert(OutboxEvent outboxEvent) {
         OutboxEventDO outboxEventDO = OutboxEventDO.builder().eventId(outboxEvent.eventId())
                 .eventType(outboxEvent.eventType()).eventVersion(outboxEvent.eventVersion())
-                .applicationNo(outboxEvent.applicationNo()).tenantCode(outboxEvent.tenantCode())
+                .claimApplicationNo(outboxEvent.claimApplicationNo()).tenantCode(outboxEvent.tenantCode())
                 .payload(outboxEvent.payload()).status(outboxEvent.status().name())
                 .retryCount(INITIAL_RETRY_COUNT).build();
         outboxEventMapper.insert(outboxEventDO);
@@ -137,7 +137,7 @@ public class MyBatisOutboxEventRepository implements OutboxEventRepository {
 
     private OutboxEvent toDomain(OutboxEventDO outboxEventDO) {
         return new OutboxEvent(outboxEventDO.getEventId(), outboxEventDO.getEventType(),
-                outboxEventDO.getEventVersion(), outboxEventDO.getApplicationNo(), outboxEventDO.getTenantCode(),
+                outboxEventDO.getEventVersion(), outboxEventDO.getClaimApplicationNo(), outboxEventDO.getTenantCode(),
                 outboxEventDO.getPayload(), OutboxEventStatus.valueOf(outboxEventDO.getStatus()),
                 outboxEventDO.getRetryCount(), outboxEventDO.getNextRetryAt(), outboxEventDO.getCreatedAt());
     }

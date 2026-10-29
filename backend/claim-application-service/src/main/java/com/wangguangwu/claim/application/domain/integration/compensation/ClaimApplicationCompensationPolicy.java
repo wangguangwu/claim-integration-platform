@@ -8,7 +8,7 @@ import java.time.Duration;
  * @author wangguangwu
  * @since 2026-10-29
  */
-public interface ApplicationCompensationPolicy {
+public interface ClaimApplicationCompensationPolicy {
 
     /**
      * 单轮补偿处理的申请条数。

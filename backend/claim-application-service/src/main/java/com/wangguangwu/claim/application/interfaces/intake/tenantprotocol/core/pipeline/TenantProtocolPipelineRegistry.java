@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -29,17 +29,17 @@ public class TenantProtocolPipelineRegistry {
     public TenantProtocolPipeline getPipeline(TenantInfo tenantInfo) {
         if (tenantInfo == null || !StringUtils.hasText(tenantInfo.tenantCode())
                 || !StringUtils.hasText(tenantInfo.protocolVersion())) {
-            throw ApplicationIntakeException.invalid("缺少租户编码或协议版本");
+            throw ClaimApplicationIntakeException.invalid("缺少租户编码或协议版本");
         }
         List<TenantProtocolPipeline> matchedPipelines = pipelines.stream()
                 .filter(pipeline -> pipeline.supports(tenantInfo))
                 .toList();
         if (matchedPipelines.isEmpty()) {
-            throw new ApplicationIntakeException(ApplicationIntakeErrorCode.TENANT_PROTOCOL_UNSUPPORTED,
+            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.TENANT_PROTOCOL_UNSUPPORTED,
                     "未找到匹配的租户申请协议流水线");
         }
         if (matchedPipelines.size() > 1) {
-            throw new ApplicationIntakeException(ApplicationIntakeErrorCode.TENANT_PROTOCOL_AMBIGUOUS,
+            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.TENANT_PROTOCOL_AMBIGUOUS,
                     "租户申请协议流水线配置冲突");
         }
         return matchedPipelines.get(0);

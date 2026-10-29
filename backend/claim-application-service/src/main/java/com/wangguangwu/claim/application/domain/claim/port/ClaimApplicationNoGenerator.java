@@ -6,14 +6,14 @@ package com.wangguangwu.claim.application.domain.claim.port;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public interface ApplicationNoGenerator {
+public interface ClaimApplicationNoGenerator {
 
     /**
      * 生成全局唯一的理赔申请编号。
      *
      * @return 理赔申请编号
      */
-    String nextApplicationNo();
+    String nextClaimApplicationNo();
 
     /**
      * 将当日计数器与已落库的最大申请编号对齐。

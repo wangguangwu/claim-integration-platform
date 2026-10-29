@@ -27,7 +27,7 @@ public class FeignMaterialFileProcessor implements MaterialFileProcessor {
     @Override
     public FileUploadResult upload(MaterialUploadRequest request) {
         FileSystemFeignClient.FileUploadResponse response = fileSystemFeignClient.upload(
-                new FileSystemFeignClient.FileUploadRequest(request.applicationNo(), request.batchNo(),
+                new FileSystemFeignClient.FileUploadRequest(request.claimApplicationNo(), request.batchNo(),
                         request.materialType(), request.sourceUrl()));
         if (response.success()) {
             return FileUploadResult.succeeded(response.uploadedFileUrl());

@@ -21,17 +21,17 @@ public interface MaterialRepository {
     /**
      * 查询申请当前有效材料，按创建顺序返回。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 未删除材料
      */
-    List<Material> findByApplicationNoAndDeletedFalse(String applicationNo);
+    List<Material> findByClaimApplicationNoAndDeletedFalse(String claimApplicationNo);
 
     /**
      * 将某申请当前有效材料逻辑删除。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      */
-    void softDeleteByApplicationNo(String applicationNo);
+    void softDeleteByClaimApplicationNo(String claimApplicationNo);
 
     /**
      * 以待处理状态为更新条件写入处理结果，重复消息不覆盖已完成结果。

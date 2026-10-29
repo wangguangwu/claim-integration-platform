@@ -16,7 +16,7 @@ import lombok.Builder;
  * 独立角色类型表达，建造者按角色命名装配，角色互换无法通过编译。</p>
  *
  * @param tenantCode            租户编码
- * @param externalApplicationNo 租户侧申请编号
+ * @param externalClaimApplicationNo 租户侧申请编号
  * @param applicant             申请人
  * @param primaryInsured        主被保险人
  * @param accidentPerson        出险人
@@ -28,7 +28,7 @@ import lombok.Builder;
 @Builder
 public record ClaimApplicationIntakeCommand(
         String tenantCode,
-        String externalApplicationNo,
+        String externalClaimApplicationNo,
         Applicant applicant,
         PrimaryInsured primaryInsured,
         AccidentPerson accidentPerson,

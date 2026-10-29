@@ -22,9 +22,9 @@
 ### 数据基线
 
 - 理赔申请域基础表固定为 `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event` 和 `t_claim_consumed_event`，表名统一使用 `t_claim_` 前缀。强归属单个申请的实体使用 `t_claim_application_*` 命名；可能跨申请、生命周期长于单次申请的关系表、操作日志与基础设施表使用域级 `t_claim_*` 命名。
-- 理赔申请必须以 `(tenant_code, external_application_no)` 唯一识别同一租户的外部申请；`application_no` 是平台申请编号且全局唯一。
+- 理赔申请必须以 `(tenant_code, external_claim_application_no)` 唯一识别同一租户的外部申请；`claim_application_no` 是平台申请编号且全局唯一。
 - 同一理赔申请可以保留多批材料、多个历史问题件和多个案件关联，但同一时刻最多存在一条未关闭 Issue。
-- 案件关联必须以 `(tenant_code, application_no, case_no)` 去重。
+- 案件关联必须以 `(tenant_code, claim_application_no, case_no)` 去重。
 - Outbox 事件以 `event_id` 唯一；消息消费以 `(consumer_group, event_id)` 去重。
 - Material 必须同时保存租户提交的初始文件 URL 与文件上传、转存后的 URL；两者均用于追溯材料流转，不得互相覆盖。
 - Issue 必须保存问题件原因和审核人。
@@ -40,7 +40,7 @@
 - Topic `claim_application_audit_delivery_v1` 用于触发已具备审核条件的理赔申请向审核系统交付。
 - RocketMQ Topic 名称只能使用字母、数字、`_`、`-`、`%` 和 `|`；版本号使用下划线表达，例如 `_v1`。
 - Topic 名称、消费者组名称、事件类型和消息信封属于版本化契约。破坏性变更必须新建版本，不得直接改变 `v1` 消息语义。
-- 所有消息必须含有 `eventId`、`eventType`、`eventVersion`、`applicationNo`、`tenantCode`、`occurredAt`、`traceId` 和 `payload`。
+- 所有消息必须含有 `eventId`、`eventType`、`eventVersion`、`claimApplicationNo`、`tenantCode`、`occurredAt`、`traceId` 和 `payload`。
 - 业务状态、InteractionLog 与待投递 OutboxEvent 必须在同一本地事务中持久化；MQ 投递由后续可靠投递能力完成。
 - 本 Spec 只定义 Topic 和消息契约，不实现 Outbox 投递器、MQ 消费者、重试任务和死信处理。
 

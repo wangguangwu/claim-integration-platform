@@ -62,14 +62,14 @@
 - 租户协议转换
 - 参数校验
 - 幂等判断
-- applicationNo 生成
+- claimApplicationNo 生成
 - 理赔申请落库
 
-落库成功后立即返回 applicationNo，后续影像、承保和审核流程异步执行。
+落库成功后立即返回 claimApplicationNo，后续影像、承保和审核流程异步执行。
 
 关键状态：
 
-- **同步签收成功**：申请完成校验及落库，平台返回 applicationNo。
+- **同步签收成功**：申请完成校验及落库，平台返回 claimApplicationNo。
 - **待受理**：理赔申请已进入平台，等待影像处理。
 - **受理成功**：影像处理完成，可以进入后续业务处理。
 - **受理失败**：影像处理失败，停止后续流程并记录异常。
@@ -80,7 +80,7 @@
 - 租户协议适配
 - 申请校验
 - 申请幂等
-- applicationNo 生成
+- claimApplicationNo 生成
 - 理赔申请状态管理
 - 影像处理
 - 自动承保
@@ -570,10 +570,10 @@ claim-foundation
 
 核心业务编号：
 
-- 理赔申请：applicationNo
+- 理赔申请：claimApplicationNo
 - 案件：caseNo
 
-案件保存 sourceApplicationNo，用于追溯来源理赔申请。
+案件保存 sourceClaimApplicationNo，用于追溯来源理赔申请。
 
 服务边界：
 

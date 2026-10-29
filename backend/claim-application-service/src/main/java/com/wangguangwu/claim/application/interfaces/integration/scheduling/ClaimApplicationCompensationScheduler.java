@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.integration.scheduling;
 
-import com.wangguangwu.claim.application.usecase.integration.compensation.ApplicationCompensationUseCase;
+import com.wangguangwu.claim.application.usecase.integration.compensation.ClaimApplicationCompensationUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,18 +15,18 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class ApplicationCompensationScheduler {
+public class ClaimApplicationCompensationScheduler {
 
-    private final ApplicationCompensationUseCase applicationCompensationUseCase;
+    private final ClaimApplicationCompensationUseCase claimApplicationCompensationUseCase;
 
     /**
      * 每轮依次恢复投递滞留、已受理滞留与承保中滞留。
      */
     @Scheduled(fixedDelayString = "${claim.compensation.fixed-delay-ms}")
     public void compensate() {
-        runStep("投递滞留重置", applicationCompensationUseCase::resetStuckSendingEvents);
-        runStep("已受理滞留补偿", applicationCompensationUseCase::redispatchAcceptedApplications);
-        runStep("承保中滞留补偿", applicationCompensationUseCase::recoverUnderwritingApplications);
+        runStep("投递滞留重置", claimApplicationCompensationUseCase::resetStuckSendingEvents);
+        runStep("已受理滞留补偿", claimApplicationCompensationUseCase::redispatchAcceptedClaimApplications);
+        runStep("承保中滞留补偿", claimApplicationCompensationUseCase::recoverUnderwritingClaimApplications);
     }
 
     private void runStep(String stepName, Runnable step) {

@@ -6,7 +6,7 @@ import com.wangguangwu.claim.application.domain.claim.person.Gender;
 import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
 import com.wangguangwu.claim.application.domain.claim.person.Payee;
 import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolConverter;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import java.util.List;
@@ -32,7 +32,7 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
     @Override
     public ClaimApplicationIntakeCommand convert(String tenantCode, TenantAIntakeRequest request) {
         return ClaimApplicationIntakeCommand.builder().tenantCode(tenantCode)
-                .externalApplicationNo(request.requestNo().trim()).applicant(toApplicant(request.applicant()))
+                .externalClaimApplicationNo(request.requestNo().trim()).applicant(toApplicant(request.applicant()))
                 .primaryInsured(toPrimaryInsured(request.insured())).accidentPerson(toAccidentPerson(request.accident()))
                 .payee(toPayee(request.payee())).materials(toMaterials(request.attachments())).build();
     }
@@ -67,7 +67,7 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
         return switch (sex.trim()) {
             case GENDER_MALE_CODE -> Gender.MALE;
             case GENDER_FEMALE_CODE -> Gender.FEMALE;
-            default -> throw ApplicationIntakeException.invalid("sex 仅支持 M 或 F");
+            default -> throw ClaimApplicationIntakeException.invalid("sex 仅支持 M 或 F");
         };
     }
 

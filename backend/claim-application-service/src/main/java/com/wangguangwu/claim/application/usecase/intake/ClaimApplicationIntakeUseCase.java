@@ -1,12 +1,12 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationExistenceQuery;
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationIntakeLock;
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationNoGenerator;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationExistenceQuery;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
 import com.wangguangwu.claim.application.domain.claim.person.PersonInfo;
-import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import java.util.List;
@@ -28,9 +28,9 @@ public class ClaimApplicationIntakeUseCase {
 
     private static final int MAX_UNIQUE_KEY_RETRY_TIMES = 3;
 
-    private final ApplicationIntakeLock applicationIntakeLock;
-    private final ApplicationExistenceQuery applicationExistenceQuery;
-    private final ApplicationNoGenerator applicationNoGenerator;
+    private final ClaimApplicationIntakeLock claimApplicationIntakeLock;
+    private final ClaimApplicationExistenceQuery claimApplicationExistenceQuery;
+    private final ClaimApplicationNoGenerator claimApplicationNoGenerator;
     private final ClaimApplicationIntakeTransactionService transactionService;
 
     /**
@@ -43,11 +43,11 @@ public class ClaimApplicationIntakeUseCase {
      */
     public ClaimApplicationIntakeResult intake(ClaimApplicationIntakeCommand command, String requestId, String traceId) {
         validate(command);
-        ClaimApplication application = ClaimApplication.submit(command.tenantCode(), command.externalApplicationNo(),
+        ClaimApplication claimApplication = ClaimApplication.submit(command.tenantCode(), command.externalClaimApplicationNo(),
                 command.applicant(), command.primaryInsured(), command.accidentPerson(), command.payee(),
                 command.materials());
-        return applicationIntakeLock.execute(application.getTenantCode(), application.getExternalApplicationNo(),
-                () -> executeInLock(application, requestId, traceId));
+        return claimApplicationIntakeLock.execute(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo(),
+                () -> executeInLock(claimApplication, requestId, traceId));
     }
 
     /**
@@ -56,50 +56,50 @@ public class ClaimApplicationIntakeUseCase {
      * <p>存在性缓存与实际数据不一致或唯一键冲突时，淘汰缓存并在下一次重试中重新判断；
      * 唯一键冲突且已存在同外部申请号记录时，直接按重复请求处理。</p>
      *
-     * @param application 待签收的理赔申请
+     * @param claimApplication 待签收的理赔申请
      * @param requestId   请求标识
      * @param traceId     链路标识
      * @return 签收结果
      */
-    private ClaimApplicationIntakeResult executeInLock(ClaimApplication application, String requestId, String traceId) {
+    private ClaimApplicationIntakeResult executeInLock(ClaimApplication claimApplication, String requestId, String traceId) {
         boolean forceCreate = false;
         for (int retryTimes = 0; retryTimes < MAX_UNIQUE_KEY_RETRY_TIMES; retryTimes++) {
             try {
-                boolean existed = !forceCreate && applicationExistenceQuery.exists(application.getTenantCode(),
-                        application.getExternalApplicationNo());
-                String candidateApplicationNo = existed ? null : applicationNoGenerator.nextApplicationNo();
-                ClaimApplicationIntakeResult result = transactionService.intake(application, existed,
-                        candidateApplicationNo, requestId, traceId);
-                evictAfterChanged(result, application);
+                boolean existed = !forceCreate && claimApplicationExistenceQuery.exists(claimApplication.getTenantCode(),
+                        claimApplication.getExternalClaimApplicationNo());
+                String candidateClaimApplicationNo = existed ? null : claimApplicationNoGenerator.nextClaimApplicationNo();
+                ClaimApplicationIntakeResult result = transactionService.intake(claimApplication, existed,
+                        candidateClaimApplicationNo, requestId, traceId);
+                evictAfterChanged(result, claimApplication);
                 return result;
-            } catch (ApplicationExistenceMismatchException exception) {
-                applicationExistenceQuery.evict(application.getTenantCode(), application.getExternalApplicationNo());
+            } catch (ClaimApplicationExistenceMismatchException exception) {
+                claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
                 forceCreate = true;
             } catch (DuplicateKeyException exception) {
                 Optional<ClaimApplicationIntakeResult> resolvedResult = transactionService.resolveAfterDuplicateKey(
-                        application, requestId, traceId);
+                        claimApplication, requestId, traceId);
                 if (resolvedResult.isPresent()) {
-                    evictAfterChanged(resolvedResult.get(), application);
+                    evictAfterChanged(resolvedResult.get(), claimApplication);
                     return resolvedResult.get();
                 }
-                applicationExistenceQuery.evict(application.getTenantCode(), application.getExternalApplicationNo());
-                applicationNoGenerator.synchronizeDailyCounter();
+                claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
+                claimApplicationNoGenerator.synchronizeDailyCounter();
                 forceCreate = false;
             }
         }
-        throw new IllegalStateException("理赔申请唯一键冲突重试次数超限，tenantCode=" + application.getTenantCode()
-                + ", externalApplicationNo=" + application.getExternalApplicationNo());
+        throw new IllegalStateException("理赔申请唯一键冲突重试次数超限，tenantCode=" + claimApplication.getTenantCode()
+                + ", externalClaimApplicationNo=" + claimApplication.getExternalClaimApplicationNo());
     }
 
     /**
      * 仅在创建或重新申请已完成提交后失效存在性缓存。
      *
      * @param result      签收结果
-     * @param application 待签收的理赔申请
+     * @param claimApplication 待签收的理赔申请
      */
-    private void evictAfterChanged(ClaimApplicationIntakeResult result, ClaimApplication application) {
+    private void evictAfterChanged(ClaimApplicationIntakeResult result, ClaimApplication claimApplication) {
         if (result.changed()) {
-            applicationExistenceQuery.evict(application.getTenantCode(), application.getExternalApplicationNo());
+            claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
         }
     }
 
@@ -110,8 +110,8 @@ public class ClaimApplicationIntakeUseCase {
      */
     private void validate(ClaimApplicationIntakeCommand command) {
         if (command == null || !StringUtils.hasText(command.tenantCode())
-                || !StringUtils.hasText(command.externalApplicationNo())) {
-            throw ApplicationIntakeException.invalid("租户编码和外部申请编号不能为空");
+                || !StringUtils.hasText(command.externalClaimApplicationNo())) {
+            throw ClaimApplicationIntakeException.invalid("租户编码和外部申请编号不能为空");
         }
         validatePerson(command.applicant(), "申请人");
         validatePerson(command.primaryInsured(), "主被保险人");
@@ -130,7 +130,7 @@ public class ClaimApplicationIntakeUseCase {
         if (personInfo == null || !StringUtils.hasText(personInfo.name()) || personInfo.gender() == null
                 || !StringUtils.hasText(personInfo.certificateType())
                 || !StringUtils.hasText(personInfo.certificateNo())) {
-            throw ApplicationIntakeException.invalid(personRole + "的姓名、性别、证件类型和证件号不能为空");
+            throw ClaimApplicationIntakeException.invalid(personRole + "的姓名、性别、证件类型和证件号不能为空");
         }
     }
 
@@ -141,12 +141,12 @@ public class ClaimApplicationIntakeUseCase {
      */
     private void validateMaterials(List<MaterialSubmission> materials) {
         if (materials == null || materials.isEmpty()) {
-            throw ApplicationIntakeException.invalid("首次签收至少需要一项材料");
+            throw ClaimApplicationIntakeException.invalid("首次签收至少需要一项材料");
         }
         boolean invalidMaterial = materials.stream().anyMatch(material -> material == null
                 || !StringUtils.hasText(material.materialType()) || !StringUtils.hasText(material.originalFileUrl()));
         if (invalidMaterial) {
-            throw ApplicationIntakeException.invalid("材料类型和初始文件地址不能为空");
+            throw ClaimApplicationIntakeException.invalid("材料类型和初始文件地址不能为空");
         }
     }
 }

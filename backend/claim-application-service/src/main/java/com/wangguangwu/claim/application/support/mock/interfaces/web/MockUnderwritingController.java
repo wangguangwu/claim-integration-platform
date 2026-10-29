@@ -75,7 +75,7 @@ public class MockUnderwritingController {
     @PostMapping("/mock/underwriting/v1/auto-underwritings")
     public AutoUnderwritingStatusResponse requestAutoUnderwriting(@RequestBody AutoUnderwritingRequest request) {
         MockUnderwritingStore.AutoUnderwritingRecord record = mockUnderwritingStore.requestAutoUnderwriting(
-                new MockUnderwritingStore.AutoUnderwritingCommand(request.applicationNo(), request.tenantCode(),
+                new MockUnderwritingStore.AutoUnderwritingCommand(request.claimApplicationNo(), request.tenantCode(),
                         request.insuredCertificateNo()));
         return AutoUnderwritingStatusResponse.of(record);
     }
@@ -83,28 +83,28 @@ public class MockUnderwritingController {
     /**
      * 查询自动承保结果，供补偿任务使用。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保状态；无记录时返回 NOT_FOUND
      */
-    @GetMapping("/mock/underwriting/v1/auto-underwritings/{applicationNo}")
-    public AutoUnderwritingStatusResponse queryAutoUnderwriting(@PathVariable("applicationNo") String applicationNo) {
-        return mockUnderwritingStore.findAutoUnderwriting(applicationNo)
+    @GetMapping("/mock/underwriting/v1/auto-underwritings/{claimApplicationNo}")
+    public AutoUnderwritingStatusResponse queryAutoUnderwriting(@PathVariable("claimApplicationNo") String claimApplicationNo) {
+        return mockUnderwritingStore.findAutoUnderwriting(claimApplicationNo)
                 .map(AutoUnderwritingStatusResponse::of)
-                .orElseGet(() -> AutoUnderwritingStatusResponse.notFound(applicationNo));
+                .orElseGet(() -> AutoUnderwritingStatusResponse.notFound(claimApplicationNo));
     }
 
     /**
      * 手工触发承保完成并发送完成通知，供联调使用。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保状态；无记录时返回 NOT_FOUND
      */
-    @PostMapping("/mock/underwriting/auto-underwritings/{applicationNo}/complete")
+    @PostMapping("/mock/underwriting/auto-underwritings/{claimApplicationNo}/complete")
     public AutoUnderwritingStatusResponse completeAutoUnderwriting(
-            @PathVariable("applicationNo") String applicationNo) {
-        return mockUnderwritingStore.completeAutoUnderwriting(applicationNo)
+            @PathVariable("claimApplicationNo") String claimApplicationNo) {
+        return mockUnderwritingStore.completeAutoUnderwriting(claimApplicationNo)
                 .map(AutoUnderwritingStatusResponse::of)
-                .orElseGet(() -> AutoUnderwritingStatusResponse.notFound(applicationNo));
+                .orElseGet(() -> AutoUnderwritingStatusResponse.notFound(claimApplicationNo));
     }
 
     /**
@@ -128,20 +128,20 @@ public class MockUnderwritingController {
     /**
      * 自动承保请求。
      *
-     * @param applicationNo        平台申请编号
+     * @param claimApplicationNo        平台申请编号
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
      */
-    public record AutoUnderwritingRequest(String applicationNo, String tenantCode, String insuredCertificateNo) {
+    public record AutoUnderwritingRequest(String claimApplicationNo, String tenantCode, String insuredCertificateNo) {
     }
 
     /**
      * 自动承保状态响应。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @param status        承保状态
      */
-    public record AutoUnderwritingStatusResponse(String applicationNo, String status) {
+    public record AutoUnderwritingStatusResponse(String claimApplicationNo, String status) {
 
         /**
          * 按承保记录构建响应。
@@ -150,17 +150,17 @@ public class MockUnderwritingController {
          * @return 状态响应
          */
         public static AutoUnderwritingStatusResponse of(MockUnderwritingStore.AutoUnderwritingRecord record) {
-            return new AutoUnderwritingStatusResponse(record.applicationNo(), record.status().name());
+            return new AutoUnderwritingStatusResponse(record.claimApplicationNo(), record.status().name());
         }
 
         /**
          * 构建查无记录的响应。
          *
-         * @param applicationNo 平台申请编号
+         * @param claimApplicationNo 平台申请编号
          * @return 状态响应
          */
-        public static AutoUnderwritingStatusResponse notFound(String applicationNo) {
-            return new AutoUnderwritingStatusResponse(applicationNo, UnderwritingResult.NOT_FOUND.name());
+        public static AutoUnderwritingStatusResponse notFound(String claimApplicationNo) {
+            return new AutoUnderwritingStatusResponse(claimApplicationNo, UnderwritingResult.NOT_FOUND.name());
         }
     }
 }

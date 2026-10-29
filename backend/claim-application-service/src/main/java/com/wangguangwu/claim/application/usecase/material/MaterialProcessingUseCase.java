@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.usecase.material;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import com.wangguangwu.claim.application.domain.material.FileUploadResult;
@@ -10,7 +10,7 @@ import com.wangguangwu.claim.application.domain.material.port.MaterialFileProces
 import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
 import com.wangguangwu.claim.application.domain.material.MaterialStatus;
 import com.wangguangwu.claim.application.domain.material.MaterialUploadRequest;
-import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
+import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import com.wangguangwu.claim.application.usecase.material.result.MaterialProcessOutcome;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingUseCase;
@@ -36,12 +36,12 @@ public class MaterialProcessingUseCase {
 
     private static final String FILE_UPLOAD_FAILED_CODE = "FILE_UPLOAD_FAILED";
 
-    private final ApplicationRepository applicationRepository;
+    private final ClaimApplicationRepository claimApplicationRepository;
     private final ConsumedEventRepository consumedEventRepository;
     private final MaterialRepository materialRepository;
     private final MaterialFileProcessor materialFileProcessor;
     private final MaterialProcessingTransactionService transactionService;
-    private final ApplicationLifecycleRecordFactory recordFactory;
+    private final ClaimApplicationLifecycleRecordFactory recordFactory;
     private final UnderwritingUseCase underwritingUseCase;
 
     /**
@@ -54,26 +54,26 @@ public class MaterialProcessingUseCase {
      */
     public void process(MaterialProcessCommand command) {
         if (consumedEventRepository.exists(MaterialProcessingTransactionService.CONSUMER_GROUP, command.eventId())) {
-            log.info("材料处理事件已消费，跳过处理，applicationNo={}，eventId={}", command.applicationNo(),
+            log.info("材料处理事件已消费，跳过处理，claimApplicationNo={}，eventId={}", command.claimApplicationNo(),
                     command.eventId());
             return;
         }
-        ClaimApplication application = applicationRepository.findByApplicationNo(command.applicationNo())
-                .orElseThrow(() -> new IllegalStateException("材料处理事件对应的申请不存在，applicationNo="
-                        + command.applicationNo()));
+        ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
+                .orElseThrow(() -> new IllegalStateException("材料处理事件对应的申请不存在，claimApplicationNo="
+                        + command.claimApplicationNo()));
         String interactionNo = recordFactory.newInteractionNo();
-        if (!isProcessable(application, command.applicationAttempt())) {
-            log.info("材料处理事件与当前申请不匹配，按重复事件处理，applicationNo={}，status={}，eventAttempt={}",
-                    command.applicationNo(), application.getStatus(), command.applicationAttempt());
+        if (!isProcessable(claimApplication, command.claimApplicationAttempt())) {
+            log.info("材料处理事件与当前申请不匹配，按重复事件处理，claimApplicationNo={}，status={}，eventAttempt={}",
+                    command.claimApplicationNo(), claimApplication.getStatus(), command.claimApplicationAttempt());
             transactionService.recordReused(command, interactionNo);
             return;
         }
-        List<Material> materials = loadPendingMaterials(command.applicationNo());
+        List<Material> materials = loadPendingMaterials(command.claimApplicationNo());
         String errorCode = null;
         String errorMessage = null;
         for (Material material : materials) {
             FileUploadResult uploadResult = materialFileProcessor.upload(new MaterialUploadRequest(
-                    material.getApplicationNo(), material.getBatchNo(), material.getMaterialType(),
+                    material.getClaimApplicationNo(), material.getBatchNo(), material.getMaterialType(),
                     material.getOriginalFileUrl()));
             if (uploadResult.success()) {
                 material.markProcessed(uploadResult.uploadedFileUrl());
@@ -89,20 +89,20 @@ public class MaterialProcessingUseCase {
                 .allMatch(material -> material.getStatus() == MaterialStatus.PROCESSED);
         String failureCode = allSucceeded ? null : (errorCode == null ? FILE_UPLOAD_FAILED_CODE : errorCode);
         String failureMessage = allSucceeded ? null : errorMessage;
-        MaterialProcessOutcome outcome = transactionService.recordProcessed(command, interactionNo, application,
+        MaterialProcessOutcome outcome = transactionService.recordProcessed(command, interactionNo, claimApplication,
                 materials, allSucceeded, failureCode, failureMessage);
         if (outcome == MaterialProcessOutcome.ACCEPTED) {
-            underwritingUseCase.dispatch(command.applicationNo(), command.traceId());
+            underwritingUseCase.dispatch(command.claimApplicationNo(), command.traceId());
         }
     }
 
-    private boolean isProcessable(ClaimApplication application, int eventApplicationAttempt) {
-        return application.isInStatus(ApplicationStatus.PENDING_ACCEPT)
-                && Objects.equals(application.getApplicationAttempt(), eventApplicationAttempt);
+    private boolean isProcessable(ClaimApplication claimApplication, int eventClaimApplicationAttempt) {
+        return claimApplication.isInStatus(ClaimApplicationStatus.PENDING_ACCEPT)
+                && Objects.equals(claimApplication.getClaimApplicationAttempt(), eventClaimApplicationAttempt);
     }
 
-    private List<Material> loadPendingMaterials(String applicationNo) {
-        return materialRepository.findByApplicationNoAndDeletedFalse(applicationNo).stream()
+    private List<Material> loadPendingMaterials(String claimApplicationNo) {
+        return materialRepository.findByClaimApplicationNoAndDeletedFalse(claimApplicationNo).stream()
                 .filter(material -> material.getStatus() == MaterialStatus.PENDING_PROCESS)
                 .toList();
     }

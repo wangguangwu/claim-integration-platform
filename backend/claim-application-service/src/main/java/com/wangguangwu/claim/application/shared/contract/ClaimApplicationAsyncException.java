@@ -6,9 +6,9 @@ package com.wangguangwu.claim.application.shared.contract;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public class ApplicationAsyncException extends RuntimeException {
+public class ClaimApplicationAsyncException extends RuntimeException {
 
-    private final ApplicationAsyncErrorCode errorCode;
+    private final ClaimApplicationAsyncErrorCode errorCode;
 
     /**
      * 创建包含明确业务错误码的异常。
@@ -16,7 +16,7 @@ public class ApplicationAsyncException extends RuntimeException {
      * @param errorCode 错误码
      * @param message   面向调用方的错误说明，不得包含敏感请求字段
      */
-    public ApplicationAsyncException(ApplicationAsyncErrorCode errorCode, String message) {
+    public ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
@@ -26,7 +26,7 @@ public class ApplicationAsyncException extends RuntimeException {
      *
      * @return 错误码
      */
-    public ApplicationAsyncErrorCode getErrorCode() {
+    public ClaimApplicationAsyncErrorCode getErrorCode() {
         return errorCode;
     }
 }

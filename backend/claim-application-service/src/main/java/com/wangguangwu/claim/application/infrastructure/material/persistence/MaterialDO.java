@@ -30,8 +30,8 @@ public class MaterialDO {
     private Long id;
 
     /** 所属理赔申请的平台申请编号。 */
-    @TableField("application_no")
-    private String applicationNo;
+    @TableField("claim_application_no")
+    private String claimApplicationNo;
 
     /** 同次申请提交共用的材料批次编号。 */
     @TableField("batch_no")

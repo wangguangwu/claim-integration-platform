@@ -9,9 +9,9 @@ package com.wangguangwu.claim.application.usecase.intake;
  * @author wangguangwu
  * @since 2026-10-27
  */
-class ApplicationExistenceMismatchException extends RuntimeException {
+class ClaimApplicationExistenceMismatchException extends RuntimeException {
 
-    ApplicationExistenceMismatchException() {
+    ClaimApplicationExistenceMismatchException() {
         super("理赔申请存在性判断与库中记录不一致，需要重新签收");
     }
 }

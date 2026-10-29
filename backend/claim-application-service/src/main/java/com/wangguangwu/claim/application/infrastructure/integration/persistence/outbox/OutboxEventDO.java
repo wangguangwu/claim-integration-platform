@@ -42,8 +42,8 @@ public class OutboxEventDO {
     private Integer eventVersion;
 
     /** 事件所属理赔申请的平台申请编号。 */
-    @TableField("application_no")
-    private String applicationNo;
+    @TableField("claim_application_no")
+    private String claimApplicationNo;
 
     /** 事件所属租户编码。 */
     @TableField("tenant_code")

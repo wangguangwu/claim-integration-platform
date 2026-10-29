@@ -40,7 +40,7 @@ public class UnderwritingCallbackController {
             @RequestHeader(value = TraceHeaders.REQUEST_ID, required = false) String requestId,
             @RequestHeader(value = TraceHeaders.TRACE_ID, required = false) String traceId) {
         UnderwritingCallbackResult result = underwritingCallbackUseCase.complete(
-                new UnderwritingCompletedCommand(request.applicationNo(), requestId, traceId));
+                new UnderwritingCompletedCommand(request.claimApplicationNo(), requestId, traceId));
         return ApiResponse.success(traceId, result);
     }
 }

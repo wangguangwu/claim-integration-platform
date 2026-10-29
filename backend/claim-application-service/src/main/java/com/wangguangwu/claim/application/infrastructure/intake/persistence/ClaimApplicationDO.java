@@ -23,7 +23,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @TableName("t_claim_application")
-public class ApplicationDO {
+public class ClaimApplicationDO {
 
     /** 主表自增主键。 */
     @TableId(type = IdType.AUTO)
@@ -34,19 +34,19 @@ public class ApplicationDO {
     private String tenantCode;
 
     /** 平台全局唯一理赔申请编号。 */
-    @TableField("application_no")
-    private String applicationNo;
+    @TableField("claim_application_no")
+    private String claimApplicationNo;
 
     /** 租户侧申请编号，与租户编码组成幂等键。 */
-    @TableField("external_application_no")
-    private String externalApplicationNo;
+    @TableField("external_claim_application_no")
+    private String externalClaimApplicationNo;
 
     /** 理赔申请生命周期状态枚举名称。 */
     private String status;
 
     /** 同一外部申请编号的受理尝试次数。 */
-    @TableField("application_attempt")
-    private Integer applicationAttempt;
+    @TableField("claim_application_attempt")
+    private Integer claimApplicationAttempt;
 
     /** 申请人标准化信息 JSON。 */
     @TableField("applicant_json")

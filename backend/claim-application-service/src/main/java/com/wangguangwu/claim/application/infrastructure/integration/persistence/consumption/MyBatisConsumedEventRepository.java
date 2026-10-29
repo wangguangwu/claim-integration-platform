@@ -41,13 +41,13 @@ public class MyBatisConsumedEventRepository implements ConsumedEventRepository {
      *
      * @param consumerGroup 消费者组
      * @param eventId       事件标识
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 首次登记时为 true
      */
     @Override
-    public boolean register(String consumerGroup, String eventId, String applicationNo) {
+    public boolean register(String consumerGroup, String eventId, String claimApplicationNo) {
         ConsumedEventDO consumedEventDO = ConsumedEventDO.builder().consumerGroup(consumerGroup).eventId(eventId)
-                .applicationNo(applicationNo).consumedAt(LocalDateTime.now(BUSINESS_ZONE_ID)).build();
+                .claimApplicationNo(claimApplicationNo).consumedAt(LocalDateTime.now(BUSINESS_ZONE_ID)).build();
         try {
             consumedEventMapper.insert(consumedEventDO);
             return true;

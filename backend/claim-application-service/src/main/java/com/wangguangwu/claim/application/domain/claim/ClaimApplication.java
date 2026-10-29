@@ -29,16 +29,16 @@ public class ClaimApplication {
     private String tenantCode;
 
     /** 平台生成的全局唯一理赔申请编号，对内外关联均使用该值。 */
-    private String applicationNo;
+    private String claimApplicationNo;
 
     /** 租户侧申请编号，与租户编码共同唯一标识一次外部提交。 */
-    private String externalApplicationNo;
+    private String externalClaimApplicationNo;
 
     /** 理赔申请当前生命周期状态，约束可执行的业务迁移。 */
-    private ApplicationStatus status;
+    private ClaimApplicationStatus status;
 
     /** 同一外部申请编号的受理尝试次数，重新申请时递增。 */
-    private Integer applicationAttempt;
+    private Integer claimApplicationAttempt;
 
     /** 申请人标准化信息。 */
     private Applicant applicant;
@@ -59,7 +59,7 @@ public class ClaimApplication {
      * 创建租户协议提交结果，此时还没有平台申请编号与状态。
      *
      * @param tenantCode            租户编码
-     * @param externalApplicationNo 外部申请编号
+     * @param externalClaimApplicationNo 外部申请编号
      * @param applicant             申请人
      * @param primaryInsured        主被保险人
      * @param accidentPerson        出险人
@@ -67,10 +67,10 @@ public class ClaimApplication {
      * @param materials             本次提交的材料
      * @return 待签收的理赔申请
      */
-    public static ClaimApplication submit(String tenantCode, String externalApplicationNo, Applicant applicant,
+    public static ClaimApplication submit(String tenantCode, String externalClaimApplicationNo, Applicant applicant,
                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
                                           List<MaterialSubmission> materials) {
-        return ClaimApplication.builder().tenantCode(tenantCode).externalApplicationNo(externalApplicationNo)
+        return ClaimApplication.builder().tenantCode(tenantCode).externalClaimApplicationNo(externalClaimApplicationNo)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
                 .materials(materials).build();
     }
@@ -82,22 +82,22 @@ public class ClaimApplication {
      *
      * @param id                  数据库主键
      * @param tenantCode          租户编码
-     * @param applicationNo       平台申请编号
-     * @param externalApplicationNo 外部申请编号
+     * @param claimApplicationNo       平台申请编号
+     * @param externalClaimApplicationNo 外部申请编号
      * @param status              当前生命周期状态
-     * @param applicationAttempt  受理尝试次数
+     * @param claimApplicationAttempt  受理尝试次数
      * @param applicant           申请人
      * @param primaryInsured      主被保险人
      * @param accidentPerson      出险人
      * @param payee               领款人
      * @return 已落库的理赔申请
      */
-    public static ClaimApplication restore(Long id, String tenantCode, String applicationNo,
-                                           String externalApplicationNo, ApplicationStatus status,
-                                           Integer applicationAttempt, Applicant applicant,
+    public static ClaimApplication restore(Long id, String tenantCode, String claimApplicationNo,
+                                           String externalClaimApplicationNo, ClaimApplicationStatus status,
+                                           Integer claimApplicationAttempt, Applicant applicant,
                                            PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee) {
-        return ClaimApplication.builder().id(id).tenantCode(tenantCode).applicationNo(applicationNo)
-                .externalApplicationNo(externalApplicationNo).status(status).applicationAttempt(applicationAttempt)
+        return ClaimApplication.builder().id(id).tenantCode(tenantCode).claimApplicationNo(claimApplicationNo)
+                .externalClaimApplicationNo(externalClaimApplicationNo).status(status).claimApplicationAttempt(claimApplicationAttempt)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
                 .build();
     }
@@ -105,12 +105,12 @@ public class ClaimApplication {
     /**
      * 绑定平台申请编号并进入待受理状态，作为首次签收的领域起点。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      */
-    public void bindApplicationNo(String applicationNo) {
-        this.applicationNo = applicationNo;
-        this.status = ApplicationStatus.PENDING_ACCEPT;
-        this.applicationAttempt = 1;
+    public void bindClaimApplicationNo(String claimApplicationNo) {
+        this.claimApplicationNo = claimApplicationNo;
+        this.status = ClaimApplicationStatus.PENDING_ACCEPT;
+        this.claimApplicationAttempt = 1;
     }
 
     /**
@@ -120,7 +120,7 @@ public class ClaimApplication {
      */
     public void bindId(Long id) {
         if (this.id != null) {
-            throw new IllegalStateException("理赔申请主键已绑定，applicationNo=" + applicationNo + "，id=" + this.id);
+            throw new IllegalStateException("理赔申请主键已绑定，claimApplicationNo=" + claimApplicationNo + "，id=" + this.id);
         }
         this.id = id;
     }
@@ -131,11 +131,11 @@ public class ClaimApplication {
      * @param submitted 新一次提交的理赔申请
      */
     public void reapply(ClaimApplication submitted) {
-        if (status != ApplicationStatus.ACCEPT_FAILED) {
+        if (status != ClaimApplicationStatus.ACCEPT_FAILED) {
             throw new IllegalStateException("仅受理失败的申请允许重新申请");
         }
-        status = ApplicationStatus.PENDING_ACCEPT;
-        applicationAttempt = applicationAttempt + 1;
+        status = ClaimApplicationStatus.PENDING_ACCEPT;
+        claimApplicationAttempt = claimApplicationAttempt + 1;
         this.applicant = submitted.applicant;
         this.primaryInsured = submitted.primaryInsured;
         this.accidentPerson = submitted.accidentPerson;
@@ -147,35 +147,35 @@ public class ClaimApplication {
      * 材料处理成功，本次申请受理通过。
      */
     public void accept() {
-        transitionTo(ApplicationStatus.PENDING_ACCEPT, ApplicationStatus.ACCEPTED);
+        transitionTo(ClaimApplicationStatus.PENDING_ACCEPT, ClaimApplicationStatus.ACCEPTED);
     }
 
     /**
      * 材料处理失败，本次申请尝试结束，等待租户重新申请。
      */
     public void failAccept() {
-        transitionTo(ApplicationStatus.PENDING_ACCEPT, ApplicationStatus.ACCEPT_FAILED);
+        transitionTo(ClaimApplicationStatus.PENDING_ACCEPT, ClaimApplicationStatus.ACCEPT_FAILED);
     }
 
     /**
      * 存在有效保单，进入等待审核签收。
      */
     public void waitAudit() {
-        transitionTo(ApplicationStatus.ACCEPTED, ApplicationStatus.WAIT_AUDIT);
+        transitionTo(ClaimApplicationStatus.ACCEPTED, ClaimApplicationStatus.WAIT_AUDIT);
     }
 
     /**
      * 不存在有效保单，进入自动承保处理中。
      */
     public void startUnderwriting() {
-        transitionTo(ApplicationStatus.ACCEPTED, ApplicationStatus.UNDERWRITING);
+        transitionTo(ClaimApplicationStatus.ACCEPTED, ClaimApplicationStatus.UNDERWRITING);
     }
 
     /**
      * 自动承保完成，进入等待审核签收。
      */
     public void finishUnderwriting() {
-        transitionTo(ApplicationStatus.UNDERWRITING, ApplicationStatus.WAIT_AUDIT);
+        transitionTo(ClaimApplicationStatus.UNDERWRITING, ClaimApplicationStatus.WAIT_AUDIT);
     }
 
     /**
@@ -186,7 +186,7 @@ public class ClaimApplication {
     public String primaryInsuredCertificateNo() {
         if (primaryInsured == null || primaryInsured.certificateNo() == null
                 || primaryInsured.certificateNo().isBlank()) {
-            throw new IllegalStateException("主被保险人缺少证件号，applicationNo=" + applicationNo);
+            throw new IllegalStateException("主被保险人缺少证件号，claimApplicationNo=" + claimApplicationNo);
         }
         return primaryInsured.certificateNo();
     }
@@ -197,13 +197,13 @@ public class ClaimApplication {
      * @param expectedStatus 期望状态
      * @return 状态一致时为 true
      */
-    public boolean isInStatus(ApplicationStatus expectedStatus) {
+    public boolean isInStatus(ClaimApplicationStatus expectedStatus) {
         return status == expectedStatus;
     }
 
-    private void transitionTo(ApplicationStatus expectedStatus, ApplicationStatus targetStatus) {
+    private void transitionTo(ClaimApplicationStatus expectedStatus, ClaimApplicationStatus targetStatus) {
         if (status != expectedStatus) {
-            throw new IllegalStateException("申请状态不允许迁移，applicationNo=" + applicationNo
+            throw new IllegalStateException("申请状态不允许迁移，claimApplicationNo=" + claimApplicationNo
                     + "，期望状态=" + expectedStatus + "，实际状态=" + status);
         }
         status = targetStatus;

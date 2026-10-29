@@ -10,7 +10,7 @@ package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.
 public interface TenantProtocolValidator<R> {
 
     /**
-     * 校验租户 request，不合法时抛出 {@code APPLICATION_INTAKE_INVALID}。
+     * 校验租户 request，不合法时抛出 {@code CLAIM_APPLICATION_INTAKE_INVALID}。
      *
      * @param request 已解析的租户 request
      */

@@ -13,8 +13,8 @@ public interface UnderwritingResultQuery {
     /**
      * 按平台申请编号查询自动承保结果。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @return 承保结果；查不到记录时返回 {@link UnderwritingResult#NOT_FOUND}
      */
-    UnderwritingResult query(String applicationNo);
+    UnderwritingResult query(String claimApplicationNo);
 }

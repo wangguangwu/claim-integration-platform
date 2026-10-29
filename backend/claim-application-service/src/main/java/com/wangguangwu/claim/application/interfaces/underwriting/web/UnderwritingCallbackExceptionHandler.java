@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.underwriting.web;
 
-import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncException;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,8 +35,8 @@ public class UnderwritingCallbackExceptionHandler {
      * @param request   当前请求
      * @return 统一失败响应
      */
-    @ExceptionHandler(ApplicationAsyncException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAsyncException(ApplicationAsyncException exception,
+    @ExceptionHandler(ClaimApplicationAsyncException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAsyncException(ClaimApplicationAsyncException exception,
                                                                   HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.warn("承保完成回调业务异常，traceId={}，errorCode={}，message={}", traceId,
@@ -46,7 +46,7 @@ public class UnderwritingCallbackExceptionHandler {
     }
 
     /**
-     * 报文无法解析时，视为缺少 applicationNo 的回调非法请求。
+     * 报文无法解析时，视为缺少 claimApplicationNo 的回调非法请求。
      *
      * @param exception 报文解析异常
      * @param request   当前请求
@@ -58,7 +58,7 @@ public class UnderwritingCallbackExceptionHandler {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.warn("承保完成回调报文无法解析，traceId={}", traceId);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.failure(ApplicationAsyncErrorCode.CALLBACK_INVALID.name(),
+                .body(ApiResponse.failure(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID.name(),
                         CALLBACK_INVALID_MESSAGE, traceId));
     }
 
@@ -74,15 +74,15 @@ public class UnderwritingCallbackExceptionHandler {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.error("承保完成回调处理异常，traceId={}", traceId, exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.failure(ApplicationAsyncErrorCode.APPLICATION_ASYNC_SYSTEM_ERROR.name(),
+                .body(ApiResponse.failure(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR.name(),
                         SYSTEM_ERROR_MESSAGE, traceId));
     }
 
-    private HttpStatus statusOf(ApplicationAsyncErrorCode errorCode) {
+    private HttpStatus statusOf(ClaimApplicationAsyncErrorCode errorCode) {
         return switch (errorCode) {
             case CALLBACK_INVALID -> HttpStatus.BAD_REQUEST;
-            case APPLICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case APPLICATION_ASYNC_SYSTEM_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case CLAIM_APPLICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 }

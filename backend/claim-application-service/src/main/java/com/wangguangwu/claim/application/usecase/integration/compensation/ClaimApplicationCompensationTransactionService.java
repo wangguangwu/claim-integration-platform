@@ -3,7 +3,7 @@ package com.wangguangwu.claim.application.usecase.integration.compensation;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
-import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
+import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,15 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @RequiredArgsConstructor
 @Service
-public class ApplicationCompensationTransactionService {
+public class ClaimApplicationCompensationTransactionService {
 
     private final InteractionLogRepository interactionLogRepository;
-    private final ApplicationLifecycleRecordFactory recordFactory;
+    private final ClaimApplicationLifecycleRecordFactory recordFactory;
 
     /**
      * 在同一事务中写入一次补偿重放的开始与结束轨迹。
      *
-     * @param applicationNo  平台申请编号
+     * @param claimApplicationNo  平台申请编号
      * @param interactionNo  行为组编号
      * @param requestId      补偿请求标识，用于与承保回调对账
      * @param terminalAction 本次重放的结束动作
@@ -36,16 +36,16 @@ public class ApplicationCompensationTransactionService {
      * @param errorMessage   失败说明，成功时为 null
      */
     @Transactional
-    public void recordAttempt(String applicationNo, String interactionNo, String requestId,
+    public void recordAttempt(String claimApplicationNo, String interactionNo, String requestId,
                               InteractionAction terminalAction, String traceId, String errorCode,
                               String errorMessage) {
-        insert(applicationNo, interactionNo, requestId, InteractionAction.STARTED, traceId, null, null);
-        insert(applicationNo, interactionNo, requestId, terminalAction, traceId, errorCode, errorMessage);
+        insert(claimApplicationNo, interactionNo, requestId, InteractionAction.STARTED, traceId, null, null);
+        insert(claimApplicationNo, interactionNo, requestId, terminalAction, traceId, errorCode, errorMessage);
     }
 
-    private void insert(String applicationNo, String interactionNo, String requestId, InteractionAction action,
+    private void insert(String claimApplicationNo, String interactionNo, String requestId, InteractionAction action,
                         String traceId, String errorCode, String errorMessage) {
-        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING, applicationNo,
+        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING, claimApplicationNo,
                 interactionNo, action, requestId, traceId, errorCode, errorMessage));
     }
 }

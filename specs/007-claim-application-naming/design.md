@@ -80,6 +80,20 @@
 
 MySQL 8 列改名语法为 `ALTER TABLE ... RENAME COLUMN old TO new`，不重写数据；生成列 `open_application_no` 需 `DROP COLUMN` 后按新名重建，索引依赖它的先 drop 索引。本地卷与 init 脚本必须同时改，否则新卷与已有卷列名不一致。
 
+### 4.1.1 入库的枚举值与 JSON 载荷键（改名即改数据，必须带 UPDATE 迁移）
+
+实测本地卷已有数据：理赔申请 79 行、材料 94 行、交互轨迹 910 行、Outbox 153 行、消费登记 72 行。以下字符串是枚举 `name()` 直接入库的结果，改名后旧值会在新代码 `valueOf` 处抛异常，必须与列改名同批迁移：
+
+| 位置 | 现值 | 新值 | 迁移方式 |
+|---|---|---|---|
+| `t_claim_outbox_event.event_type` | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `UPDATE` 全表；`AUDIT_DELIVERY_REQUESTED` 不含该前缀，不动 |
+| `t_claim_interaction_log.interaction_type` | `APPLICATION_INTAKE` | `CLAIM_APPLICATION_INTAKE` | `UPDATE` 命中行；`MATERIAL_PROCESS`、`UNDERWRITING`、`UNDERWRITING_CALLBACK` 不动 |
+| `t_claim_outbox_event.payload`（JSON 文本） | `"applicationNo"`、`"applicationAttempt"` 键 | `"claimApplicationNo"`、`"claimApplicationAttempt"` | 仅对未投递成功的行做键名替换，已 `PUBLISHED` 的行作为历史留档不改写 |
+
+在途消息处理：改名窗口内不得残留旧键名的待投递与待消费消息，验证前用一次性查询确认 `status <> 'PUBLISHED'` 的行数为 0 或已全部改写。
+
+`RedisMySqlApplicationNoGenerator` 的编号前缀常量 `APPLICATION_NO_PREFIX`（值为 `"A"`）是内部标识符，随 N2 改名为 `CLAIM_APPLICATION_NO_PREFIX`，编号值本身不变。
+
 ### 4.2 对外字段与路径
 
 | 位置 | 现名 | 新名 | 影响方 |

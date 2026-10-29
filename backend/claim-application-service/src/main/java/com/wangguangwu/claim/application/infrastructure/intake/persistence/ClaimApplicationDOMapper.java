@@ -10,5 +10,5 @@ import org.apache.ibatis.annotations.Mapper;
  * @since 2026-10-27
  */
 @Mapper
-public interface ApplicationDOMapper extends BaseMapper<ApplicationDO> {
+public interface ClaimApplicationDOMapper extends BaseMapper<ClaimApplicationDO> {
 }

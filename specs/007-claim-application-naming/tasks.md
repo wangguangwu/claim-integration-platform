@@ -15,7 +15,7 @@
 
 | 编号 | 任务 | 产物 | 完成条件 |
 |---|---|---|---|
-| N5 | 列与索引改名及本地卷迁移 | `deploy/mysql/init/02-application-schema.sql` 新列名与新索引名；一次性 `ALTER TABLE ... RENAME COLUMN` 脚本 | init 脚本与运行库 `information_schema` 列名集合一致；`application_no` 系列列命中 0；迁移前后各表行数与抽查主键一致；生成列表达式与索引覆盖列顺序不变 |
+| N5 | 列与索引改名及本地卷数据迁移 | `deploy/mysql/init/02-application-schema.sql` 新列名与新索引名；一次性 `ALTER TABLE ... RENAME COLUMN` 脚本 + 入库枚举值与载荷键的 `UPDATE` 脚本 | init 脚本与运行库 `information_schema` 列名集合一致；`application_no` 系列列命中 0；迁移前后各表行数与抽查主键一致；生成列表达式与索引覆盖列顺序不变；`event_type` 与 `interaction_type` 无旧值残留，未投递成功行的载荷键为新名 |
 | N6 | 文档、脚本与历史 Spec 同步 | 集成契约文档（含 breaking 标注）、`docs/testing` 3 篇、`docs/architecture` 相关页、`scripts/jmeter/*.jmx` 的 JSONPath、specs 002/003/004/006 被触及条目 | 文档字段名、列名、路径与 design §三/§四 映射表逐条一致；002 信封冻结注释与 006 边界条目改为指向 007；压测脚本断言取新键名 |
 
 ## 第 3 批 · 验证门

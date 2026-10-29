@@ -8,12 +8,12 @@
 
 ## 压测目标与安全边界
 
-脚本以租户调用方身份请求 `claim-gateway` 暴露的 `POST /api/application/v1/applications`，验证唯一外部申请号的并发创建吞吐和同一外部申请号的幂等控制。压测覆盖网关 TraceId 生成、租户请求头校验、路由转发和理赔申请服务响应，不直接调用数据库、Repository、MQ 或应用服务 `8081` 端口。仅允许使用本地环境和虚构数据，禁止指向生产、测试共享环境或真实个人信息环境。
+脚本以租户调用方身份请求 `claim-gateway` 暴露的 `POST /api/application/v1/claim-applications`，验证唯一外部申请号的并发创建吞吐和同一外部申请号的幂等控制。压测覆盖网关 TraceId 生成、租户请求头校验、路由转发和理赔申请服务响应，不直接调用数据库、Repository、MQ 或应用服务 `8081` 端口。仅允许使用本地环境和虚构数据，禁止指向生产、测试共享环境或真实个人信息环境。
 
 | 脚本 | 验证场景 | 默认负载 | 预期业务结果 |
 |---|---|---|---|
 | `application-intake-throughput.jmx` | 每次请求产生不同 `requestNo` | 10 线程，5 秒升压，每线程 10 次 | 全部返回 HTTP 200、`code=SUCCESS` 和 `X-Trace-Id` |
-| `application-intake-idempotency.jmx` | 所有线程提交相同 `requestNo` | 20 线程，1 秒升压，每线程 1 次 | 全部返回 HTTP 200、`code=SUCCESS` 和 `X-Trace-Id`；脚本提取并断言所有响应中的 `applicationNo` 一致 |
+| `application-intake-idempotency.jmx` | 所有线程提交相同 `requestNo` | 20 线程，1 秒升压，每线程 1 次 | 全部返回 HTTP 200、`code=SUCCESS` 和 `X-Trace-Id`；脚本提取并断言所有响应中的 `claimApplicationNo` 一致 |
 
 ## 前置准备
 

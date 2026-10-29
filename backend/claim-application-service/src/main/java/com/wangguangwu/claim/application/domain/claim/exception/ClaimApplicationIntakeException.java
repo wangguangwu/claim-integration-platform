@@ -6,9 +6,9 @@ package com.wangguangwu.claim.application.domain.claim.exception;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public class ApplicationIntakeException extends RuntimeException {
+public class ClaimApplicationIntakeException extends RuntimeException {
 
-    private final ApplicationIntakeErrorCode errorCode;
+    private final ClaimApplicationIntakeErrorCode errorCode;
 
     /**
      * 创建包含明确业务错误码的异常。
@@ -16,7 +16,7 @@ public class ApplicationIntakeException extends RuntimeException {
      * @param errorCode 错误码
      * @param message 面向调用方的错误说明，不得包含敏感请求字段
      */
-    public ApplicationIntakeException(ApplicationIntakeErrorCode errorCode, String message) {
+    public ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
@@ -28,7 +28,7 @@ public class ApplicationIntakeException extends RuntimeException {
      * @param message 面向调用方的错误说明，不得包含敏感请求字段
      * @param cause 原始异常
      */
-    public ApplicationIntakeException(ApplicationIntakeErrorCode errorCode, String message, Throwable cause) {
+    public ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode errorCode, String message, Throwable cause) {
         super(message, cause);
         this.errorCode = errorCode;
     }
@@ -39,8 +39,8 @@ public class ApplicationIntakeException extends RuntimeException {
      * @param message 面向调用方的错误说明，不得包含敏感请求字段
      * @return 业务异常
      */
-    public static ApplicationIntakeException invalid(String message) {
-        return new ApplicationIntakeException(ApplicationIntakeErrorCode.APPLICATION_INTAKE_INVALID, message);
+    public static ClaimApplicationIntakeException invalid(String message) {
+        return new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID, message);
     }
 
     /**
@@ -50,8 +50,8 @@ public class ApplicationIntakeException extends RuntimeException {
      * @param cause 原始异常
      * @return 业务异常
      */
-    public static ApplicationIntakeException invalid(String message, Throwable cause) {
-        return new ApplicationIntakeException(ApplicationIntakeErrorCode.APPLICATION_INTAKE_INVALID, message, cause);
+    public static ClaimApplicationIntakeException invalid(String message, Throwable cause) {
+        return new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID, message, cause);
     }
 
     /**
@@ -59,7 +59,7 @@ public class ApplicationIntakeException extends RuntimeException {
      *
      * @return 错误码
      */
-    public ApplicationIntakeErrorCode getErrorCode() {
+    public ClaimApplicationIntakeErrorCode getErrorCode() {
         return errorCode;
     }
 }

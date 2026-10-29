@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.integration.config;
 
-import com.wangguangwu.claim.application.domain.integration.compensation.ApplicationCompensationPolicy;
+import com.wangguangwu.claim.application.domain.integration.compensation.ClaimApplicationCompensationPolicy;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -17,9 +17,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @since 2026-10-27
  */
 @ConfigurationProperties(prefix = "claim.compensation")
-public record ApplicationCompensationProperties(
+public record ClaimApplicationCompensationProperties(
         int batchSize,
         Duration outboxSendingTimeout,
         Duration acceptedStallTimeout,
-        Duration underwritingTimeout) implements ApplicationCompensationPolicy {
+        Duration underwritingTimeout) implements ClaimApplicationCompensationPolicy {
 }

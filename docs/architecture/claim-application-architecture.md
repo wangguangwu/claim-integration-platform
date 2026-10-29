@@ -10,7 +10,7 @@
 
 设计目标：
 
-- 同步请求只确认平台已签收申请并返回 `applicationNo`，不等待材料、承保或审核等耗时处理。
+- 同步请求只确认平台已签收申请并返回 `claimApplicationNo`，不等待材料、承保或审核等耗时处理。
 - 租户协议差异只存在于适配层，核心业务只处理标准模型。
 - 通过状态机、唯一约束、Outbox、MQ 和补偿机制保证重复请求、异步通知与跨系统交互可恢复、可追踪。
 - 理赔申请与案件只建立关联；案件后续生命周期不属于本服务。
@@ -37,7 +37,7 @@
 | 职责 | 说明 |
 | --- | --- |
 | 统一接入 | 接收不同租户协议，完成验签、解密、解析、校验、映射和响应转换。 |
-| 申请受理 | 使用 `tenantCode + externalApplicationNo` 确认唯一性，创建或重置理赔申请。 |
+| 申请受理 | 使用 `tenantCode + externalClaimApplicationNo` 确认唯一性，创建或重置理赔申请。 |
 | 材料管理 | 管理首次材料与补材批次，保留软删除材料的审计轨迹。 |
 | 承保协同 | 查询有效保单；无保单时发起自动承保并等待完成通知。 |
 | 审核协同 | 提交审核申请，接收一次性返回全部案件的审核签收回调。 |
@@ -121,7 +121,7 @@ flowchart TB
 
 | 交互 | 发起方 | 处理方式 | 业务含义 |
 | --- | --- | --- | --- |
-| 理赔申请提交 | 租户系统 | 同步 | 完成校验、幂等、理赔申请落库并返回 `applicationNo`。 |
+| 理赔申请提交 | 租户系统 | 同步 | 完成校验、幂等、理赔申请落库并返回 `claimApplicationNo`。 |
 | 材料处理 | 理赔申请| 异步 | 材料处理完成后推进承保确认。 |
 | 自动承保完成通知 | 承保系统 | 异步 | 无有效保单时进入 `UNDERWRITING`，通知后推进审核交付。 |
 | 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，建立关联后完成理赔申请。 |
@@ -134,10 +134,10 @@ flowchart TB
 
 | 对象 | 职责 | 关键约束 |
 | --- | --- | --- |
-| `ClaimApplication` | 申请聚合根，持有生命周期状态、外部申请号和人员信息。 | `(tenantCode, externalApplicationNo)` 唯一。 |
+| `ClaimApplication` | 申请聚合根，持有生命周期状态、外部申请号和人员信息。 | `(tenantCode, externalClaimApplicationNo)` 唯一。 |
 | `Material` | 首次材料和补材记录。 | 使用 `batchNo` 区分材料批次；重新申请时旧材料软删除。 |
 | `Issue` | 审核系统下发的问题件。 | 同一理赔申请同时只允许一条未关闭记录。 |
-| `CaseRelation` | 理赔申请与审核签收返回案件的关联。 | `(tenantCode, applicationNo, caseNo)` 唯一。 |
+| `CaseRelation` | 理赔申请与审核签收返回案件的关联。 | `(tenantCode, claimApplicationNo, caseNo)` 唯一。 |
 | `InteractionLog` | 外部系统调用、通知和回调的处理轨迹。 | 记录必要业务标识与结果，不记录完整敏感信息。 |
 | `OutboxEvent` | 与本地业务数据同事务持久化的待投递事件。 | `eventId` 唯一，按事件和理赔申请幂等消费。 |
 
@@ -154,8 +154,8 @@ erDiagram
     APPLICATION {
         bigint id
         varchar tenant_code
-        varchar application_no
-        varchar external_application_no
+        varchar claim_application_no
+        varchar external_claim_application_no
         varchar status
         json applicant_json
         json primary_insured_json
@@ -165,7 +165,7 @@ erDiagram
 
     MATERIAL {
         bigint id
-        varchar application_no
+        varchar claim_application_no
         varchar batch_no
         varchar material_type
         varchar status
@@ -174,7 +174,7 @@ erDiagram
 
     ISSUE {
         bigint id
-        varchar application_no
+        varchar claim_application_no
         varchar issue_no
         varchar status
         boolean open
@@ -183,13 +183,13 @@ erDiagram
     CASE_RELATION {
         bigint id
         varchar tenant_code
-        varchar application_no
+        varchar claim_application_no
         varchar case_no
     }
 
     INTERACTION_LOG {
         bigint id
-        varchar application_no
+        varchar claim_application_no
         varchar interaction_type
         varchar target_system
     }
@@ -197,7 +197,7 @@ erDiagram
     OUTBOX_EVENT {
         bigint id
         varchar event_id
-        varchar application_no
+        varchar claim_application_no
         varchar event_type
         varchar status
     }
@@ -207,21 +207,21 @@ erDiagram
 
 - 理赔申请使用 `applicantJson`、`primaryInsuredJson`、`accidentPersonJson`、`payeeJson` 四个 JSON 字段分别保存申请人、主被保险人、出险人和领款人，避免角色数据相互覆盖。
 - 每个 JSON 字段必须有明确的版本和必填字段约束；租户转换器负责外部字段映射，领域模型只接收标准化数据。
-- 证件号、银行卡号等敏感字段不得写入 INFO、WARN 和 ERROR 日志；日志仅记录脱敏值及 `applicationNo`、租户和 TraceId。
+- 证件号、银行卡号等敏感字段不得写入 INFO、WARN 和 ERROR 日志；日志仅记录脱敏值及 `claimApplicationNo`、租户和 TraceId。
 - 首次提交和每次补材分别创建新的 `batchNo`。材料软删除只用于重新申请覆盖旧材料，不物理删除审计数据。
 
 ### 数据约束与幂等基础
 
-- 理赔申请主表唯一约束：`tenantCode + externalApplicationNo`。
+- 理赔申请主表唯一约束：`tenantCode + externalClaimApplicationNo`。
 - 同一理赔申请可以有多条历史 Issue，但同时只能有一条 `open = true` 的 Issue。
-- CaseRelation 唯一约束：`tenantCode + applicationNo + caseNo`。
-- OutboxEvent 以 `eventId` 唯一；消费者以事件标识和 `applicationNo` 防止重复处理。
+- CaseRelation 唯一约束：`tenantCode + claimApplicationNo + caseNo`。
+- OutboxEvent 以 `eventId` 唯一；消费者以事件标识和 `claimApplicationNo` 防止重复处理。
 
 ## 主状态机设计
 
 ### 状态定义
 
-当前实现覆盖签收、材料处理与承保分流，`ApplicationStatus` 只保留这五个状态：
+当前实现覆盖签收、材料处理与承保分流，`ClaimApplicationStatus` 只保留这五个状态：
 
 | 状态 | 业务含义 |
 | --- | --- |
@@ -233,7 +233,7 @@ erDiagram
 
 审核能力落地后才引入 `ISSUE`（审核下发问题件，等待租户补材）、`COMPLETED`（审核签收完成，已建立全部案件关联）与 `REVOKED`（撤销完成，理赔申请的唯一生命周期终态）。006 整改已删除这三个尚未启用的枚举值，实现审核与撤销时按目标态迁移表重新加入。
 
-`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `applicationNo` 并开始新的申请尝试。
+`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `claimApplicationNo` 并开始新的申请尝试。
 
 ```mermaid
 stateDiagram-v2
@@ -253,7 +253,7 @@ stateDiagram-v2
 状态推进规则：
 
 - 异步通知只能在理赔申请当前状态符合预期时推进状态；迟到通知、重复通知和已撤销理赔申请的通知只记录交互轨迹，不改变状态。
-- `COMPLETED` 后允许撤销，但只有审核系统按 `applicationNo` 确认可撤销、锁定并撤销成功后才进入 `REVOKED`。
+- `COMPLETED` 后允许撤销，但只有审核系统按 `claimApplicationNo` 确认可撤销、锁定并撤销成功后才进入 `REVOKED`。
 - 理赔申请进入 `REVOKED` 后，审核签收、问题件、材料和承保通知都不能再次推进生命周期。
 
 ## 核心链路设计
@@ -266,41 +266,41 @@ sequenceDiagram
     participant T as 租户系统
     participant G as Gateway
     participant A as TenantPipeline
-    participant U as ApplicationUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant DB as MySQL
 
     T->>G: 提交理赔申请
     G->>A: 转发租户请求
     A->>A: 验签、解密、解析、校验、转换
     A->>U: ClaimApplication
-    U->>DB: 按 tenantCode 与 externalApplicationNo 查询
+    U->>DB: 按 tenantCode 与 externalClaimApplicationNo 查询
 
     alt 首次申请
-        U->>DB: 生成 applicationNo，创建理赔申请与 Material
-        U->>DB: 同事务写入 ApplicationCreated OutboxEvent
+        U->>DB: 生成 claimApplicationNo，创建理赔申请与 Material
+        U->>DB: 同事务写入 CLAIM_APPLICATION_CREATED OutboxEvent
     else 已存在且状态为 ACCEPT_FAILED
         U->>DB: 软删除旧 Material，覆盖当前申请内容
-        U->>DB: 复用 applicationNo，状态重置为 PENDING_ACCEPT
-        U->>DB: 同事务写入 ApplicationReapplied OutboxEvent
+        U->>DB: 复用 claimApplicationNo，状态重置为 PENDING_ACCEPT
+        U->>DB: 同事务写入 CLAIM_APPLICATION_REAPPLIED OutboxEvent
     else 非失败状态的重复请求
-        DB-->>U: 返回既有 applicationNo
+        DB-->>U: 返回既有 claimApplicationNo
     end
 
-    U-->>A: applicationNo
+    U-->>A: claimApplicationNo
     A-->>G: 租户协议响应
     G-->>T: 返回受理结果
 ```
 
-- 首次请求创建理赔申请并返回新 `applicationNo`。
-- `ACCEPT_FAILED` 后的重新申请沿用原 `applicationNo`，覆盖当前申请内容，旧 Material 软删除，历史失败原因和交互记录保留。
-- 除 `ACCEPT_FAILED` 外，重复请求不覆盖数据，只返回既有 `applicationNo`。
+- 首次请求创建理赔申请并返回新 `claimApplicationNo`。
+- `ACCEPT_FAILED` 后的重新申请沿用原 `claimApplicationNo`，覆盖当前申请内容，旧 Material 软删除，历史失败原因和交互记录保留。
+- 除 `ACCEPT_FAILED` 外，重复请求不覆盖数据，只返回既有 `claimApplicationNo`。
 
 ### 材料处理与承保确认
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as ApplicationUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant M as Material
     participant F as 文件系统
     participant I as 承保系统
@@ -338,7 +338,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as ApplicationUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant A as 审核系统
     participant CR as CaseRelation
 
@@ -356,7 +356,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant A as 审核系统
-    participant U as ApplicationUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant I as Issue
     participant T as 租户系统
     participant M as Material
@@ -383,7 +383,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant T as 租户系统
-    participant U as ApplicationUseCase
+    participant U as ClaimApplicationIntakeUseCase
     participant A as 审核系统
 
     T->>U: 撤销理赔申请
@@ -392,7 +392,7 @@ sequenceDiagram
     alt 未完成审核签收
         U->>U: 状态变更为 REVOKED
     else 已完成审核签收
-        U->>A: 按 applicationNo 查询是否可撤销
+        U->>A: 按 claimApplicationNo 查询是否可撤销
         A->>A: 锁定理赔申请
         A-->>U: 返回可撤销
         U->>A: 发起理赔申请撤销
@@ -411,7 +411,7 @@ sequenceDiagram
 
 - 理赔申请主表的唯一约束确保同一租户相同外部申请号不会创建多条主记录。
 - 创建、重复请求判断、重新申请重置和 Outbox 写入必须在同一事务内完成。
-- 非失败状态下的重复请求直接返回既有 `applicationNo`。
+- 非失败状态下的重复请求直接返回既有 `claimApplicationNo`。
 - 重新申请只允许在 `ACCEPT_FAILED` 发生；并发重新申请通过主记录锁或条件更新保证只有一次状态重置生效。
 
 ### 回调与事件幂等
@@ -438,7 +438,7 @@ flowchart LR
 
 - 状态变更、InteractionLog 与 OutboxEvent 同事务提交，避免业务数据成功但异步流程未触发。
 - 投递器只投递已提交的 OutboxEvent；投递失败的事件保留并由补偿任务重试。
-- 消费者按照 `eventId` 和 `applicationNo` 幂等处理；至少一次投递不会造成重复数据或重复状态推进。
+- 消费者按照 `eventId` 和 `claimApplicationNo` 幂等处理；至少一次投递不会造成重复数据或重复状态推进。
 - 承保完成通知缺失时，补偿任务查询承保结果，不将理赔申请标记为自动承保失败。
 - 已撤销或状态不匹配的理赔申请收到迟到事件时，只记录交互轨迹，不触发业务补偿。
 
@@ -446,21 +446,21 @@ flowchart LR
 
 ### 异常处理
 
-- 业务校验失败、状态不允许迁移、唯一约束冲突和外部系统拒绝必须返回统一业务异常，并携带必要的 `applicationNo`、租户或外部申请号上下文。
+- 业务校验失败、状态不允许迁移、唯一约束冲突和外部系统拒绝必须返回统一业务异常，并携带必要的 `claimApplicationNo`、租户或外部申请号上下文。
 - 不捕获异常后继续执行，不吞掉外部系统、MQ 或数据库异常。
 - 自动承保的完成通知缺失不产生业务失败状态，由补偿查询恢复；查询结果未得到前保持 `UNDERWRITING`。
 - 审核撤销失败时保持 `COMPLETED`，不修改 CaseRelation，也不将理赔申请标记为已撤销。
 
 ### 日志与追踪
 
-- 关键日志至少包含 `traceId`、`tenantCode`、`applicationNo`、外部申请号的脱敏值和当前状态。
+- 关键日志至少包含 `traceId`、`tenantCode`、`claimApplicationNo`、外部申请号的脱敏值和当前状态。
 - InteractionLog 记录外部系统名称、交互类型、请求时间、结果和错误上下文，用于前端查询与故障诊断。
 - 禁止记录 Token、密钥、完整证件号、银行卡号以及四个人员 JSON 的完整内容。
 - 循环重试不大量输出 INFO 日志；同一异常由责任边界记录一次，避免重复打印堆栈。
 
 ## 对现有功能的影响
 
-- 总架构中的理赔申请核心编号统一为 `applicationNo`，案件使用 `sourceApplicationNo` 追溯来源申请。
+- 总架构中的理赔申请核心编号统一为 `claimApplicationNo`，案件使用 `sourceClaimApplicationNo` 追溯来源申请。
 - `claim-gateway` 的职责保持不变；租户协议适配仍由理赔申请服务承担。
 - 当前变更只定义理赔申请业务域架构与后续实现约束，不改变案件、AI、文件、承保或审核系统的内部业务实现。
 - 后续代码、数据库变更和测试必须以本文档的状态机、数据约束、幂等规则和异步一致性方案为准。

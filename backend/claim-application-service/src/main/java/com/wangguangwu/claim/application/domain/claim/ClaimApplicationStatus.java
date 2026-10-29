@@ -8,7 +8,7 @@ package com.wangguangwu.claim.application.domain.claim;
  * @author wangguangwu
  * @since 2026-10-27
  */
-public enum ApplicationStatus {
+public enum ClaimApplicationStatus {
 
     PENDING_ACCEPT,
     ACCEPTED,

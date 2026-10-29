@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  * @param eventId      事件标识，全局唯一
  * @param eventType    事件类型
  * @param eventVersion 事件版本
- * @param applicationNo 平台申请编号
+ * @param claimApplicationNo 平台申请编号
  * @param tenantCode   租户编码
  * @param payload      不含敏感信息的业务载荷
  * @param status       投递状态
@@ -22,7 +22,7 @@ public record OutboxEvent(
         String eventId,
         String eventType,
         int eventVersion,
-        String applicationNo,
+        String claimApplicationNo,
         String tenantCode,
         String payload,
         OutboxEventStatus status,
@@ -36,14 +36,14 @@ public record OutboxEvent(
      * @param eventId        事件标识
      * @param eventType      事件类型
      * @param eventVersion   事件版本
-     * @param applicationNo  平台申请编号
+     * @param claimApplicationNo  平台申请编号
      * @param tenantCode     租户编码
      * @param payload        业务载荷
      * @return 待投递事件
      */
-    public static OutboxEvent pending(String eventId, String eventType, int eventVersion, String applicationNo,
+    public static OutboxEvent pending(String eventId, String eventType, int eventVersion, String claimApplicationNo,
                                       String tenantCode, String payload) {
-        return new OutboxEvent(eventId, eventType, eventVersion, applicationNo, tenantCode, payload,
+        return new OutboxEvent(eventId, eventType, eventVersion, claimApplicationNo, tenantCode, payload,
                 OutboxEventStatus.PENDING, null, null, null);
     }
 }

@@ -16,9 +16,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @ConfigurationPropertiesScan
 @EnableFeignClients
 @EnableScheduling
-public class ApplicationServiceApplication {
+public class ClaimApplicationServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ApplicationServiceApplication.class, args);
+        SpringApplication.run(ClaimApplicationServiceApplication.class, args);
     }
 }

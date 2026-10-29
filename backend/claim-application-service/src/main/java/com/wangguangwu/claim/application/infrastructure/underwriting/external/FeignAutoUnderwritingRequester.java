@@ -19,14 +19,14 @@ public class FeignAutoUnderwritingRequester implements AutoUnderwritingRequester
     /**
      * 按平台申请编号发起自动承保，外部系统保证重复发起幂等。
      *
-     * @param applicationNo        平台申请编号
+     * @param claimApplicationNo        平台申请编号
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
      */
     @Override
-    public void request(String applicationNo, String tenantCode, String insuredCertificateNo) {
+    public void request(String claimApplicationNo, String tenantCode, String insuredCertificateNo) {
         underwritingFeignClient.requestAutoUnderwriting(
-                new UnderwritingFeignClient.AutoUnderwritingRequest(applicationNo, tenantCode,
+                new UnderwritingFeignClient.AutoUnderwritingRequest(claimApplicationNo, tenantCode,
                         insuredCertificateNo));
     }
 }

@@ -38,8 +38,8 @@ public class ConsumedEventDO {
     private String eventId;
 
     /** 消息所属理赔申请的平台申请编号。 */
-    @TableField("application_no")
-    private String applicationNo;
+    @TableField("claim_application_no")
+    private String claimApplicationNo;
 
     /** 消费业务处理成功的时间。 */
     @TableField("consumed_at")

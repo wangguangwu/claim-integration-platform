@@ -30,8 +30,8 @@ public class InteractionLogDO {
     private Long id;
 
     /** 所属理赔申请的平台申请编号。 */
-    @TableField("application_no")
-    private String applicationNo;
+    @TableField("claim_application_no")
+    private String claimApplicationNo;
 
     /** 一次交互行为的聚合编号，可关联开始、完成或失败事件。 */
     @TableField("interaction_no")

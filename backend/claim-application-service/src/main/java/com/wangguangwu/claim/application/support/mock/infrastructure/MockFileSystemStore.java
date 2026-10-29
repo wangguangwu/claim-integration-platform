@@ -42,7 +42,7 @@ public class MockFileSystemStore {
     public UploadOutcome upload(MockUploadCommand command) {
         applyDelay();
         if (shouldReject(command.materialType())) {
-            log.info("模拟文件系统拒绝上传，applicationNo={}，materialType={}", command.applicationNo(),
+            log.info("模拟文件系统拒绝上传，claimApplicationNo={}，materialType={}", command.claimApplicationNo(),
                     command.materialType());
             return UploadOutcome.rejected(REJECTED_ERROR_CODE, REJECTED_ERROR_MESSAGE);
         }
@@ -68,9 +68,9 @@ public class MockFileSystemStore {
     }
 
     private UploadRecord newUploadRecord(MockUploadCommand command) {
-        String uploadedFileUrl = UPLOADED_FILE_URL_TEMPLATE.formatted(command.applicationNo(), command.batchNo(),
+        String uploadedFileUrl = UPLOADED_FILE_URL_TEMPLATE.formatted(command.claimApplicationNo(), command.batchNo(),
                 command.materialType());
-        return new UploadRecord(UUID.randomUUID().toString(), command.applicationNo(), command.batchNo(),
+        return new UploadRecord(UUID.randomUUID().toString(), command.claimApplicationNo(), command.batchNo(),
                 command.materialType(), uploadedFileUrl, LocalDateTime.now(BUSINESS_ZONE_ID));
     }
 
@@ -93,25 +93,25 @@ public class MockFileSystemStore {
     /**
      * 模拟上传命令。
      *
-     * @param applicationNo 平台申请编号
+     * @param claimApplicationNo 平台申请编号
      * @param batchNo       材料批次编号
      * @param materialType  材料类型
      * @param sourceUrl     租户提交的初始文件地址
      */
-    public record MockUploadCommand(String applicationNo, String batchNo, String materialType, String sourceUrl) {
+    public record MockUploadCommand(String claimApplicationNo, String batchNo, String materialType, String sourceUrl) {
     }
 
     /**
      * 模拟上传记录。
      *
      * @param fileId          文件标识
-     * @param applicationNo   平台申请编号
+     * @param claimApplicationNo   平台申请编号
      * @param batchNo         材料批次编号
      * @param materialType    材料类型
      * @param uploadedFileUrl 模拟上传地址
      * @param registeredAt    登记时间
      */
-    public record UploadRecord(String fileId, String applicationNo, String batchNo, String materialType,
+    public record UploadRecord(String fileId, String claimApplicationNo, String batchNo, String materialType,
                                String uploadedFileUrl, LocalDateTime registeredAt) {
     }
 

@@ -77,14 +77,14 @@ erDiagram
     APPLICATION {
         bigint id PK
         varchar tenant_code
-        varchar application_no UK
-        varchar external_application_no
+        varchar claim_application_no UK
+        varchar external_claim_application_no
         varchar status
-        int application_attempt
+        int claim_application_attempt
     }
     MATERIAL {
         bigint id PK
-        varchar application_no
+        varchar claim_application_no
         varchar batch_no
         varchar material_type
         varchar original_file_url
@@ -93,7 +93,7 @@ erDiagram
     }
     ISSUE {
         bigint id PK
-        varchar application_no
+        varchar claim_application_no
         varchar issue_no
         varchar reason
         varchar auditor
@@ -102,12 +102,12 @@ erDiagram
     CASE_RELATION {
         bigint id PK
         varchar tenant_code
-        varchar application_no
+        varchar claim_application_no
         varchar case_no
     }
     INTERACTION_LOG {
         bigint id PK
-        varchar application_no
+        varchar claim_application_no
         varchar interaction_no
         varchar interaction_type
         varchar action
@@ -119,7 +119,7 @@ erDiagram
         bigint id PK
         varchar event_id UK
         varchar event_type
-        varchar application_no
+        varchar claim_application_no
         varchar status
     }
     CONSUMED_EVENT {
@@ -152,10 +152,10 @@ USE claim_application_db;
 CREATE TABLE IF NOT EXISTS t_claim_application (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
-    application_no VARCHAR(64) NOT NULL,
-    external_application_no VARCHAR(128) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
+    external_claim_application_no VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL,
-    application_attempt INT UNSIGNED NOT NULL DEFAULT 1,
+    claim_application_attempt INT UNSIGNED NOT NULL DEFAULT 1,
     applicant_json JSON NULL,
     primary_insured_json JSON NULL,
     accident_person_json JSON NULL,
@@ -163,14 +163,14 @@ CREATE TABLE IF NOT EXISTS t_claim_application (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_application_no (application_no),
-    UNIQUE KEY uk_tenant_external_application (tenant_code, external_application_no),
-    KEY idx_application_status_updated_at (status, updated_at)
+    UNIQUE KEY uk_claim_application_no (claim_application_no),
+    UNIQUE KEY uk_tenant_external_claim_application (tenant_code, external_claim_application_no),
+    KEY idx_claim_application_status_updated_at (status, updated_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS t_claim_application_material (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     batch_no VARCHAR(64) NOT NULL,
     material_type VARCHAR(64) NOT NULL,
     original_file_url VARCHAR(1024) NOT NULL,
@@ -181,46 +181,46 @@ CREATE TABLE IF NOT EXISTS t_claim_application_material (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    KEY idx_material_application_batch (application_no, batch_no),
-    KEY idx_material_application_deleted (application_no, deleted)
+    KEY idx_material_claim_application_batch (claim_application_no, batch_no),
+    KEY idx_material_claim_application_deleted (claim_application_no, deleted)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS t_claim_application_issue (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     issue_no VARCHAR(64) NOT NULL,
     reason VARCHAR(512) NOT NULL,
     auditor VARCHAR(128) NOT NULL,
     issue_content_json JSON NOT NULL,
     status VARCHAR(32) NOT NULL,
     is_open TINYINT(1) NOT NULL DEFAULT 1,
-    open_application_no VARCHAR(64) GENERATED ALWAYS AS (
-        CASE WHEN is_open = 1 THEN application_no ELSE NULL END
+    open_claim_application_no VARCHAR(64) GENERATED ALWAYS AS (
+        CASE WHEN is_open = 1 THEN claim_application_no ELSE NULL END
     ) STORED,
     closed_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE KEY uk_issue_no (issue_no),
-    UNIQUE KEY uk_open_issue_application (open_application_no),
-    KEY idx_issue_application_created_at (application_no, created_at)
+    UNIQUE KEY uk_open_issue_claim_application (open_claim_application_no),
+    KEY idx_issue_claim_application_created_at (claim_application_no, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS t_claim_case_relation (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tenant_code VARCHAR(64) NOT NULL,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     case_no VARCHAR(64) NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_tenant_application_case (tenant_code, application_no, case_no),
-    KEY idx_case_relation_application (application_no)
+    UNIQUE KEY uk_tenant_claim_application_case (tenant_code, claim_application_no, case_no),
+    KEY idx_case_relation_claim_application (claim_application_no)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS t_claim_interaction_log (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     interaction_no VARCHAR(64) NOT NULL,
     interaction_type VARCHAR(64) NOT NULL,
     action VARCHAR(32) NOT NULL,
@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS t_claim_interaction_log (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    KEY idx_interaction_application_occurred_at (application_no, occurred_at),
+    KEY idx_interaction_claim_application_occurred_at (claim_application_no, occurred_at),
     KEY idx_interaction_group_occurred_at (interaction_no, occurred_at),
     KEY idx_interaction_request_id (request_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS t_claim_outbox_event (
     event_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     event_version INT UNSIGNED NOT NULL DEFAULT 1,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     tenant_code VARCHAR(64) NOT NULL,
     payload JSON NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -257,30 +257,30 @@ CREATE TABLE IF NOT EXISTS t_claim_outbox_event (
     PRIMARY KEY (id),
     UNIQUE KEY uk_outbox_event_id (event_id),
     KEY idx_outbox_status_next_retry_at (status, next_retry_at),
-    KEY idx_outbox_application_created_at (application_no, created_at)
+    KEY idx_outbox_claim_application_created_at (claim_application_no, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     consumer_group VARCHAR(128) NOT NULL,
     event_id VARCHAR(64) NOT NULL,
-    application_no VARCHAR(64) NOT NULL,
+    claim_application_no VARCHAR(64) NOT NULL,
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE KEY uk_consumed_event (consumer_group, event_id),
-    KEY idx_consumed_application (application_no)
+    KEY idx_consumed_claim_application (claim_application_no)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 ```
 
-`t_claim_application_material.original_file_url` 保存租户首次提交的文件地址，`t_claim_application_material.uploaded_file_url` 保存文件系统上传、转存后的地址。`t_claim_application_issue.reason` 和 `t_claim_application_issue.auditor` 分别保存问题原因和下发问题件的审核人。`t_claim_interaction_log` 使用一行记录一个已发生的事件：`interaction_no` 是同一行为组的关联键，`interaction_type` 表示行为类型，例如 `IMAGE_UPLOAD`，`action` 表示阶段，例如 `STARTED`、`COMPLETED`、`FAILED`，`occurred_at` 表示该事件的实际发生时间。一次影像上传的开始与完成应写入两行日志，使用同一 `interaction_no`，按 `occurred_at` 排序后还原完整行为。`t_claim_application_issue.open_application_no` 使用生成列和唯一索引表达“一个理赔申请同时只允许一条未关闭 Issue”；关闭 Issue 后该列为 `NULL`，允许保留多条历史关闭记录。
+`t_claim_application_material.original_file_url` 保存租户首次提交的文件地址，`t_claim_application_material.uploaded_file_url` 保存文件系统上传、转存后的地址。`t_claim_application_issue.reason` 和 `t_claim_application_issue.auditor` 分别保存问题原因和下发问题件的审核人。`t_claim_interaction_log` 使用一行记录一个已发生的事件：`interaction_no` 是同一行为组的关联键，`interaction_type` 表示行为类型，例如 `IMAGE_UPLOAD`，`action` 表示阶段，例如 `STARTED`、`COMPLETED`、`FAILED`，`occurred_at` 表示该事件的实际发生时间。一次影像上传的开始与完成应写入两行日志，使用同一 `interaction_no`，按 `occurred_at` 排序后还原完整行为。`t_claim_application_issue.open_claim_application_no` 使用生成列和唯一索引表达“一个理赔申请同时只允许一条未关闭 Issue”；关闭 Issue 后该列为 `NULL`，允许保留多条历史关闭记录。
 
 ## MQ 契约设计
 
 | Topic | 事件类型 | 生产条件 | 消费者组 | 消费职责 |
 |---|---|---|---|---|
-| `claim_application_material_process_v1` | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | 理赔申请签收或重新申请的本地事务提交后 | `claim-application-material-processor-v1` | 异步处理指定申请的材料 |
+| `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | 理赔申请签收或重新申请的本地事务提交后 | `claim-application-material-processor-v1` | 异步处理指定申请的材料 |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | 理赔申请已进入 `WAIT_AUDIT` 的本地事务提交后 | `claim-application-audit-delivery-v1` | 向审核系统交付申请 |
 
 所有 Topic 配置 8 个读队列、8 个写队列，消息保留 72 小时。后续如需调整吞吐、保留时间或死信策略，必须先修改本 Spec。
@@ -290,9 +290,9 @@ CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
 ```json
 {
   "eventId": "019a9c8c-4d02-7d19-9f16-32d447d4ee66",
-  "eventType": "APPLICATION_CREATED",
+  "eventType": "CLAIM_APPLICATION_CREATED",
   "eventVersion": 1,
-  "applicationNo": "AP202610270001",
+  "claimApplicationNo": "AP202610270001",
   "tenantCode": "tenant-a",
   "occurredAt": "2026-10-27T10:00:00+08:00",
   "traceId": "5bba2a7f468c4efe",
@@ -300,7 +300,9 @@ CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
 }
 ```
 
-`payload` 只承载该事件必要的非敏感业务数据。需要人员信息或材料明细时，消费者以 `applicationNo` 读取理赔申请私有库，不在 MQ 中广播完整人员 JSON、证件号和银行卡号。
+`payload` 只承载该事件必要的非敏感业务数据。需要人员信息或材料明细时，消费者以 `claimApplicationNo` 读取理赔申请私有库，不在 MQ 中广播完整人员 JSON、证件号和银行卡号。
+
+本段信封与事件类型字段名已在 007「理赔申请命名全链路收敛」中随业务对象统一改名，字段级映射表以 007 design §四 为准；本节只固化信封结构与 Topic 配置，不再单独持有命名基线。
 
 ## HTTP 契约设计
 
@@ -315,12 +317,12 @@ CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
 
 | 接口 | 方法 | 用途 | 业务关联字段 |
 |---|---|---|---|
-| `/api/application/v1/applications` | `POST` | 租户提交理赔申请| `externalApplicationNo` |
-| `/api/application/v1/applications/{applicationNo}/materials` | `POST` | 租户提交补充材料 | `applicationNo`、`batchNo` |
-| `/api/application/v1/applications/{applicationNo}/revoke` | `POST` | 租户发起理赔申请撤销 | `applicationNo` |
-| `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统通知自动承保完成 | `applicationNo`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统通知签收及全部案件 | `applicationNo`、`caseNos`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统下发问题件 | `applicationNo`、`issueNo`、`X-Request-Id` |
+| `/api/application/v1/claim-applications` | `POST` | 租户提交理赔申请| `externalClaimApplicationNo` |
+| `/api/application/v1/claim-applications/{claimApplicationNo}/materials` | `POST` | 租户提交补充材料 | `claimApplicationNo`、`batchNo` |
+| `/api/application/v1/claim-applications/{claimApplicationNo}/revoke` | `POST` | 租户发起理赔申请撤销 | `claimApplicationNo` |
+| `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
+| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统通知签收及全部案件 | `claimApplicationNo`、`caseNos`、`X-Request-Id` |
+| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
 
 成功响应的公共信封固定如下：
 
@@ -350,7 +352,7 @@ CREATE TABLE IF NOT EXISTS t_claim_consumed_event (
 
 - `t_claim_application`、`t_claim_application_material`、`t_claim_application_issue`、`t_claim_case_relation`、`t_claim_interaction_log`、`t_claim_outbox_event` 的实际写入事务由后续用例 Spec 定义；本 Spec 通过唯一约束提供并发安全基础。
 - 任何事件处理都以 `eventId` 和消费者组在 `t_claim_consumed_event` 中去重；插入冲突代表已成功处理或正在处理，后续消费逻辑不得重复推进状态。
-- 回调以 `X-Request-Id` 结合 `applicationNo`、`issueNo` 或 `caseNo` 进行幂等；传输请求标识不替代业务唯一约束。InteractionLog 的开始、完成、失败分别作为独立事件落库，查询同一 `interaction_no` 可得到完整行为链路。
+- 回调以 `X-Request-Id` 结合 `claimApplicationNo`、`issueNo` 或 `caseNo` 进行幂等；传输请求标识不替代业务唯一约束。InteractionLog 的开始、完成、失败分别作为独立事件落库，查询同一 `interaction_no` 可得到完整行为链路。
 - Topic 初始化或数据库初始化失败必须直接失败并输出上下文；不得吞异常或伪造初始化成功。
 - DDL 禁止创建外键，避免理赔申请服务异步处理、逻辑删除和跨表演进被物理约束阻塞；关联完整性由领域规则和唯一约束保证。
 

@@ -1,11 +1,11 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
-import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncException;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
-import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
+import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,8 +24,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class UnderwritingCallbackUseCase {
 
-    private final ApplicationRepository applicationRepository;
-    private final ApplicationLifecycleRecordFactory recordFactory;
+    private final ClaimApplicationRepository claimApplicationRepository;
+    private final ClaimApplicationLifecycleRecordFactory recordFactory;
     private final UnderwritingCallbackTransactionService transactionService;
 
     /**
@@ -36,22 +36,22 @@ public class UnderwritingCallbackUseCase {
      */
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command) {
         validate(command);
-        ClaimApplication application = applicationRepository.findByApplicationNo(command.applicationNo())
-                .orElseThrow(() -> new ApplicationAsyncException(ApplicationAsyncErrorCode.APPLICATION_NOT_FOUND,
-                        "承保完成通知对应的申请不存在，applicationNo=" + command.applicationNo()));
-        UnderwritingCallbackResult result = transactionService.complete(command, application,
+        ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
+                .orElseThrow(() -> new ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
+                        "承保完成通知对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
+        UnderwritingCallbackResult result = transactionService.complete(command, claimApplication,
                 recordFactory.newInteractionNo());
-        log.info("承保完成通知处理完成，applicationNo={}, disposition={}, traceId={}", command.applicationNo(),
+        log.info("承保完成通知处理完成，claimApplicationNo={}, disposition={}, traceId={}", command.claimApplicationNo(),
                 result.disposition(), command.traceId());
         return result;
     }
 
     private void validate(UnderwritingCompletedCommand command) {
-        if (isBlank(command.applicationNo())) {
-            throw new ApplicationAsyncException(ApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 applicationNo");
+        if (isBlank(command.claimApplicationNo())) {
+            throw new ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 claimApplicationNo");
         }
         if (isBlank(command.requestId())) {
-            throw new ApplicationAsyncException(ApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 X-Request-Id");
+            throw new ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 X-Request-Id");
         }
     }
 

@@ -13,9 +13,9 @@ public interface AutoUnderwritingRequester {
     /**
      * 发起自动承保。
      *
-     * @param applicationNo        平台申请编号
+     * @param claimApplicationNo        平台申请编号
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
      */
-    void request(String applicationNo, String tenantCode, String insuredCertificateNo);
+    void request(String claimApplicationNo, String tenantCode, String insuredCertificateNo);
 }
