@@ -4,9 +4,6 @@ import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository
 import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.domain.material.FileUploadResult;
 import com.wangguangwu.claim.application.domain.material.Material;
 import com.wangguangwu.claim.application.domain.material.port.MaterialFileProcessor;
@@ -26,6 +23,9 @@ import org.springframework.stereotype.Service;
 /**
  * 材料处理用例：校验事件与申请一致性、逐条处理材料并驱动承保分流。
  *
+ * <p>行为轨迹的开始与结束都由事务服务一次写入，用例本身不再单独登记开始事件，
+ * 避免外部调用中断后留下没有结束的轨迹。</p>
+ *
  * @author wangguangwu
  * @since 2026-10-27
  */
@@ -42,7 +42,6 @@ public class MaterialProcessingUseCase {
     private final MaterialFileProcessor materialFileProcessor;
     private final MaterialProcessingTransactionService transactionService;
     private final ApplicationLifecycleRecordFactory recordFactory;
-    private final InteractionLogRepository interactionLogRepository;
     private final UnderwritingUseCase underwritingUseCase;
 
     /**
@@ -63,7 +62,6 @@ public class MaterialProcessingUseCase {
                 .orElseThrow(() -> new IllegalStateException("材料处理事件对应的申请不存在，applicationNo="
                         + command.applicationNo()));
         String interactionNo = recordFactory.newInteractionNo();
-        recordInteraction(command, interactionNo, InteractionAction.STARTED, null, null);
         if (!isProcessable(application, command.applicationAttempt())) {
             log.info("材料处理事件与当前申请不匹配，按重复事件处理，applicationNo={}，status={}，eventAttempt={}",
                     command.applicationNo(), application.getStatus(), command.applicationAttempt());
@@ -107,12 +105,5 @@ public class MaterialProcessingUseCase {
         return materialRepository.findByApplicationNoAndDeletedFalse(applicationNo).stream()
                 .filter(material -> material.getStatus() == MaterialStatus.PENDING_PROCESS)
                 .toList();
-    }
-
-    private void recordInteraction(MaterialProcessCommand command, String interactionNo, InteractionAction action,
-                                   String errorCode, String errorMessage) {
-        interactionLogRepository.insert(recordFactory.interaction(InteractionType.MATERIAL_PROCESS,
-                command.applicationNo(), interactionNo, action, command.eventId(), command.traceId(), errorCode,
-                errorMessage));
     }
 }

@@ -27,7 +27,6 @@ import lombok.Builder;
  */
 @Builder
 public record ClaimApplicationIntakeCommand(
-
         String tenantCode,
         String externalApplicationNo,
         Applicant applicant,

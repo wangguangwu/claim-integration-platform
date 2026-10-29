@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage.TenantProtocolParser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * A 租户报文解析器，把请求正文反序列化为 {@link TenantAIntakeRequest}。
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
 @RequiredArgsConstructor
 public class TenantARequestParser implements TenantProtocolParser<TenantAIntakeRequest> {
 
@@ -28,7 +30,9 @@ public class TenantARequestParser implements TenantProtocolParser<TenantAIntakeR
         try {
             return objectMapper.readValue(rawPayload, TenantAIntakeRequest.class);
         } catch (JsonProcessingException exception) {
-            throw ApplicationIntakeException.invalid("租户申请报文不是合法的 A 租户协议 JSON");
+            // 只记录异常类型：报文原文含证件号，不允许进日志。
+            log.warn("A 租户申请报文解析失败，原因类型={}", exception.getClass().getSimpleName());
+            throw ApplicationIntakeException.invalid("租户申请报文不是合法的 A 租户协议 JSON", exception);
         }
     }
 }

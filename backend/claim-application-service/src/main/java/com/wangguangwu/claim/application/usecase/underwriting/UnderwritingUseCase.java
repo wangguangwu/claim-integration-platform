@@ -4,8 +4,6 @@ import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository
 import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
 import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
 import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
@@ -19,7 +17,8 @@ import org.springframework.stereotype.Service;
  * 承保分流用例：事务外查询有效保单，按结果推进到等待审核签收或自动承保。
  *
  * <p>保单查询与自动承保发起都在事务外执行，外部调用失败时保持申请原状态，
- * 由补偿任务按 `ACCEPTED` 或 `UNDERWRITING` 滞留重试。</p>
+ * 由补偿任务按 `ACCEPTED` 或 `UNDERWRITING` 滞留重试。两次调用的开始与结束轨迹都由
+ * 事务服务一次写入，调用中断时不会留下孤儿轨迹。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -37,7 +36,6 @@ public class UnderwritingUseCase {
     private final AutoUnderwritingRequester autoUnderwritingRequester;
     private final UnderwritingTransactionService transactionService;
     private final ApplicationLifecycleRecordFactory recordFactory;
-    private final InteractionLogRepository interactionLogRepository;
 
     /**
      * 对处于已受理状态的申请执行承保分流。
@@ -81,15 +79,15 @@ public class UnderwritingUseCase {
                                                           String traceId) {
         String applicationNo = application.getApplicationNo();
         String interactionNo = recordFactory.newInteractionNo();
-        recordInteraction(applicationNo, interactionNo, InteractionAction.STARTED, traceId, null, null);
         try {
             Optional<PolicySnapshot> policySnapshot = validPolicyQuery.findValidPolicy(application.getTenantCode(),
                     insuredCertificateNo);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
+            transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId,
+                    null, null);
             return Optional.of(new PolicyQueryOutcome(policySnapshot));
         } catch (RuntimeException exception) {
             log.warn("有效保单查询失败，申请保持已受理状态等待补偿，applicationNo={}", applicationNo, exception);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
+            transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     POLICY_QUERY_FAILED_CODE, exception.getMessage());
             return Optional.empty();
         }
@@ -98,21 +96,15 @@ public class UnderwritingUseCase {
     private void requestAutoUnderwriting(ClaimApplication application, String insuredCertificateNo, String traceId) {
         String applicationNo = application.getApplicationNo();
         String interactionNo = recordFactory.newInteractionNo();
-        recordInteraction(applicationNo, interactionNo, InteractionAction.STARTED, traceId, null, null);
         try {
             autoUnderwritingRequester.request(applicationNo, application.getTenantCode(), insuredCertificateNo);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
+            transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId,
+                    null, null);
         } catch (RuntimeException exception) {
             log.warn("自动承保请求失败，申请保持承保中状态等待补偿重发，applicationNo={}", applicationNo, exception);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
+            transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
         }
-    }
-
-    private void recordInteraction(String applicationNo, String interactionNo, InteractionAction action, String traceId,
-                                   String errorCode, String errorMessage) {
-        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING, applicationNo,
-                interactionNo, action, null, traceId, errorCode, errorMessage));
     }
 
     /**

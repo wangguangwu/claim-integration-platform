@@ -9,7 +9,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>调度间隔由 {@code @Scheduled} 占位符直接读取，不经过领域策略端口。</p>
  *
- * @param fixedDelayMs         补偿调度间隔
  * @param batchSize            单次处理的申请条数
  * @param outboxSendingTimeout 发送中事件的滞留判定阈值
  * @param acceptedStallTimeout 已受理申请的分流滞留判定阈值
@@ -19,7 +18,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "claim.compensation")
 public record ApplicationCompensationProperties(
-        long fixedDelayMs,
         int batchSize,
         Duration outboxSendingTimeout,
         Duration acceptedStallTimeout,

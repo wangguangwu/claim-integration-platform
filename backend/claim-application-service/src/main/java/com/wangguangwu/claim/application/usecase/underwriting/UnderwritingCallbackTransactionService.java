@@ -31,10 +31,11 @@ public class UnderwritingCallbackTransactionService {
     private final ApplicationLifecycleRecordFactory recordFactory;
 
     /**
-     * 在同一事务中推进状态、写入审核交付事件与结束轨迹。
+     * 在同一事务中写入开始轨迹、推进状态、写入审核交付事件与结束轨迹。
      *
      * <p>申请不在自动承保中时按重复通知处理，只记录复用轨迹。条件更新影响行数为 0
-     * 说明并发通知已先推进状态，同样按重复处理。</p>
+     * 说明并发通知已先推进状态，同样按重复处理。开始与结束轨迹同事务落库，
+     * 事务回滚时不会留下没有结束的行为组。</p>
      *
      * @param command       承保完成通知命令；applicationNo 已通过校验
      * @param application   已存在的申请
@@ -44,6 +45,7 @@ public class UnderwritingCallbackTransactionService {
     @Transactional
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command, ClaimApplication application,
                                                String interactionNo) {
+        recordStarted(command, interactionNo);
         if (!application.isInStatus(ApplicationStatus.UNDERWRITING)) {
             recordFinished(command, interactionNo, InteractionAction.REUSED);
             return new UnderwritingCallbackResult(command.applicationNo(), UnderwritingCallbackDisposition.REUSED);
@@ -56,6 +58,12 @@ public class UnderwritingCallbackTransactionService {
         outboxEventRepository.insert(recordFactory.auditDeliveryRequestedEvent(application, command.traceId()));
         recordFinished(command, interactionNo, InteractionAction.COMPLETED);
         return new UnderwritingCallbackResult(command.applicationNo(), UnderwritingCallbackDisposition.COMPLETED);
+    }
+
+    private void recordStarted(UnderwritingCompletedCommand command, String interactionNo) {
+        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING_CALLBACK,
+                command.applicationNo(), interactionNo, InteractionAction.STARTED, command.requestId(),
+                command.traceId(), null, null));
     }
 
     private void recordFinished(UnderwritingCompletedCommand command, String interactionNo,

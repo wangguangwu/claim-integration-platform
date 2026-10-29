@@ -9,7 +9,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>调度间隔由 {@code @Scheduled} 占位符直接读取，不经过领域策略端口。</p>
  *
- * @param fixedDelayMs     两次投递调度的间隔
  * @param batchSize        单次投递处理的最大事件数
  * @param maxRetryCount    允许的最大投递次数，达到后置为失败
  * @param retryBaseSeconds 退避基准秒数
@@ -19,7 +18,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "claim.outbox.relay")
 public record OutboxRelayProperties(
-        long fixedDelayMs,
         int batchSize,
         int maxRetryCount,
         long retryBaseSeconds,

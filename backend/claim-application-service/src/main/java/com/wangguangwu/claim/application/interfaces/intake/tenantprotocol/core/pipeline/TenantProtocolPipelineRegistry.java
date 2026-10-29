@@ -42,6 +42,6 @@ public class TenantProtocolPipelineRegistry {
             throw new ApplicationIntakeException(ApplicationIntakeErrorCode.TENANT_PROTOCOL_AMBIGUOUS,
                     "租户申请协议流水线配置冲突");
         }
-        return matchedPipelines.getFirst();
+        return matchedPipelines.get(0);
     }
 }

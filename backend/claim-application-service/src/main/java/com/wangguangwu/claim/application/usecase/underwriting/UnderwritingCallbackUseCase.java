@@ -2,9 +2,6 @@ package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncException;
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
@@ -17,6 +14,8 @@ import org.springframework.stereotype.Service;
 /**
  * 承保完成通知用例，HTTP 回调与进程内模拟承保共用同一套幂等规则。
  *
+ * <p>开始与结束轨迹由事务服务一次写入，用例只负责校验与取申请。</p>
+ *
  * @author wangguangwu
  * @since 2026-10-27
  */
@@ -26,7 +25,6 @@ import org.springframework.stereotype.Service;
 public class UnderwritingCallbackUseCase {
 
     private final ApplicationRepository applicationRepository;
-    private final InteractionLogRepository interactionLogRepository;
     private final ApplicationLifecycleRecordFactory recordFactory;
     private final UnderwritingCallbackTransactionService transactionService;
 
@@ -41,11 +39,8 @@ public class UnderwritingCallbackUseCase {
         ClaimApplication application = applicationRepository.findByApplicationNo(command.applicationNo())
                 .orElseThrow(() -> new ApplicationAsyncException(ApplicationAsyncErrorCode.APPLICATION_NOT_FOUND,
                         "承保完成通知对应的申请不存在，applicationNo=" + command.applicationNo()));
-        String interactionNo = recordFactory.newInteractionNo();
-        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING_CALLBACK,
-                command.applicationNo(), interactionNo, InteractionAction.STARTED, command.requestId(),
-                command.traceId(), null, null));
-        UnderwritingCallbackResult result = transactionService.complete(command, application, interactionNo);
+        UnderwritingCallbackResult result = transactionService.complete(command, application,
+                recordFactory.newInteractionNo());
         log.info("承保完成通知处理完成，applicationNo={}, disposition={}, traceId={}", command.applicationNo(),
                 result.disposition(), command.traceId());
         return result;

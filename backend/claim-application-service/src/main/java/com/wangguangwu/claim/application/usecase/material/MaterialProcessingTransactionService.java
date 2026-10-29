@@ -52,6 +52,7 @@ public class MaterialProcessingTransactionService {
         if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.applicationNo())) {
             return MaterialProcessOutcome.SKIPPED;
         }
+        recordStarted(command, interactionNo);
         recordFinished(command, interactionNo, InteractionAction.REUSED, null, null);
         return MaterialProcessOutcome.REUSED;
     }
@@ -78,6 +79,7 @@ public class MaterialProcessingTransactionService {
         if (!consumedEventRepository.register(CONSUMER_GROUP, command.eventId(), command.applicationNo())) {
             return MaterialProcessOutcome.SKIPPED;
         }
+        recordStarted(command, interactionNo);
         for (Material material : materials) {
             if (!materialRepository.updateProcessResult(material)) {
                 log.warn("材料处理结果未写入，材料已不是待处理状态，applicationNo={}，materialType={}",
@@ -96,6 +98,12 @@ public class MaterialProcessingTransactionService {
         recordFinished(command, interactionNo, allSucceeded ? InteractionAction.COMPLETED : InteractionAction.FAILED,
                 errorCode, errorMessage);
         return allSucceeded ? MaterialProcessOutcome.ACCEPTED : MaterialProcessOutcome.ACCEPT_FAILED;
+    }
+
+    private void recordStarted(MaterialProcessCommand command, String interactionNo) {
+        interactionLogRepository.insert(recordFactory.interaction(InteractionType.MATERIAL_PROCESS,
+                command.applicationNo(), interactionNo, InteractionAction.STARTED, command.eventId(),
+                command.traceId(), null, null));
     }
 
     private void recordFinished(MaterialProcessCommand command, String interactionNo, InteractionAction action,

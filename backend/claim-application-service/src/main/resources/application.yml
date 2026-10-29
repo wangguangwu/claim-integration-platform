@@ -7,6 +7,14 @@ spring:
   profiles:
     default: local
   cloud:
+    nacos:
+      # 注册中心与配置中心开关默认开启，本地联调由 local 文档关闭。
+      discovery:
+        enabled: ${CLAIM_APPLICATION_NACOS_DISCOVERY_ENABLED:true}
+      config:
+        enabled: ${CLAIM_APPLICATION_NACOS_CONFIG_ENABLED:true}
+        import-check:
+          enabled: ${CLAIM_APPLICATION_NACOS_CONFIG_IMPORT_CHECK_ENABLED:true}
     openfeign:
       client:
         config:
@@ -14,32 +22,6 @@ spring:
             # 外部调用收紧超时，避免消费线程长时间占用。
             connect-timeout: 1000
             read-timeout: 2000
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      # Redis 是可降级依赖，就绪探针只看数据库，避免缓存故障摘除实例。
-      group:
-        readiness:
-          include: db
-
----
-spring:
-  config:
-    activate:
-      on-profile: local
-  cloud:
-    nacos:
-      discovery:
-        enabled: false
-      config:
-        enabled: false
-        import-check:
-          enabled: false
     function:
       # 材料处理消费者以函数式绑定注册，由 binder 驱动消息接收。
       definition: materialProcess
@@ -76,31 +58,43 @@ spring:
       username: ${CLAIM_APPLICATION_REDIS_USERNAME:claim_app}
       password: ${CLAIM_APPLICATION_REDIS_PASSWORD:claim_redis}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # Redis 是可降级依赖，就绪探针只看数据库，避免缓存故障摘除实例。
+      group:
+        readiness:
+          include: db
+
 claim:
   outbox:
     relay:
       # 投递调度间隔、批量与退避阈值全部由配置决定，不硬编码在代码中。
-      fixed-delay-ms: 2000
-      batch-size: 50
-      max-retry-count: 5
-      retry-base-seconds: 5
-      retry-max-seconds: 300
-  integration:
-    file-system:
-      # 文件系统由本服务的模拟接口提供，生产替换为真实系统地址即可。
-      url: http://127.0.0.1:${server.port}
-    underwriting:
-      url: http://127.0.0.1:${server.port}
+      fixed-delay-ms: ${CLAIM_APPLICATION_OUTBOX_RELAY_FIXED_DELAY_MS:2000}
+      batch-size: ${CLAIM_APPLICATION_OUTBOX_RELAY_BATCH_SIZE:50}
+      max-retry-count: ${CLAIM_APPLICATION_OUTBOX_RELAY_MAX_RETRY_COUNT:5}
+      retry-base-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_BASE_SECONDS:5}
+      retry-max-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_MAX_SECONDS:300}
   compensation:
     # 补偿调度间隔、批量与三类滞留阈值，全部由配置决定。
-    fixed-delay-ms: 30000
-    batch-size: 20
-    outbox-sending-timeout: 60s
-    accepted-stall-timeout: 5m
-    underwriting-timeout: 1m
+    fixed-delay-ms: ${CLAIM_APPLICATION_COMPENSATION_FIXED_DELAY_MS:30000}
+    batch-size: ${CLAIM_APPLICATION_COMPENSATION_BATCH_SIZE:20}
+    outbox-sending-timeout: ${CLAIM_APPLICATION_COMPENSATION_OUTBOX_SENDING_TIMEOUT:60s}
+    accepted-stall-timeout: ${CLAIM_APPLICATION_COMPENSATION_ACCEPTED_STALL_TIMEOUT:5m}
+    underwriting-timeout: ${CLAIM_APPLICATION_COMPENSATION_UNDERWRITING_TIMEOUT:1m}
+  integration:
+    file-system:
+      # 真实文件系统地址必须显式给出：不提供默认值，缺失时出站客户端创建失败并报出该环境变量名。
+      url: ${CLAIM_APPLICATION_FILE_SYSTEM_URL}
+    underwriting:
+      url: ${CLAIM_APPLICATION_UNDERWRITING_URL}
   mock:
-    # 模拟开关关闭时，文件系统与承保的模拟接口不再注册。
-    enabled: true
+    # 模拟开关默认关闭，仅本地联调显式开启；关闭时文件系统与承保的模拟接口不再注册。
+    enabled: ${CLAIM_APPLICATION_MOCK_ENABLED:false}
     file-system:
       # 命中这些材料类型时模拟上传被拒绝，用于验证受理失败链路。
       fail-material-types:
@@ -111,3 +105,27 @@ claim:
       # 关闭后自动承保不再发送完成通知，用于验证补偿查询链路。
       notify-on-complete: true
       completion-delay: 1s
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+
+claim:
+  integration:
+    file-system:
+      # 本地联调由本服务自带的模拟接口提供文件系统能力。
+      url: http://127.0.0.1:${server.port}
+    underwriting:
+      url: http://127.0.0.1:${server.port}
+  mock:
+    enabled: true

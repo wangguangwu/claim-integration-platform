@@ -5,8 +5,6 @@ import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.compensation.ApplicationCompensationPolicy;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
 import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResult;
@@ -25,6 +23,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * 补偿用例：恢复投递滞留、已受理滞留与承保中滞留，仅在状态仍符合预期时推进。
+ *
+ * <p>补偿重放的开始与结束轨迹都由 {@link ApplicationCompensationTransactionService}
+ * 一次性写入，重放中断时不会留下只有开始的行为组。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -46,7 +47,7 @@ public class ApplicationCompensationUseCase {
     private final UnderwritingResultQuery underwritingResultQuery;
     private final AutoUnderwritingRequester autoUnderwritingRequester;
     private final ApplicationLifecycleRecordFactory recordFactory;
-    private final InteractionLogRepository interactionLogRepository;
+    private final ApplicationCompensationTransactionService compensationTransactionService;
     private final ApplicationCompensationPolicy compensationPolicy;
 
     /**
@@ -108,18 +109,19 @@ public class ApplicationCompensationUseCase {
     private void recoverUnderwritingApplication(ClaimApplication application) {
         String applicationNo = application.getApplicationNo();
         String traceId = UUID.randomUUID().toString();
+        String requestId = COMPENSATION_REQUEST_ID_PREFIX + applicationNo;
         String interactionNo = recordFactory.newInteractionNo();
-        recordInteraction(applicationNo, interactionNo, InteractionAction.STARTED, traceId, null, null);
         UnderwritingResult underwritingResult;
         try {
             underwritingResult = underwritingResultQuery.query(applicationNo);
         } catch (RuntimeException exception) {
             log.warn("承保结果查询失败，等待下一轮补偿，applicationNo={}", applicationNo, exception);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
-                    UNDERWRITING_RESULT_QUERY_FAILED_CODE, exception.getMessage());
+            compensationTransactionService.recordAttempt(applicationNo, interactionNo, requestId,
+                    InteractionAction.FAILED, traceId, UNDERWRITING_RESULT_QUERY_FAILED_CODE, exception.getMessage());
             return;
         }
-        recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
+        compensationTransactionService.recordAttempt(applicationNo, interactionNo, requestId,
+                InteractionAction.COMPLETED, traceId, null, null);
         switch (underwritingResult) {
             case COMPLETED -> completeUnderwriting(application, traceId);
             case NOT_FOUND -> reRequestAutoUnderwriting(application, traceId);
@@ -146,23 +148,17 @@ public class ApplicationCompensationUseCase {
     private void reRequestAutoUnderwriting(ClaimApplication application, String traceId) {
         String applicationNo = application.getApplicationNo();
         String interactionNo = recordFactory.newInteractionNo();
-        recordInteraction(applicationNo, interactionNo, InteractionAction.STARTED, traceId, null, null);
+        String requestId = COMPENSATION_REQUEST_ID_PREFIX + applicationNo;
         try {
             autoUnderwritingRequester.request(applicationNo, application.getTenantCode(),
                     application.primaryInsuredCertificateNo());
-            recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
+            compensationTransactionService.recordAttempt(applicationNo, interactionNo, requestId,
+                    InteractionAction.COMPLETED, traceId, null, null);
         } catch (RuntimeException exception) {
             log.warn("自动承保请求补偿重发失败，保持承保中状态，applicationNo={}", applicationNo, exception);
-            recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
-                    AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
+            compensationTransactionService.recordAttempt(applicationNo, interactionNo, requestId,
+                    InteractionAction.FAILED, traceId, AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
         }
-    }
-
-    private void recordInteraction(String applicationNo, String interactionNo, InteractionAction action, String traceId,
-                                   String errorCode, String errorMessage) {
-        interactionLogRepository.insert(recordFactory.interaction(InteractionType.UNDERWRITING, applicationNo,
-                interactionNo, action, COMPENSATION_REQUEST_ID_PREFIX + applicationNo, traceId, errorCode,
-                errorMessage));
     }
 
     private LocalDateTime now() {
