@@ -46,7 +46,7 @@ flowchart LR
 | Redis | `redis:7.4.11-alpine` | `6379` | `claim-redis-data` | 使用应用 ACL 账号执行 `redis-cli ping` |
 | RocketMQ NameServer | `apache/rocketmq:5.5.0` | `9876` | 无 | `mqadmin clusterList` |
 | RocketMQ Broker | `apache/rocketmq:5.5.0` | `10909`、`10911` | 无 | `mqadmin clusterList` |
-| RocketMQ Dashboard | `apacherocketmq/rocketmq-dashboard:2.1.0` | `8082` | 无 | HTTP 200 |
+| RocketMQ Dashboard | `apacherocketmq/rocketmq-dashboard:2.1.0` | `8090` | 无 | HTTP 200 |
 
 编排网络统一命名为 `claim-local-network`。MySQL、Redis、RocketMQ 容器拥有稳定服务名，理赔申请服务在宿主机启动时默认使用 `127.0.0.1` 地址，在容器网络内启动时使用服务名覆盖环境变量。
 

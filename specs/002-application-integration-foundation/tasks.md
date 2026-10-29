@@ -59,5 +59,5 @@
 - 使用 Corretto 21 执行 `mvn -B clean test` 通过，9 个现有测试全部通过；执行 `mvn -B -DskipTests package` 通过。
 - 使用 Corretto 21 启动 `claim-application-service` 可执行 Jar，`http://127.0.0.1:8081/actuator/health` 返回 `{"status":"UP"}`；验证后已停止该 Java 进程。
 - `scripts/docker-start.sh` 与 `scripts/docker-stop.sh` 均通过 Shell 语法检查，并完成一次停止后重启验证；停止过程保留命名数据卷，重启后四项常驻服务恢复健康。
-- RocketMQ Dashboard 已启动并通过 HTTP 健康检查，可通过 `http://127.0.0.1:8082` 使用本地环境文件中的账号登录；`docs/environment/local-infrastructure-health-check.md` 已列出 MySQL、Redis、RocketMQ、Dashboard 和理赔申请的检查命令与预期结果。
+- RocketMQ Dashboard 已启动并通过 HTTP 健康检查，可通过 `http://127.0.0.1:8090` 使用本地环境文件中的账号登录；`docs/environment/local-infrastructure-health-check.md` 已列出 MySQL、Redis、RocketMQ、Dashboard 和理赔申请的检查命令与预期结果。
 - 已确认并实际运行 `mysql:8.4.13`、`redis:7.4.11-alpine`、`apache/rocketmq:5.5.0`、`apacherocketmq/rocketmq-dashboard:2.1.0` 的 `arm64/linux` 变体；Compose 已移除 Dashboard 的 AMD64 强制平台配置，Dashboard HTTP 健康检查通过。
