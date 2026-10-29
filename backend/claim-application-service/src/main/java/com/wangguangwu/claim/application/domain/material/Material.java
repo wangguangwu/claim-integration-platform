@@ -50,7 +50,7 @@ public class Material {
      * @param originalFileUrl 租户提交的初始文件地址
      * @return 待处理材料
      */
-    public static Material createPending(String applicationNo, String batchNo, String materialType,
+    private static Material createPending(String applicationNo, String batchNo, String materialType,
                                          String originalFileUrl) {
         return Material.builder().applicationNo(applicationNo).batchNo(batchNo).materialType(materialType)
                 .originalFileUrl(originalFileUrl).status(MaterialStatus.PENDING_PROCESS).build();

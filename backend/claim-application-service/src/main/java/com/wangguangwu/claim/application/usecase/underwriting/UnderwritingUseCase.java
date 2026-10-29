@@ -5,7 +5,6 @@ import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
-import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
 import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import java.util.Optional;
@@ -56,8 +55,7 @@ public class UnderwritingUseCase {
         if (queryOutcome.isEmpty()) {
             return;
         }
-        Optional<PolicySnapshot> policySnapshot = queryOutcome.get().policySnapshot();
-        if (policySnapshot.isPresent()) {
+        if (queryOutcome.get().hasValidPolicy()) {
             if (!transactionService.promoteToWaitAudit(application, traceId)) {
                 log.info("承保分流状态已被其他执行者推进，applicationNo={}", applicationNo);
             }
@@ -71,7 +69,7 @@ public class UnderwritingUseCase {
     }
 
     /**
-     * 查询有效保单并记录行为组轨迹。
+     * 查询有效保单存在性并记录行为组轨迹。
      *
      * @return 查询结果；查询失败时为空，调用方保持申请原状态
      */
@@ -80,11 +78,10 @@ public class UnderwritingUseCase {
         String applicationNo = application.getApplicationNo();
         String interactionNo = recordFactory.newInteractionNo();
         try {
-            Optional<PolicySnapshot> policySnapshot = validPolicyQuery.findValidPolicy(application.getTenantCode(),
-                    insuredCertificateNo);
+            boolean hasValidPolicy = validPolicyQuery.hasValidPolicy(application.getTenantCode(), insuredCertificateNo);
             transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId,
                     null, null);
-            return Optional.of(new PolicyQueryOutcome(policySnapshot));
+            return Optional.of(new PolicyQueryOutcome(hasValidPolicy));
         } catch (RuntimeException exception) {
             log.warn("有效保单查询失败，申请保持已受理状态等待补偿，applicationNo={}", applicationNo, exception);
             transactionService.recordAttempt(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
@@ -108,10 +105,10 @@ public class UnderwritingUseCase {
     }
 
     /**
-     * 一次保单查询的结果，区分"查询完成但无有效保单"与"查询失败"。
+     * 一次保单查询的结果，区分"查询完成"与"查询失败"，失败由调用方保持原状态。
      *
-     * @param policySnapshot 有效保单
+     * @param hasValidPolicy 被保人是否存在有效保单
      */
-    private record PolicyQueryOutcome(Optional<PolicySnapshot> policySnapshot) {
+    private record PolicyQueryOutcome(boolean hasValidPolicy) {
     }
 }

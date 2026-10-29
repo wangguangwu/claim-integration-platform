@@ -42,7 +42,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 角色 | 后缀/形态 | 所在层 | 本项目实例 |
 |---|---|---|---|
 | 聚合根 | 业务名词，record/class，构造器私有或只暴露命名工厂 | `domain/<聚合>` | `domain/claim/ClaimApplication`、`domain/material/Material`、`domain/integration/interaction/InteractionLog`、`domain/integration/outbox/OutboxEvent` |
-| 值对象 | 业务名词 | `domain`，人员角色另入 `domain/claim/person` | `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`PolicySnapshot`、`MaterialSubmission` |
+| 值对象 | 业务名词 | `domain`，人员角色另入 `domain/claim/person` | `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`MaterialSubmission` |
 | 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | `domain` | `ApplicationStatus`、`OutboxEventStatus`、`ApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
 | 枚举自带的业务映射 | 枚举字段与方法 | `domain` | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
 | 仓储端口 | `*Repository` | `domain/<聚合>/port`（该域只有一个端口时直接放聚合包） | `ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` |
@@ -59,7 +59,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
 | 报文防腐组件 | `*Parser`、`*Validator`、`*Converter`、`*FieldGuard` | `interfaces/<域>/tenantprotocol/core/stage`（端口）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/校验/转换） | `TenantARequestParser`、`TenantBRequestValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`）、`TenantProtocolFieldGuard` |
-| 租户响应渲染 | `*ResponseRenderer`、`*ResponseRouter` | `interfaces/<域>/web/render` | `TenantApplicationResponseRenderer`、`TenantApplicationResponseRouter`、`UnifiedApplicationResponseRenderer` |
+| 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ApplicationResponseRenderer` |
 | 跨域契约 | 信封、命令 DTO | `shared/contract` | `ApplicationEventEnvelope`、`UnderwritingCompletedCommand` |
 
 ## 4. 本项目的落位
@@ -138,11 +138,11 @@ grep -rn 'PersonInfo' --include='*.java' domain/claim/ClaimApplication.java usec
   interfaces/intake/tenantprotocol | wc -l
 ```
 
-当前结果：第 1～7、9～14、16 项全部为 0，第 8 项 16 个端口（其中 13 个在 `port` 子包）、第 8b 项 3 个单端口域、第 15 项 9（两个异常类需要 `super(message)`、两个租户流水线需要 `super(...)` 装配组件、四个人员角色值对象需要 `super(...)` 传递基础字段、`TenantApplicationResponseRouter` 需要在构造时过滤掉统一渲染器；Lombok 不生成 `super` 调用，这些都属于有逻辑的构造器，不在 `@RequiredArgsConstructor` 范围），生产类 137、目录 76。单元测试代码在功能定稿前全部移除，`mvn -B -pl backend/claim-application-service -am package` 编译通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、改造前落库的人员 JSON 由新代码按角色还原、tenant-b 协议、未支持租户错误映射、同号并发单行、异步链路至 `WAIT_AUDIT`、材料失败与重新申请覆盖四个角色字段并进入第 2 次尝试）逐项一致。
+当前结果：第 1～7、9～14、16 项全部为 0，第 8 项 16 个端口（其中 13 个在 `port` 子包）、第 8b 项 3 个单端口域、第 15 项 8（两个异常类需要 `super(message)`、两个租户流水线需要 `super(...)` 装配组件、四个人员角色值对象需要 `super(...)` 传递基础字段；Lombok 不生成 `super` 调用，这些都属于有逻辑的构造器，不在 `@RequiredArgsConstructor` 范围），生产类 135、目录 76。单元测试代码在功能定稿前全部移除，`mvn -B -pl backend/claim-application-service -am package` 编译通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、改造前落库的人员 JSON 由新代码按角色还原、tenant-b 协议、未支持租户错误映射、同号并发单行、异步链路至 `WAIT_AUDIT`、材料失败与重新申请覆盖四个角色字段并进入第 2 次尝试）逐项一致。
 
 第 14、15 项是样板收敛的量化口径，属于本项目方言而不是标准强制项：依赖注入统一 `@RequiredArgsConstructor` + `private final`，日志统一 `@Slf4j`，多字段装配统一 `@Builder`（`ClaimApplication`、`Material` 的建造者是 `@Builder(access = PRIVATE)`，公开的创建入口仍只有 `submit`/`createPending`/`restore`/`reapply`；`ClaimApplicationIntakeCommand` 与 `*DO` 用公开建造者）。第 16 项约束人员角色的装配口径：四类人员不共用一个 `PersonInfo` 位置参数，而是由 `PersonInfo` 基类派生 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个密封（sealed）终态子类，聚合字段、受理命令与租户转换器一律按角色类型声明，四个同名字段被按位置装错在编译期就不可能；基类只持有四个基础字段与相等语义，新增角色必须显式出现在 `permits` 列表里。方言改动不得松动第 9、10 项：聚合的字段写入只能发生在聚合自己内部。
 
-第 9、10、12、13 项对应"层的职责"里的聚合封装与所有权和"依赖方向"里的配置归属，此前不满足（`ClaimApplication`、`Material` 暴露 Lombok setter；`usecase/intake` 直接构造材料聚合与异步记录聚合，与 `integration` 的记录装配工厂形成两套实现；交互事件本身也靠在用例层 `new InteractionLog` 拼装），由 005 的 T6、T8、T9 归位后归零；两个聚合的构造器已改私有，只能经 `submit`/`createPending`/`restore`/`pending`/`of` 工厂创建，且工厂调用点只出现在 `domain` 与 `usecase`。第 11 项是同一规则的另一面：装配入口不得自带一套业务词汇。"层的职责"第三条——不变式失败改说本域业务异常与错误码——会改变对外错误语义，不在 005 范围，另立 Spec。
+第 9、10、12、13 项对应"层的职责"里的聚合封装与所有权和"依赖方向"里的配置归属，此前不满足（`ClaimApplication`、`Material` 暴露 Lombok setter；`usecase/intake` 直接构造材料聚合与异步记录聚合，与 `integration` 的记录装配工厂形成两套实现；交互事件本身也靠在用例层 `new InteractionLog` 拼装），由 005 的 T6、T8、T9 归位后归零；两个聚合的构造器已改私有，只能经 `submit`/`createPending`/`restore`/`pending`/`of` 工厂创建，且工厂调用点只出现在 `domain` 与 `usecase`；`OutboxEvent` 是投递状态的记录型，与规范构造器逐字等价的 `restore` 已删除，持久化层直接以规范构造器还原。第 11 项是同一规则的另一面：装配入口不得自带一套业务词汇。"层的职责"第三条——不变式失败改说本域业务异常与错误码——会改变对外错误语义，不在 005 范围，另立 Spec。
 
 ## 6. 本项目的标准与方言分界
 

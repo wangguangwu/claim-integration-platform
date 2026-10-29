@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.intake.web;
 
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline.TenantProtocolPipelineFactory;
-import com.wangguangwu.claim.application.interfaces.intake.web.render.TenantApplicationResponseRouter;
+import com.wangguangwu.claim.application.interfaces.intake.web.render.ApplicationResponseRenderer;
 import com.wangguangwu.claim.application.usecase.intake.ClaimApplicationIntakeUseCase;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
@@ -30,10 +30,10 @@ public class ApplicationIntakeController {
 
     private final TenantProtocolPipelineFactory pipelineFactory;
     private final ClaimApplicationIntakeUseCase applicationIntakeUseCase;
-    private final TenantApplicationResponseRouter responseRouter;
+    private final ApplicationResponseRenderer responseRenderer;
 
     /**
-     * 接收租户私有报文，经协议流水线归一化为受理命令后执行标准化签收，并按租户渲染响应结构。
+     * 接收租户私有报文，经协议流水线归一化为受理命令后执行标准化签收，并渲染统一响应结构。
      *
      * @param rawPayload 租户私有请求正文
      * @param request    当前 HTTP 请求
@@ -46,6 +46,6 @@ public class ApplicationIntakeController {
         ClaimApplicationIntakeCommand command = pipelineFactory.execute(tenantInfo, rawPayload);
         ClaimApplicationIntakeResult result = applicationIntakeUseCase.intake(command,
                 request.getHeader(TraceHeaders.REQUEST_ID), traceId);
-        return responseRouter.renderSuccess(tenantInfo, traceId, result);
+        return responseRenderer.renderSuccess(traceId, result);
     }
 }

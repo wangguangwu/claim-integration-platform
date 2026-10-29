@@ -1,13 +1,11 @@
 package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 
-import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
 import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 有效保单查询的 Feign 适配器，承保系统不可用时异常向上抛出。
+ * 有效保单存在性查询的 Feign 适配器，承保系统不可用时异常向上抛出。
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -19,19 +17,16 @@ public class FeignValidPolicyQuery implements ValidPolicyQuery {
     private final UnderwritingFeignClient underwritingFeignClient;
 
     /**
-     * 按租户与被保人证件号查询有效保单。
+     * 查询被保人是否存在有效保单。
      *
      * @param tenantCode           租户编码
      * @param insuredCertificateNo 被保人证件号
-     * @return 有效保单；不存在时为空
+     * @return 存在有效保单时为 true
      */
     @Override
-    public Optional<PolicySnapshot> findValidPolicy(String tenantCode, String insuredCertificateNo) {
+    public boolean hasValidPolicy(String tenantCode, String insuredCertificateNo) {
         UnderwritingFeignClient.PolicyQueryResponse response = underwritingFeignClient.queryPolicy(
                 new UnderwritingFeignClient.PolicyQueryRequest(tenantCode, insuredCertificateNo));
-        if (!response.hasValidPolicy()) {
-            return Optional.empty();
-        }
-        return Optional.of(new PolicySnapshot(response.policyNo()));
+        return response.hasValidPolicy();
     }
 }

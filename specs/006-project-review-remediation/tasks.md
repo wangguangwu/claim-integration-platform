@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | T5 | 删除租户响应渲染 SPI | 单一渲染入口 | `web/render` 剩 1 个类；两类租户与未支持租户响应逐字段不变 | #49 |
 | T6 | 删除零引用枚举值与伪端口 | 领域与端口签名收敛 | 引用计数归零或按新签名收敛；`PolicySnapshot` 不存在 | #50 |
-| T7 | 删除五个零引用依赖 | 根与模块 `pom.xml` | 依赖树中上述 artifact 计数 0；`clean package` 通过、jar 体积下降 | #51 |
+| T7 | 删除五个零引用依赖 | 根与模块 `pom.xml` | 各 pom 中上述 artifact 的直接声明计数 0（`spring-boot-starter-validation` 由 spring-cloud-stream 与 openfeign 传递引入，依赖树计数无法归零）；`clean package` 通过、jar 体积下降 | #51 |
 
 ## 第 3 轮 · 语义收敛（先立本 Spec 语义，再改码）
 

@@ -221,6 +221,8 @@ erDiagram
 
 ### 状态定义
 
+当前实现覆盖签收、材料处理与承保分流，`ApplicationStatus` 只保留这五个状态：
+
 | 状态 | 业务含义 |
 | --- | --- |
 | `PENDING_ACCEPT` | 理赔申请已签收，等待材料处理。 |
@@ -228,11 +230,10 @@ erDiagram
 | `ACCEPT_FAILED` | 当前申请尝试受理失败。 |
 | `UNDERWRITING` | 未找到有效保单，自动承保处理中，等待完成通知。 |
 | `WAIT_AUDIT` | 已进入审核签收流程，等待审核系统处理。 |
-| `ISSUE` | 审核系统下发问题件，等待租户补材。 |
-| `COMPLETED` | 审核系统签收完成，已建立全部案件关联。 |
-| `REVOKED` | 理赔申请撤销完成，生命周期终止。 |
 
-`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `applicationNo` 并开始新的申请尝试。`REVOKED` 是理赔申请的唯一生命周期终态。
+审核能力落地后才引入 `ISSUE`（审核下发问题件，等待租户补材）、`COMPLETED`（审核签收完成，已建立全部案件关联）与 `REVOKED`（撤销完成，理赔申请的唯一生命周期终态）。006 整改已删除这三个尚未启用的枚举值，实现审核与撤销时按目标态迁移表重新加入。
+
+`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `applicationNo` 并开始新的申请尝试。
 
 ```mermaid
 stateDiagram-v2
@@ -245,20 +246,9 @@ stateDiagram-v2
     ACCEPTED --> WAIT_AUDIT: 存在有效保单
     ACCEPTED --> UNDERWRITING: 不存在有效保单
     UNDERWRITING --> WAIT_AUDIT: 承保完成通知
-
-    WAIT_AUDIT --> COMPLETED: 审核签收并返回全部案件
-    WAIT_AUDIT --> ISSUE: 审核下发问题件
-    ISSUE --> WAIT_AUDIT: 提交补材并关闭 Issue
-
-    PENDING_ACCEPT --> REVOKED: 租户撤销
-    ACCEPTED --> REVOKED: 租户撤销
-    UNDERWRITING --> REVOKED: 租户撤销
-    WAIT_AUDIT --> REVOKED: 租户撤销
-    ISSUE --> REVOKED: 租户撤销
-    COMPLETED --> REVOKED: 审核系统撤销成功
-
-    REVOKED --> [*]
 ```
+
+审核签收之后的目标态迁移（尚未实现）：`WAIT_AUDIT → COMPLETED`（审核签收并返回全部案件）、`WAIT_AUDIT ⇄ ISSUE`（下发问题件与补材关闭）、`PENDING_ACCEPT/ACCEPTED/UNDERWRITING/WAIT_AUDIT/ISSUE/COMPLETED → REVOKED`（租户或审核系统撤销），`REVOKED` 为终态。
 
 状态推进规则：
 

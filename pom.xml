@@ -33,14 +33,12 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-cloud.version>2025.0.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
-        <spring-ai.version>1.1.8</spring-ai.version>
         <mybatis-plus.version>3.5.18</mybatis-plus.version>
         <!-- 统一 Application 服务的领域对象与数据库对象映射版本。 -->
         <mapstruct.version>1.6.3</mapstruct.version>
         <!-- Redisson 提供 Redis 原子计数、旁路缓存与 watchdog 分布式锁。 -->
         <redisson.version>4.8.0</redisson.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
-        <xxl-job.version>3.5.0</xxl-job.version>
         <claim-foundation.version>${project.version}</claim-foundation.version>
     </properties>
 
@@ -57,13 +55,6 @@
                 <groupId>com.alibaba.cloud</groupId>
                 <artifactId>spring-cloud-alibaba-dependencies</artifactId>
                 <version>${spring-cloud-alibaba.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.ai</groupId>
-                <artifactId>spring-ai-bom</artifactId>
-                <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -100,11 +91,6 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-mapstruct-binding</artifactId>
                 <version>${lombok-mapstruct-binding.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.xuxueli</groupId>
-                <artifactId>xxl-job-core</artifactId>
-                <version>${xxl-job.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.wangguangwu.claim</groupId>

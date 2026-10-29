@@ -4,42 +4,43 @@ import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntak
 import com.wangguangwu.claim.application.interfaces.intake.web.ApplicationIntakeResponse;
 import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
-import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 /**
- * 平台统一响应结构渲染器，作为未定制响应协议的租户兜底实现。
+ * 平台统一申请响应渲染器，全部租户共用同一种响应结构与状态码映射。
  *
  * @author wangguangwu
- * @since 2026-10-27
+ * @since 2026-10-29
  */
 @Component
-public class UnifiedApplicationResponseRenderer implements TenantApplicationResponseRenderer {
+public class ApplicationResponseRenderer {
 
     /**
-     * 统一结构覆盖全部租户，由响应路由作为兜底选择。
+     * 渲染签收成功响应。
      *
-     * @param tenantInfo 当前租户信息
-     * @return 恒为 true
+     * @param traceId 链路标识
+     * @param result  签收结果
+     * @return HTTP 响应
      */
-    @Override
-    public boolean supports(TenantInfo tenantInfo) {
-        return true;
-    }
-
-    @Override
-    public ResponseEntity<Object> renderSuccess(TenantInfo tenantInfo, String traceId, ClaimApplicationIntakeResult result) {
+    public ResponseEntity<Object> renderSuccess(String traceId, ClaimApplicationIntakeResult result) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.success(traceId, new ApplicationIntakeResponse(result.applicationNo())));
     }
 
-    @Override
-    public ResponseEntity<Object> renderFailure(TenantInfo tenantInfo, String traceId,
-                                                ApplicationIntakeErrorCode errorCode, String errorMessage) {
+    /**
+     * 渲染签收失败响应，按错误码映射 HTTP 状态。
+     *
+     * @param traceId      链路标识
+     * @param errorCode    业务错误码
+     * @param errorMessage 面向调用方的错误说明
+     * @return HTTP 响应
+     */
+    public ResponseEntity<Object> renderFailure(String traceId, ApplicationIntakeErrorCode errorCode,
+                                                String errorMessage) {
         return ResponseEntity.status(statusOf(errorCode))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(errorCode.name(), errorMessage, traceId));

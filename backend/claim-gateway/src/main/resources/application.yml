@@ -52,8 +52,6 @@ spring:
         enabled: false
         import-check:
           enabled: false
-    sentinel:
-      enabled: false
 
 # 本地未启动注册中心，负载均衡地址无法解析，改为直连本机服务端口。
 claim:

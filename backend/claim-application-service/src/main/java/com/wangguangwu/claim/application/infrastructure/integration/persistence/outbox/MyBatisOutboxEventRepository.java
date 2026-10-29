@@ -136,7 +136,7 @@ public class MyBatisOutboxEventRepository implements OutboxEventRepository {
     }
 
     private OutboxEvent toDomain(OutboxEventDO outboxEventDO) {
-        return OutboxEvent.restore(outboxEventDO.getEventId(), outboxEventDO.getEventType(),
+        return new OutboxEvent(outboxEventDO.getEventId(), outboxEventDO.getEventType(),
                 outboxEventDO.getEventVersion(), outboxEventDO.getApplicationNo(), outboxEventDO.getTenantCode(),
                 outboxEventDO.getPayload(), OutboxEventStatus.valueOf(outboxEventDO.getStatus()),
                 outboxEventDO.getRetryCount(), outboxEventDO.getNextRetryAt(), outboxEventDO.getCreatedAt());
