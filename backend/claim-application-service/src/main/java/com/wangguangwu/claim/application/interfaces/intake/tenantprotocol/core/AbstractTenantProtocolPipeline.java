@@ -3,6 +3,8 @@ package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.application.usecase.intake.command.ApplicationIntakeCommand;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 租户协议流水线模板，固定「验签 → 解密 → 解析 → 校验 → 转换」执行链路。
@@ -15,6 +17,7 @@ import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class AbstractTenantProtocolPipeline<R> implements TenantProtocolPipeline {
 
     private final String tenantCode;
@@ -22,17 +25,6 @@ public abstract class AbstractTenantProtocolPipeline<R> implements TenantProtoco
     private final TenantProtocolParser<R> parser;
     private final TenantProtocolValidator<R> validator;
     private final TenantProtocolConverter<R> converter;
-
-    protected AbstractTenantProtocolPipeline(String tenantCode, String protocolVersion,
-                                                TenantProtocolParser<R> parser,
-                                                TenantProtocolValidator<R> validator,
-                                                TenantProtocolConverter<R> converter) {
-        this.tenantCode = tenantCode;
-        this.protocolVersion = protocolVersion;
-        this.parser = parser;
-        this.validator = validator;
-        this.converter = converter;
-    }
 
     /**
      * 判断租户上下文是否与当前协议完全匹配。

@@ -11,6 +11,7 @@ import com.wangguangwu.claim.application.usecase.intake.command.ApplicationIntak
 import com.wangguangwu.claim.application.usecase.intake.result.ApplicationIntakeResult;
 import java.util.List;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -21,6 +22,7 @@ import org.springframework.util.StringUtils;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class ApplicationIntakeUseCase {
 
@@ -30,16 +32,6 @@ public class ApplicationIntakeUseCase {
     private final ApplicationExistenceQuery applicationExistenceQuery;
     private final ApplicationNoGenerator applicationNoGenerator;
     private final ApplicationIntakeTransactionService transactionService;
-
-    public ApplicationIntakeUseCase(ApplicationIntakeLock applicationIntakeLock,
-                                    ApplicationExistenceQuery applicationExistenceQuery,
-                                    ApplicationNoGenerator applicationNoGenerator,
-                                    ApplicationIntakeTransactionService transactionService) {
-        this.applicationIntakeLock = applicationIntakeLock;
-        this.applicationExistenceQuery = applicationExistenceQuery;
-        this.applicationNoGenerator = applicationNoGenerator;
-        this.transactionService = transactionService;
-    }
 
     /**
      * 校验受理命令后创建理赔申请，并在同一外部申请号锁内签收，成功提交后失效存在性缓存。

@@ -15,8 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -28,11 +28,12 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 @ConditionalOnProperty(name = "claim.mock.enabled", havingValue = "true")
 public class MockUnderwritingStore {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MockUnderwritingStore.class);
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     private final Map<String, PolicyRecord> policiesByCertificateNo = new ConcurrentHashMap<>();
@@ -40,12 +41,6 @@ public class MockUnderwritingStore {
     private final ScheduledExecutorService completionScheduler = Executors.newSingleThreadScheduledExecutor();
     private final MockUnderwritingProperties properties;
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
-
-    public MockUnderwritingStore(MockUnderwritingProperties properties,
-                                 UnderwritingCallbackUseCase underwritingCallbackUseCase) {
-        this.properties = properties;
-        this.underwritingCallbackUseCase = underwritingCallbackUseCase;
-    }
 
     /**
      * 登记有效保单，重复登记覆盖旧保单号。
@@ -170,7 +165,7 @@ public class MockUnderwritingStore {
             underwritingCallbackUseCase.complete(
                     new UnderwritingCompletedCommand(applicationNo, requestId, createTraceId()));
         } catch (RuntimeException exception) {
-            LOGGER.warn("模拟承保完成通知处理失败，等待补偿任务恢复，applicationNo={}", applicationNo, exception);
+            log.warn("模拟承保完成通知处理失败，等待补偿任务恢复，applicationNo={}", applicationNo, exception);
         }
     }
 

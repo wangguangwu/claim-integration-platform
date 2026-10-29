@@ -91,7 +91,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 2. 它承载业务不变式或业务词汇吗？是 → `domain`（哪怕它是接口或异常）。
 3. 它只是把外部请求翻译成用例调用吗？是 → `interfaces`。三者都不是 → `usecase`。
 
-可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 16 外结果必须全为 0）：
+可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 16、第 15 项应为 5 处白名单外结果必须全为 0）：
 
 ```bash
 P=com.wangguangwu.claim.application
@@ -125,9 +125,15 @@ grep -rn '"INBOUND"\|"OUTBOUND"\|"CLAIM_APPLICATION_SERVICE"\|"MATERIAL_PROCESSO
 grep -rh 'ClaimApplication' --include='*.java' interfaces | wc -l
 # 13 用例层不得自行绑定配置
 grep -rn '@ConfigurationProperties' --include='*.java' usecase | wc -l
+# 14 样板日志：不得再手写 Logger（统一 Lombok @Slf4j）
+grep -rn 'LoggerFactory' --include='*.java' . | wc -l
+# 15 样板构造器：纯赋值的依赖注入统一 @RequiredArgsConstructor，白名单外不得手写
+grep -rn '^\s*public [A-Z][A-Za-z0-9]*(' --include='*.java' . | wc -l
 ```
 
-当前结果：第 1～7、9～13 项全部为 0，`domain` 端口 16 个，生产类 133、测试类 18；`mvn -B -pl backend/claim-application-service -am test` 90 个测试全通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、同号并发单行、未支持租户错误映射、tenant-b 协议、异步链路至 `WAIT_AUDIT`、材料失败与重新申请）与调整前逐项一致。
+当前结果：第 1～7、9～14 项全部为 0，第 15 项为 5（两个异常类需要 `super(message)`、两个租户流水线需要 `super(...)` 装配组件、`TenantApplicationResponseRouter` 需要在构造时过滤掉统一渲染器，都属于有逻辑的构造器，不在 `@RequiredArgsConstructor` 范围），`domain` 端口 16 个，生产类 133、测试类 18；`mvn -B -pl backend/claim-application-service -am test` 90 个测试全通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、同号并发单行、未支持租户错误映射、tenant-b 协议、异步链路至 `WAIT_AUDIT`、材料失败与重新申请）与调整前逐项一致。
+
+第 14、15 项是样板收敛的量化口径，属于本项目方言而不是标准强制项：依赖注入统一 `@RequiredArgsConstructor` + `private final`，日志统一 `@Slf4j`，多字段装配统一 `@Builder`（`ClaimApplication`、`Material` 的建造者是 `@Builder(access = PRIVATE)`，公开的创建入口仍只有 `submit`/`createPending`/`restore`；`ApplicationIntakeCommand` 与 `*DO` 用公开建造者，避免四类同为 `PersonInfo` 的人员参数按位置错位）。方言改动不得松动第 9、10 项：聚合的字段写入只能发生在聚合自己内部。
 
 第 9、10、12、13 项对应"层的职责"里的聚合封装与所有权和"依赖方向"里的配置归属，此前不满足（`ClaimApplication`、`Material` 暴露 Lombok setter；`usecase/intake` 直接构造材料聚合与异步记录聚合，与 `integration` 的记录装配工厂形成两套实现；交互事件本身也靠在用例层 `new InteractionLog` 拼装），由 005 的 T6、T8、T9 归位后归零；两个聚合的构造器已改私有，只能经 `submit`/`createPending`/`restore`/`pending`/`of` 工厂创建，且工厂调用点只出现在 `domain` 与 `usecase`。第 11 项是同一规则的另一面：装配入口不得自带一套业务词汇。"层的职责"第三条——不变式失败改说本域业务异常与错误码——会改变对外错误语义，不在 005 范围，另立 Spec。
 

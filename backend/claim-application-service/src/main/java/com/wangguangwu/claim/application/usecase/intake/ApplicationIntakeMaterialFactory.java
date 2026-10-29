@@ -4,6 +4,7 @@ import com.wangguangwu.claim.application.domain.material.Material;
 import com.wangguangwu.claim.application.domain.material.MaterialBatchNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,14 +13,11 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class ApplicationIntakeMaterialFactory {
 
     private final MaterialBatchNoGenerator materialBatchNoGenerator;
-
-    public ApplicationIntakeMaterialFactory(MaterialBatchNoGenerator materialBatchNoGenerator) {
-        this.materialBatchNoGenerator = materialBatchNoGenerator;
-    }
 
     /**
      * 为同一次签收创建共用批次编号的材料记录。

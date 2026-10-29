@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class ApplicationLifecycleRecordFactory {
 
@@ -30,10 +32,6 @@ public class ApplicationLifecycleRecordFactory {
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     private final ObjectMapper objectMapper;
-
-    public ApplicationLifecycleRecordFactory(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 生成行为组编号，同一行为的开始与结束事件共用该编号。

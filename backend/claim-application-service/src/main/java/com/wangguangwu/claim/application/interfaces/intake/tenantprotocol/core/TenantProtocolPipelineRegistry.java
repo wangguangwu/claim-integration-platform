@@ -4,6 +4,7 @@ import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntak
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -13,14 +14,11 @@ import org.springframework.util.StringUtils;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class TenantProtocolPipelineRegistry {
 
     private final List<TenantProtocolPipeline> pipelines;
-
-    public TenantProtocolPipelineRegistry(List<TenantProtocolPipeline> pipelines) {
-        this.pipelines = pipelines;
-    }
 
     /**
      * 获取与租户上下文唯一匹配的协议流水线。

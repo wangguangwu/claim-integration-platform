@@ -28,9 +28,10 @@ public class TenantBRequestConverter implements TenantProtocolConverter<TenantBI
      */
     @Override
     public ApplicationIntakeCommand convert(String tenantCode, TenantBIntakeRequest request) {
-        return new ApplicationIntakeCommand(tenantCode, request.claimReference().trim(), toPerson(request.claimant()),
-                toPerson(request.mainInsured()), toPerson(request.injured()), toPerson(request.beneficiary()),
-                toMaterials(request.evidences()));
+        return ApplicationIntakeCommand.builder().tenantCode(tenantCode)
+                .externalApplicationNo(request.claimReference().trim()).applicant(toPerson(request.claimant()))
+                .primaryInsured(toPerson(request.mainInsured())).accidentPerson(toPerson(request.injured()))
+                .payee(toPerson(request.beneficiary())).materials(toMaterials(request.evidences())).build();
     }
 
     private PersonInfo toPerson(TenantBIntakeRequest.TenantBPerson person) {

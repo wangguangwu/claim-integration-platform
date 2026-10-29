@@ -11,8 +11,8 @@ import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
 import com.wangguangwu.claim.application.domain.underwriting.ValidPolicyQuery;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -24,10 +24,11 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class UnderwritingUseCase {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(UnderwritingUseCase.class);
     private static final String POLICY_QUERY_FAILED_CODE = "POLICY_QUERY_FAILED";
     private static final String AUTO_UNDERWRITING_REQUEST_FAILED_CODE = "AUTO_UNDERWRITING_REQUEST_FAILED";
 
@@ -37,20 +38,6 @@ public class UnderwritingUseCase {
     private final UnderwritingTransactionService transactionService;
     private final ApplicationLifecycleRecordFactory recordFactory;
     private final InteractionLogRepository interactionLogRepository;
-
-    public UnderwritingUseCase(ApplicationRepository applicationRepository,
-                               ValidPolicyQuery validPolicyQuery,
-                               AutoUnderwritingRequester autoUnderwritingRequester,
-                               UnderwritingTransactionService transactionService,
-                               ApplicationLifecycleRecordFactory recordFactory,
-                               InteractionLogRepository interactionLogRepository) {
-        this.applicationRepository = applicationRepository;
-        this.validPolicyQuery = validPolicyQuery;
-        this.autoUnderwritingRequester = autoUnderwritingRequester;
-        this.transactionService = transactionService;
-        this.recordFactory = recordFactory;
-        this.interactionLogRepository = interactionLogRepository;
-    }
 
     /**
      * 对处于已受理状态的申请执行承保分流。
@@ -62,7 +49,7 @@ public class UnderwritingUseCase {
         ClaimApplication application = applicationRepository.findByApplicationNo(applicationNo)
                 .orElseThrow(() -> new IllegalStateException("承保分流对应的申请不存在，applicationNo=" + applicationNo));
         if (!application.isInStatus(ApplicationStatus.ACCEPTED)) {
-            LOGGER.info("申请不处于已受理状态，跳过承保分流，applicationNo={}，status={}", applicationNo,
+            log.info("申请不处于已受理状态，跳过承保分流，applicationNo={}，status={}", applicationNo,
                     application.getStatus());
             return;
         }
@@ -74,12 +61,12 @@ public class UnderwritingUseCase {
         Optional<PolicySnapshot> policySnapshot = queryOutcome.get().policySnapshot();
         if (policySnapshot.isPresent()) {
             if (!transactionService.promoteToWaitAudit(application, traceId)) {
-                LOGGER.info("承保分流状态已被其他执行者推进，applicationNo={}", applicationNo);
+                log.info("承保分流状态已被其他执行者推进，applicationNo={}", applicationNo);
             }
             return;
         }
         if (!transactionService.startUnderwriting(application)) {
-            LOGGER.info("自动承保状态已被其他执行者推进，applicationNo={}", applicationNo);
+            log.info("自动承保状态已被其他执行者推进，applicationNo={}", applicationNo);
             return;
         }
         requestAutoUnderwriting(application, insuredCertificateNo, traceId);
@@ -101,7 +88,7 @@ public class UnderwritingUseCase {
             recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
             return Optional.of(new PolicyQueryOutcome(policySnapshot));
         } catch (RuntimeException exception) {
-            LOGGER.warn("有效保单查询失败，申请保持已受理状态等待补偿，applicationNo={}", applicationNo, exception);
+            log.warn("有效保单查询失败，申请保持已受理状态等待补偿，applicationNo={}", applicationNo, exception);
             recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     POLICY_QUERY_FAILED_CODE, exception.getMessage());
             return Optional.empty();
@@ -116,7 +103,7 @@ public class UnderwritingUseCase {
             autoUnderwritingRequester.request(applicationNo, application.getTenantCode(), insuredCertificateNo);
             recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
         } catch (RuntimeException exception) {
-            LOGGER.warn("自动承保请求失败，申请保持承保中状态等待补偿重发，applicationNo={}", applicationNo, exception);
+            log.warn("自动承保请求失败，申请保持承保中状态等待补偿重发，applicationNo={}", applicationNo, exception);
             recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
         }

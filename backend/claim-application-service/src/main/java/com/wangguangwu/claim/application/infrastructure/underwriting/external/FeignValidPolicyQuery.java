@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 import com.wangguangwu.claim.application.domain.underwriting.PolicySnapshot;
 import com.wangguangwu.claim.application.domain.underwriting.ValidPolicyQuery;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,14 +12,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class FeignValidPolicyQuery implements ValidPolicyQuery {
 
     private final UnderwritingFeignClient underwritingFeignClient;
-
-    public FeignValidPolicyQuery(UnderwritingFeignClient underwritingFeignClient) {
-        this.underwritingFeignClient = underwritingFeignClient;
-    }
 
     /**
      * 按租户与被保人证件号查询有效保单。

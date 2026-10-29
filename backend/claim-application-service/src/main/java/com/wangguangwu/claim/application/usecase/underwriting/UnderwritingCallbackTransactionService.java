@@ -11,6 +11,7 @@ import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCo
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackDisposition;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class UnderwritingCallbackTransactionService {
 
@@ -27,16 +29,6 @@ public class UnderwritingCallbackTransactionService {
     private final OutboxEventRepository outboxEventRepository;
     private final InteractionLogRepository interactionLogRepository;
     private final ApplicationLifecycleRecordFactory recordFactory;
-
-    public UnderwritingCallbackTransactionService(ApplicationRepository applicationRepository,
-                                                  OutboxEventRepository outboxEventRepository,
-                                                  InteractionLogRepository interactionLogRepository,
-                                                  ApplicationLifecycleRecordFactory recordFactory) {
-        this.applicationRepository = applicationRepository;
-        this.outboxEventRepository = outboxEventRepository;
-        this.interactionLogRepository = interactionLogRepository;
-        this.recordFactory = recordFactory;
-    }
 
     /**
      * 在同一事务中推进状态、写入审核交付事件与结束轨迹。

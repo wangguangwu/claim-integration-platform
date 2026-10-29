@@ -6,11 +6,11 @@ import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntak
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,18 +21,15 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RedissonApplicationIntakeLock.class);
     private static final String LOCK_KEY_PREFIX = "claim:application:intake:";
     private static final long WAIT_SECONDS = 30L;
 
     private final RedissonClient redissonClient;
-
-    public RedissonApplicationIntakeLock(RedissonClient redissonClient) {
-        this.redissonClient = redissonClient;
-    }
 
     /**
      * 最多等待 30 秒获取锁，不指定 leaseTime，由 watchdog 每 30 秒续期。
@@ -75,7 +72,7 @@ public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
             throw new ApplicationIntakeException(ApplicationIntakeErrorCode.APPLICATION_INTAKE_BUSY,
                     "申请签收等待锁被中断，请稍后重试");
         } catch (RedisException exception) {
-            LOGGER.warn("申请签收锁不可用，降级为无锁执行并依赖数据库唯一约束", exception);
+            log.warn("申请签收锁不可用，降级为无锁执行并依赖数据库唯一约束", exception);
             return false;
         }
     }
@@ -91,7 +88,7 @@ public class RedissonApplicationIntakeLock implements ApplicationIntakeLock {
                 lock.unlock();
             }
         } catch (RedisException exception) {
-            LOGGER.warn("申请签收锁释放失败，等待 watchdog 超时自动释放", exception);
+            log.warn("申请签收锁释放失败，等待 watchdog 超时自动释放", exception);
         }
     }
 }

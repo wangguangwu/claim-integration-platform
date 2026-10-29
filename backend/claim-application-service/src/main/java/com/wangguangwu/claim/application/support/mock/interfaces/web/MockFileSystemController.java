@@ -2,6 +2,7 @@ package com.wangguangwu.claim.application.support.mock.interfaces.web;
 
 import com.wangguangwu.claim.application.support.mock.infrastructure.MockFileSystemStore;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,16 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/mock/file-system/v1/uploads")
 @ConditionalOnProperty(name = "claim.mock.enabled", havingValue = "true")
 public class MockFileSystemController {
 
     private final MockFileSystemStore mockFileSystemStore;
-
-    public MockFileSystemController(MockFileSystemStore mockFileSystemStore) {
-        this.mockFileSystemStore = mockFileSystemStore;
-    }
 
     /**
      * 上传材料，按源地址幂等。

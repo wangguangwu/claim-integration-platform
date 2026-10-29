@@ -4,11 +4,11 @@ import com.wangguangwu.claim.application.domain.claim.ApplicationExistenceQuery;
 import com.wangguangwu.claim.application.domain.claim.ApplicationRepository;
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;
 import java.time.Duration;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,22 +17,17 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class RedisApplicationExistenceQuery implements ApplicationExistenceQuery {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RedisApplicationExistenceQuery.class);
     private static final String CACHE_KEY_PREFIX = "claim:application:exists:";
     private static final Duration EXIST_TTL = Duration.ofMinutes(10);
     private static final Duration ABSENT_TTL = Duration.ofMinutes(1);
 
     private final RedissonClient redissonClient;
     private final ApplicationRepository applicationRepository;
-
-    public RedisApplicationExistenceQuery(RedissonClient redissonClient,
-                                          ApplicationRepository applicationRepository) {
-        this.redissonClient = redissonClient;
-        this.applicationRepository = applicationRepository;
-    }
 
     /**
      * 先读缓存，未命中时回源 MySQL 并以不同 TTL 缓存存在与不存在结果。
@@ -55,7 +50,7 @@ public class RedisApplicationExistenceQuery implements ApplicationExistenceQuery
             bucket.set(applicationExists, applicationExists ? EXIST_TTL : ABSENT_TTL);
             return applicationExists;
         } catch (RedisException exception) {
-            LOGGER.warn("理赔申请存在性缓存不可用，回源 MySQL，cacheKey={}", cacheKey, exception);
+            log.warn("理赔申请存在性缓存不可用，回源 MySQL，cacheKey={}", cacheKey, exception);
             return applicationRepository.exists(tenantCode, externalApplicationNo);
         }
     }
@@ -72,7 +67,7 @@ public class RedisApplicationExistenceQuery implements ApplicationExistenceQuery
         try {
             redissonClient.getBucket(cacheKey).delete();
         } catch (RedisException exception) {
-            LOGGER.warn("理赔申请存在性缓存失效失败，cacheKey={}", cacheKey, exception);
+            log.warn("理赔申请存在性缓存失效失败，cacheKey={}", cacheKey, exception);
         }
     }
 

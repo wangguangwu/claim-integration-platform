@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -29,10 +29,11 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class ApplicationCompensationUseCase {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ApplicationCompensationUseCase.class);
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
     private static final String UNDERWRITING_RESULT_QUERY_FAILED_CODE = "UNDERWRITING_RESULT_QUERY_FAILED";
     private static final String AUTO_UNDERWRITING_REQUEST_FAILED_CODE = "AUTO_UNDERWRITING_REQUEST_FAILED";
@@ -48,26 +49,6 @@ public class ApplicationCompensationUseCase {
     private final InteractionLogRepository interactionLogRepository;
     private final ApplicationCompensationPolicy compensationPolicy;
 
-    public ApplicationCompensationUseCase(OutboxEventRepository outboxEventRepository,
-                                          ApplicationRepository applicationRepository,
-                                          UnderwritingUseCase underwritingUseCase,
-                                          UnderwritingCallbackUseCase underwritingCallbackUseCase,
-                                          UnderwritingResultQuery underwritingResultQuery,
-                                          AutoUnderwritingRequester autoUnderwritingRequester,
-                                          ApplicationLifecycleRecordFactory recordFactory,
-                                          InteractionLogRepository interactionLogRepository,
-                                          ApplicationCompensationPolicy compensationPolicy) {
-        this.outboxEventRepository = outboxEventRepository;
-        this.applicationRepository = applicationRepository;
-        this.underwritingUseCase = underwritingUseCase;
-        this.underwritingCallbackUseCase = underwritingCallbackUseCase;
-        this.underwritingResultQuery = underwritingResultQuery;
-        this.autoUnderwritingRequester = autoUnderwritingRequester;
-        this.recordFactory = recordFactory;
-        this.interactionLogRepository = interactionLogRepository;
-        this.compensationPolicy = compensationPolicy;
-    }
-
     /**
      * 把停留过久的发送中事件重置为待投递，处理投递进程崩溃场景。
      *
@@ -77,7 +58,7 @@ public class ApplicationCompensationUseCase {
         LocalDateTime sendingBefore = now().minus(compensationPolicy.outboxSendingTimeout());
         int resetCount = outboxEventRepository.resetStuckSending(sendingBefore);
         if (resetCount > 0) {
-            LOGGER.info("Outbox 发送滞留事件已重置为待投递，resetCount={}，sendingBefore={}", resetCount,
+            log.info("Outbox 发送滞留事件已重置为待投递，resetCount={}，sendingBefore={}", resetCount,
                     sendingBefore);
         }
         return resetCount;
@@ -96,12 +77,12 @@ public class ApplicationCompensationUseCase {
             try {
                 underwritingUseCase.dispatch(application.getApplicationNo(), UUID.randomUUID().toString());
             } catch (RuntimeException exception) {
-                LOGGER.warn("已受理申请补偿分流失败，等待下一轮补偿，applicationNo={}",
+                log.warn("已受理申请补偿分流失败，等待下一轮补偿，applicationNo={}",
                         application.getApplicationNo(), exception);
             }
         }
         if (!applications.isEmpty()) {
-            LOGGER.info("已受理滞留补偿执行完成，compensatedCount={}", applications.size());
+            log.info("已受理滞留补偿执行完成，compensatedCount={}", applications.size());
         }
         return applications.size();
     }
@@ -119,7 +100,7 @@ public class ApplicationCompensationUseCase {
             recoverUnderwritingApplication(application);
         }
         if (!applications.isEmpty()) {
-            LOGGER.info("承保中滞留补偿执行完成，compensatedCount={}", applications.size());
+            log.info("承保中滞留补偿执行完成，compensatedCount={}", applications.size());
         }
         return applications.size();
     }
@@ -133,7 +114,7 @@ public class ApplicationCompensationUseCase {
         try {
             underwritingResult = underwritingResultQuery.query(applicationNo);
         } catch (RuntimeException exception) {
-            LOGGER.warn("承保结果查询失败，等待下一轮补偿，applicationNo={}", applicationNo, exception);
+            log.warn("承保结果查询失败，等待下一轮补偿，applicationNo={}", applicationNo, exception);
             recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     UNDERWRITING_RESULT_QUERY_FAILED_CODE, exception.getMessage());
             return;
@@ -142,7 +123,7 @@ public class ApplicationCompensationUseCase {
         switch (underwritingResult) {
             case COMPLETED -> completeUnderwriting(application, traceId);
             case NOT_FOUND -> reRequestAutoUnderwriting(application, traceId);
-            case PROCESSING -> LOGGER.info("承保结果仍在处理中，保持承保中状态，applicationNo={}", applicationNo);
+            case PROCESSING -> log.info("承保结果仍在处理中，保持承保中状态，applicationNo={}", applicationNo);
         }
     }
 
@@ -155,7 +136,7 @@ public class ApplicationCompensationUseCase {
             underwritingCallbackUseCase.complete(new UnderwritingCompletedCommand(applicationNo,
                     COMPENSATION_REQUEST_ID_PREFIX + applicationNo, traceId));
         } catch (RuntimeException exception) {
-            LOGGER.warn("承保完成补偿推进失败，等待下一轮补偿，applicationNo={}", applicationNo, exception);
+            log.warn("承保完成补偿推进失败，等待下一轮补偿，applicationNo={}", applicationNo, exception);
         }
     }
 
@@ -171,7 +152,7 @@ public class ApplicationCompensationUseCase {
                     application.primaryInsuredCertificateNo());
             recordInteraction(applicationNo, interactionNo, InteractionAction.COMPLETED, traceId, null, null);
         } catch (RuntimeException exception) {
-            LOGGER.warn("自动承保请求补偿重发失败，保持承保中状态，applicationNo={}", applicationNo, exception);
+            log.warn("自动承保请求补偿重发失败，保持承保中状态，applicationNo={}", applicationNo, exception);
             recordInteraction(applicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
         }

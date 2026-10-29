@@ -10,8 +10,8 @@ import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncExcepti
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,25 +20,15 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class UnderwritingCallbackUseCase {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(UnderwritingCallbackUseCase.class);
 
     private final ApplicationRepository applicationRepository;
     private final InteractionLogRepository interactionLogRepository;
     private final ApplicationLifecycleRecordFactory recordFactory;
     private final UnderwritingCallbackTransactionService transactionService;
-
-    public UnderwritingCallbackUseCase(ApplicationRepository applicationRepository,
-                                       InteractionLogRepository interactionLogRepository,
-                                       ApplicationLifecycleRecordFactory recordFactory,
-                                       UnderwritingCallbackTransactionService transactionService) {
-        this.applicationRepository = applicationRepository;
-        this.interactionLogRepository = interactionLogRepository;
-        this.recordFactory = recordFactory;
-        this.transactionService = transactionService;
-    }
 
     /**
      * 处理承保完成通知。
@@ -56,7 +46,7 @@ public class UnderwritingCallbackUseCase {
                 command.applicationNo(), interactionNo, InteractionAction.STARTED, command.requestId(),
                 command.traceId(), null, null));
         UnderwritingCallbackResult result = transactionService.complete(command, application, interactionNo);
-        LOGGER.info("承保完成通知处理完成，applicationNo={}, disposition={}, traceId={}", command.applicationNo(),
+        log.info("承保完成通知处理完成，applicationNo={}, disposition={}, traceId={}", command.applicationNo(),
                 result.disposition(), command.traceId());
         return result;
     }

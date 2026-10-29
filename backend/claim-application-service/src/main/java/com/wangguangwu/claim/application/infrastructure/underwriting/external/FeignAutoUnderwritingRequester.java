@@ -1,6 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 
 import com.wangguangwu.claim.application.domain.underwriting.AutoUnderwritingRequester;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -9,14 +10,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class FeignAutoUnderwritingRequester implements AutoUnderwritingRequester {
 
     private final UnderwritingFeignClient underwritingFeignClient;
-
-    public FeignAutoUnderwritingRequester(UnderwritingFeignClient underwritingFeignClient) {
-        this.underwritingFeignClient = underwritingFeignClient;
-    }
 
     /**
      * 按平台申请编号发起自动承保，外部系统保证重复发起幂等。

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
@@ -13,16 +14,13 @@ import org.springframework.stereotype.Repository;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Repository
 public class MyBatisConsumedEventRepository implements ConsumedEventRepository {
 
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     private final ConsumedEventDOMapper consumedEventMapper;
-
-    public MyBatisConsumedEventRepository(ConsumedEventDOMapper consumedEventMapper) {
-        this.consumedEventMapper = consumedEventMapper;
-    }
 
     /**
      * 判断事件是否已在同一消费者组登记。
@@ -48,11 +46,8 @@ public class MyBatisConsumedEventRepository implements ConsumedEventRepository {
      */
     @Override
     public boolean register(String consumerGroup, String eventId, String applicationNo) {
-        ConsumedEventDO consumedEventDO = new ConsumedEventDO();
-        consumedEventDO.setConsumerGroup(consumerGroup);
-        consumedEventDO.setEventId(eventId);
-        consumedEventDO.setApplicationNo(applicationNo);
-        consumedEventDO.setConsumedAt(LocalDateTime.now(BUSINESS_ZONE_ID));
+        ConsumedEventDO consumedEventDO = ConsumedEventDO.builder().consumerGroup(consumerGroup).eventId(eventId)
+                .applicationNo(applicationNo).consumedAt(LocalDateTime.now(BUSINESS_ZONE_ID)).build();
         try {
             consumedEventMapper.insert(consumedEventDO);
             return true;

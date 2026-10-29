@@ -12,6 +12,7 @@ import com.wangguangwu.claim.application.usecase.intake.result.ApplicationIntake
 import com.wangguangwu.claim.application.usecase.intake.result.ApplicationIntakeResult;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class ApplicationIntakeTransactionService {
 
@@ -30,20 +32,6 @@ public class ApplicationIntakeTransactionService {
     private final OutboxEventRepository outboxEventRepository;
     private final ApplicationIntakeMaterialFactory materialFactory;
     private final ApplicationLifecycleRecordFactory lifecycleRecordFactory;
-
-    public ApplicationIntakeTransactionService(ApplicationRepository applicationRepository,
-                                               MaterialRepository materialRepository,
-                                               InteractionLogRepository interactionLogRepository,
-                                               OutboxEventRepository outboxEventRepository,
-                                               ApplicationIntakeMaterialFactory materialFactory,
-                                               ApplicationLifecycleRecordFactory lifecycleRecordFactory) {
-        this.applicationRepository = applicationRepository;
-        this.materialRepository = materialRepository;
-        this.interactionLogRepository = interactionLogRepository;
-        this.outboxEventRepository = outboxEventRepository;
-        this.materialFactory = materialFactory;
-        this.lifecycleRecordFactory = lifecycleRecordFactory;
-    }
 
     /**
      * 在本地事务中完成首次签收、重复复用或受理失败后的重新申请。

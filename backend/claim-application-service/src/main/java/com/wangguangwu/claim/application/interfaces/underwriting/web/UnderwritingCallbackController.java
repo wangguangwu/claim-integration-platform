@@ -5,6 +5,7 @@ import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingCallbackUseCase;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,15 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/application/v1/callbacks")
 public class UnderwritingCallbackController {
 
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
-
-    public UnderwritingCallbackController(UnderwritingCallbackUseCase underwritingCallbackUseCase) {
-        this.underwritingCallbackUseCase = underwritingCallbackUseCase;
-    }
 
     /**
      * 接收承保完成通知；重复、迟到或状态不匹配的通知同样返回成功。

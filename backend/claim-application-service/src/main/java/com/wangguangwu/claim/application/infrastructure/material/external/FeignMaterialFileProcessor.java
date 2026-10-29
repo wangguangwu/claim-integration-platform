@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.material.external;
 import com.wangguangwu.claim.application.domain.material.FileUploadResult;
 import com.wangguangwu.claim.application.domain.material.MaterialFileProcessor;
 import com.wangguangwu.claim.application.domain.material.MaterialUploadRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,14 +12,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class FeignMaterialFileProcessor implements MaterialFileProcessor {
 
     private final FileSystemFeignClient fileSystemFeignClient;
-
-    public FeignMaterialFileProcessor(FileSystemFeignClient fileSystemFeignClient) {
-        this.fileSystemFeignClient = fileSystemFeignClient;
-    }
 
     /**
      * 上传材料并转换文件系统返回结果，异常向上抛出表示文件系统不可用。

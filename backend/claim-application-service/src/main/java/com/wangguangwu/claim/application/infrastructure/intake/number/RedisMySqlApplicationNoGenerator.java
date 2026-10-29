@@ -6,12 +6,12 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,10 +20,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RedisMySqlApplicationNoGenerator.class);
     private static final String NUMBER_KEY_PREFIX = "claim:application:number:";
     private static final String INITIALIZE_LOCK_KEY_PREFIX = "claim:application:number:initialize:";
     private static final String APPLICATION_NO_PREFIX = "A";
@@ -35,12 +36,6 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
 
     private final RedissonClient redissonClient;
     private final ApplicationRepository applicationRepository;
-
-    public RedisMySqlApplicationNoGenerator(RedissonClient redissonClient,
-                                             ApplicationRepository applicationRepository) {
-        this.redissonClient = redissonClient;
-        this.applicationRepository = applicationRepository;
-    }
 
     /**
      * 生成 A 加日期加八位序列的理赔申请编号。
@@ -113,7 +108,7 @@ public class RedisMySqlApplicationNoGenerator implements ApplicationNoGenerator 
         try {
             raiseCounterTo(counter, persistedSequence);
         } catch (RedisException exception) {
-            LOGGER.warn("理赔申请编号计数器校准失败，继续使用 MySQL 兜底，date={}", formattedDate, exception);
+            log.warn("理赔申请编号计数器校准失败，继续使用 MySQL 兜底，date={}", formattedDate, exception);
         }
     }
 

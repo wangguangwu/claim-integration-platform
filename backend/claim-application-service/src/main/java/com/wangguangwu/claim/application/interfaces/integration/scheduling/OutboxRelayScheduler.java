@@ -1,8 +1,8 @@
 package com.wangguangwu.claim.application.interfaces.integration.scheduling;
 
 import com.wangguangwu.claim.application.usecase.integration.outbox.OutboxRelayUseCase;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -12,16 +12,12 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class OutboxRelayScheduler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(OutboxRelayScheduler.class);
-
     private final OutboxRelayUseCase outboxRelayUseCase;
-
-    public OutboxRelayScheduler(OutboxRelayUseCase outboxRelayUseCase) {
-        this.outboxRelayUseCase = outboxRelayUseCase;
-    }
 
     /**
      * 按固定间隔投递到期事件。
@@ -31,10 +27,10 @@ public class OutboxRelayScheduler {
         try {
             int publishedCount = outboxRelayUseCase.relayOnce();
             if (publishedCount > 0) {
-                LOGGER.info("Outbox 事件投递完成，publishedCount={}", publishedCount);
+                log.info("Outbox 事件投递完成，publishedCount={}", publishedCount);
             }
         } catch (RuntimeException exception) {
-            LOGGER.error("Outbox 事件投递调度异常，等待下一轮调度重试", exception);
+            log.error("Outbox 事件投递调度异常，等待下一轮调度重试", exception);
         }
     }
 }

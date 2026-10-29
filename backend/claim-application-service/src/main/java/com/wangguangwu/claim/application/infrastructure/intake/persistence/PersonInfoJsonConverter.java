@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.intake.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wangguangwu.claim.application.domain.claim.PersonInfo;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,14 +12,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-28
  */
+@RequiredArgsConstructor
 @Component
 public class PersonInfoJsonConverter {
 
     private final ObjectMapper objectMapper;
-
-    public PersonInfoJsonConverter(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 将人员信息序列化为 JSON 列内容。

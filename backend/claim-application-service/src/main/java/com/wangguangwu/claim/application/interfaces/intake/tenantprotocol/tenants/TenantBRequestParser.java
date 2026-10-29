@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.TenantProtocolParser;
+import lombok.RequiredArgsConstructor;
 
 /**
  * B 租户报文解析器，把请求正文反序列化为 {@link TenantBIntakeRequest}。
@@ -11,13 +12,10 @@ import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.T
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 public class TenantBRequestParser implements TenantProtocolParser<TenantBIntakeRequest> {
 
     private final ObjectMapper objectMapper;
-
-    public TenantBRequestParser(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 解析请求正文，不合法 JSON 或结构不匹配时返回报文错误。

@@ -6,6 +6,7 @@ import com.wangguangwu.claim.application.domain.material.MaterialRepository;
 import com.wangguangwu.claim.application.domain.material.MaterialStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Repository;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Repository
 public class MyBatisMaterialRepository implements MaterialRepository {
 
@@ -22,11 +24,6 @@ public class MyBatisMaterialRepository implements MaterialRepository {
 
     private final MaterialDOMapper materialMapper;
     private final MaterialDataConverter materialDataConverter;
-
-    public MyBatisMaterialRepository(MaterialDOMapper materialMapper, MaterialDataConverter materialDataConverter) {
-        this.materialMapper = materialMapper;
-        this.materialDataConverter = materialDataConverter;
-    }
 
     /**
      * 逐条保存同批次材料，避免 MyBatis 批量执行器跨事务缓存造成行为不透明。

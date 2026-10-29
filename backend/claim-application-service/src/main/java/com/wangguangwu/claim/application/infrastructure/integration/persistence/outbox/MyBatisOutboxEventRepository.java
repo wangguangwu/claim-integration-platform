@@ -7,6 +7,7 @@ import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventRe
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -15,16 +16,13 @@ import org.springframework.stereotype.Repository;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Repository
 public class MyBatisOutboxEventRepository implements OutboxEventRepository {
 
     private static final int INITIAL_RETRY_COUNT = 0;
 
     private final OutboxEventDOMapper outboxEventMapper;
-
-    public MyBatisOutboxEventRepository(OutboxEventDOMapper outboxEventMapper) {
-        this.outboxEventMapper = outboxEventMapper;
-    }
 
     /**
      * 保存初始为待投递状态的 Outbox 事件。
@@ -33,15 +31,11 @@ public class MyBatisOutboxEventRepository implements OutboxEventRepository {
      */
     @Override
     public void insert(OutboxEvent outboxEvent) {
-        OutboxEventDO outboxEventDO = new OutboxEventDO();
-        outboxEventDO.setEventId(outboxEvent.eventId());
-        outboxEventDO.setEventType(outboxEvent.eventType());
-        outboxEventDO.setEventVersion(outboxEvent.eventVersion());
-        outboxEventDO.setApplicationNo(outboxEvent.applicationNo());
-        outboxEventDO.setTenantCode(outboxEvent.tenantCode());
-        outboxEventDO.setPayload(outboxEvent.payload());
-        outboxEventDO.setStatus(outboxEvent.status().name());
-        outboxEventDO.setRetryCount(INITIAL_RETRY_COUNT);
+        OutboxEventDO outboxEventDO = OutboxEventDO.builder().eventId(outboxEvent.eventId())
+                .eventType(outboxEvent.eventType()).eventVersion(outboxEvent.eventVersion())
+                .applicationNo(outboxEvent.applicationNo()).tenantCode(outboxEvent.tenantCode())
+                .payload(outboxEvent.payload()).status(outboxEvent.status().name())
+                .retryCount(INITIAL_RETRY_COUNT).build();
         outboxEventMapper.insert(outboxEventDO);
     }
 

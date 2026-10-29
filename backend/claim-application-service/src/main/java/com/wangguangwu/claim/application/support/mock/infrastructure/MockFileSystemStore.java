@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -19,11 +19,12 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 @ConditionalOnProperty(name = "claim.mock.enabled", havingValue = "true")
 public class MockFileSystemStore {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MockFileSystemStore.class);
     private static final String UPLOADED_FILE_URL_TEMPLATE = "mock://file-system/%s/%s/%s";
     private static final String REJECTED_ERROR_CODE = "MOCK_UPLOAD_REJECTED";
     private static final String REJECTED_ERROR_MESSAGE = "模拟文件系统按材料类型拒绝上传";
@@ -31,10 +32,6 @@ public class MockFileSystemStore {
 
     private final Map<String, UploadRecord> uploadsBySourceUrl = new ConcurrentHashMap<>();
     private final MockFileSystemProperties properties;
-
-    public MockFileSystemStore(MockFileSystemProperties properties) {
-        this.properties = properties;
-    }
 
     /**
      * 模拟上传材料，同一源地址重复上传返回同一模拟地址。
@@ -45,7 +42,7 @@ public class MockFileSystemStore {
     public UploadOutcome upload(MockUploadCommand command) {
         applyDelay();
         if (shouldReject(command.materialType())) {
-            LOGGER.info("模拟文件系统拒绝上传，applicationNo={}，materialType={}", command.applicationNo(),
+            log.info("模拟文件系统拒绝上传，applicationNo={}，materialType={}", command.applicationNo(),
                     command.materialType());
             return UploadOutcome.rejected(REJECTED_ERROR_CODE, REJECTED_ERROR_MESSAGE);
         }

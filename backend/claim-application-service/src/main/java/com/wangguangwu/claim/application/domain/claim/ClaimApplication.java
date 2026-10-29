@@ -1,18 +1,21 @@
 package com.wangguangwu.claim.application.domain.claim;
 
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 
 /**
  * 理赔申请聚合根，承载平台统一的人员信息、提交材料与生命周期状态。
  *
  * <p>租户协议流水线的转换产物即为该模型：提交结果只包含租户口径的业务字段，
- * 平台申请编号与状态由签收用例绑定。</p>
+ * 平台申请编号与状态由签收用例绑定。字段装配只通过本类的领域工厂完成。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
+@Builder(access = AccessLevel.PRIVATE)
 public class ClaimApplication {
 
     /** 数据库主键，仅用于持久化更新条件。 */
@@ -48,9 +51,6 @@ public class ClaimApplication {
     /** 本次提交的材料，落库后由材料仓储独立管理。 */
     private List<MaterialSubmission> materials;
 
-    private ClaimApplication() {
-    }
-
     /**
      * 创建租户协议提交结果，此时还没有平台申请编号与状态。
      *
@@ -66,15 +66,9 @@ public class ClaimApplication {
     public static ClaimApplication submit(String tenantCode, String externalApplicationNo, PersonInfo applicant,
                                           PersonInfo primaryInsured, PersonInfo accidentPerson, PersonInfo payee,
                                           List<MaterialSubmission> materials) {
-        ClaimApplication application = new ClaimApplication();
-        application.tenantCode = tenantCode;
-        application.externalApplicationNo = externalApplicationNo;
-        application.applicant = applicant;
-        application.primaryInsured = primaryInsured;
-        application.accidentPerson = accidentPerson;
-        application.payee = payee;
-        application.materials = materials;
-        return application;
+        return ClaimApplication.builder().tenantCode(tenantCode).externalApplicationNo(externalApplicationNo)
+                .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
+                .materials(materials).build();
     }
 
     /**
@@ -98,18 +92,10 @@ public class ClaimApplication {
                                            String externalApplicationNo, ApplicationStatus status,
                                            Integer applicationAttempt, PersonInfo applicant, PersonInfo primaryInsured,
                                            PersonInfo accidentPerson, PersonInfo payee) {
-        ClaimApplication application = new ClaimApplication();
-        application.id = id;
-        application.tenantCode = tenantCode;
-        application.applicationNo = applicationNo;
-        application.externalApplicationNo = externalApplicationNo;
-        application.status = status;
-        application.applicationAttempt = applicationAttempt;
-        application.applicant = applicant;
-        application.primaryInsured = primaryInsured;
-        application.accidentPerson = accidentPerson;
-        application.payee = payee;
-        return application;
+        return ClaimApplication.builder().id(id).tenantCode(tenantCode).applicationNo(applicationNo)
+                .externalApplicationNo(externalApplicationNo).status(status).applicationAttempt(applicationAttempt)
+                .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
+                .build();
     }
 
     /**

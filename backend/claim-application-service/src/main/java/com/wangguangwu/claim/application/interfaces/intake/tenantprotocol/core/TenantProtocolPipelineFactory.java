@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core;
 import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntakeException;
 import com.wangguangwu.claim.application.usecase.intake.command.ApplicationIntakeCommand;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,14 +12,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-28
  */
+@RequiredArgsConstructor
 @Component
 public class TenantProtocolPipelineFactory {
 
     private final TenantProtocolPipelineRegistry pipelineRegistry;
-
-    public TenantProtocolPipelineFactory(TenantProtocolPipelineRegistry pipelineRegistry) {
-        this.pipelineRegistry = pipelineRegistry;
-    }
 
     /**
      * 根据租户编码和协议版本获取对应流水线。

@@ -28,9 +28,10 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
      */
     @Override
     public ApplicationIntakeCommand convert(String tenantCode, TenantAIntakeRequest request) {
-        return new ApplicationIntakeCommand(tenantCode, request.requestNo().trim(), toPerson(request.applicant()),
-                toPerson(request.insured()), toPerson(request.accident()), toPerson(request.payee()),
-                toMaterials(request.attachments()));
+        return ApplicationIntakeCommand.builder().tenantCode(tenantCode)
+                .externalApplicationNo(request.requestNo().trim()).applicant(toPerson(request.applicant()))
+                .primaryInsured(toPerson(request.insured())).accidentPerson(toPerson(request.accident()))
+                .payee(toPerson(request.payee())).materials(toMaterials(request.attachments())).build();
     }
 
     private PersonInfo toPerson(TenantAIntakeRequest.TenantAPerson person) {

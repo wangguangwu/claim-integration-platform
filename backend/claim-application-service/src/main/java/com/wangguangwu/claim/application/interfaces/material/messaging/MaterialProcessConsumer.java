@@ -5,6 +5,7 @@ import com.wangguangwu.claim.application.usecase.material.MaterialProcessingUseC
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import java.util.Map;
 import java.util.function.Consumer;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
@@ -17,16 +18,13 @@ import org.springframework.messaging.Message;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Configuration(proxyBeanMethods = false)
 public class MaterialProcessConsumer {
 
     private static final String APPLICATION_ATTEMPT_FIELD = "applicationAttempt";
 
     private final MaterialProcessingUseCase materialProcessingUseCase;
-
-    public MaterialProcessConsumer(MaterialProcessingUseCase materialProcessingUseCase) {
-        this.materialProcessingUseCase = materialProcessingUseCase;
-    }
 
     /**
      * 声明材料处理消费函数，绑定名与 002 冻结的配置一致。

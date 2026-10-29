@@ -19,8 +19,8 @@ import com.wangguangwu.claim.application.usecase.material.result.MaterialProcess
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingUseCase;
 import java.util.List;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -29,10 +29,11 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class MaterialProcessingUseCase {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MaterialProcessingUseCase.class);
     private static final String FILE_UPLOAD_FAILED_CODE = "FILE_UPLOAD_FAILED";
 
     private final ApplicationRepository applicationRepository;
@@ -44,24 +45,6 @@ public class MaterialProcessingUseCase {
     private final InteractionLogRepository interactionLogRepository;
     private final UnderwritingUseCase underwritingUseCase;
 
-    public MaterialProcessingUseCase(ApplicationRepository applicationRepository,
-                                     ConsumedEventRepository consumedEventRepository,
-                                     MaterialRepository materialRepository,
-                                     MaterialFileProcessor materialFileProcessor,
-                                     MaterialProcessingTransactionService transactionService,
-                                     ApplicationLifecycleRecordFactory recordFactory,
-                                     InteractionLogRepository interactionLogRepository,
-                                     UnderwritingUseCase underwritingUseCase) {
-        this.applicationRepository = applicationRepository;
-        this.consumedEventRepository = consumedEventRepository;
-        this.materialRepository = materialRepository;
-        this.materialFileProcessor = materialFileProcessor;
-        this.transactionService = transactionService;
-        this.recordFactory = recordFactory;
-        this.interactionLogRepository = interactionLogRepository;
-        this.underwritingUseCase = underwritingUseCase;
-    }
-
     /**
      * 处理一次材料处理事件。
      *
@@ -72,7 +55,7 @@ public class MaterialProcessingUseCase {
      */
     public void process(MaterialProcessCommand command) {
         if (consumedEventRepository.exists(MaterialProcessingTransactionService.CONSUMER_GROUP, command.eventId())) {
-            LOGGER.info("材料处理事件已消费，跳过处理，applicationNo={}，eventId={}", command.applicationNo(),
+            log.info("材料处理事件已消费，跳过处理，applicationNo={}，eventId={}", command.applicationNo(),
                     command.eventId());
             return;
         }
@@ -82,7 +65,7 @@ public class MaterialProcessingUseCase {
         String interactionNo = recordFactory.newInteractionNo();
         recordInteraction(command, interactionNo, InteractionAction.STARTED, null, null);
         if (!isProcessable(application, command.applicationAttempt())) {
-            LOGGER.info("材料处理事件与当前申请不匹配，按重复事件处理，applicationNo={}，status={}，eventAttempt={}",
+            log.info("材料处理事件与当前申请不匹配，按重复事件处理，applicationNo={}，status={}，eventAttempt={}",
                     command.applicationNo(), application.getStatus(), command.applicationAttempt());
             transactionService.recordReused(command, interactionNo);
             return;

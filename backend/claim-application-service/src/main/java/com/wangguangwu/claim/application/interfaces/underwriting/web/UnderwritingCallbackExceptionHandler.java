@@ -5,8 +5,7 @@ import com.wangguangwu.claim.application.shared.contract.ApplicationAsyncExcepti
 import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -21,11 +20,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
 @RestControllerAdvice(basePackages = "com.wangguangwu.claim.application.interfaces.underwriting.web")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class UnderwritingCallbackExceptionHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(UnderwritingCallbackExceptionHandler.class);
     private static final String CALLBACK_INVALID_MESSAGE = "承保完成回调报文不合法";
     private static final String SYSTEM_ERROR_MESSAGE = "承保完成回调处理失败";
 
@@ -40,7 +39,7 @@ public class UnderwritingCallbackExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAsyncException(ApplicationAsyncException exception,
                                                                   HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        LOGGER.warn("承保完成回调业务异常，traceId={}，errorCode={}，message={}", traceId,
+        log.warn("承保完成回调业务异常，traceId={}，errorCode={}，message={}", traceId,
                 exception.getErrorCode().name(), exception.getMessage());
         return ResponseEntity.status(statusOf(exception.getErrorCode()))
                 .body(ApiResponse.failure(exception.getErrorCode().name(), exception.getMessage(), traceId));
@@ -57,7 +56,7 @@ public class UnderwritingCallbackExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleUnreadableMessage(HttpMessageNotReadableException exception,
                                                                      HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        LOGGER.warn("承保完成回调报文无法解析，traceId={}", traceId);
+        log.warn("承保完成回调报文无法解析，traceId={}", traceId);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.failure(ApplicationAsyncErrorCode.CALLBACK_INVALID.name(),
                         CALLBACK_INVALID_MESSAGE, traceId));
@@ -73,7 +72,7 @@ public class UnderwritingCallbackExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleSystemException(Exception exception, HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        LOGGER.error("承保完成回调处理异常，traceId={}", traceId, exception);
+        log.error("承保完成回调处理异常，traceId={}", traceId, exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.failure(ApplicationAsyncErrorCode.APPLICATION_ASYNC_SYSTEM_ERROR.name(),
                         SYSTEM_ERROR_MESSAGE, traceId));

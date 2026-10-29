@@ -15,8 +15,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,10 +25,11 @@ import org.springframework.stereotype.Service;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class OutboxRelayUseCase {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(OutboxRelayUseCase.class);
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter OCCURRED_AT_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -38,16 +39,6 @@ public class OutboxRelayUseCase {
     private final OutboxEventPublisher outboxEventPublisher;
     private final OutboxRelayPolicy outboxRelayPolicy;
     private final ObjectMapper objectMapper;
-
-    public OutboxRelayUseCase(OutboxEventRepository outboxEventRepository,
-                              OutboxEventPublisher outboxEventPublisher,
-                              OutboxRelayPolicy outboxRelayPolicy,
-                              ObjectMapper objectMapper) {
-        this.outboxEventRepository = outboxEventRepository;
-        this.outboxEventPublisher = outboxEventPublisher;
-        this.outboxRelayPolicy = outboxRelayPolicy;
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 投递一批到期事件，单条失败不影响同批其他事件。
@@ -91,14 +82,14 @@ public class OutboxRelayUseCase {
         int retryCount = currentRetryCount(outboxEvent) + 1;
         if (retryCount >= outboxRelayPolicy.maxRetryCount()) {
             outboxEventRepository.markFailed(outboxEvent.eventId(), retryCount);
-            LOGGER.error("Outbox 事件投递次数超限，标记失败，eventId={}, eventType={}, applicationNo={}, retryCount={}",
+            log.error("Outbox 事件投递次数超限，标记失败，eventId={}, eventType={}, applicationNo={}, retryCount={}",
                     outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.applicationNo(), retryCount,
                     exception);
             return;
         }
         LocalDateTime nextRetryAt = LocalDateTime.now(BUSINESS_ZONE_ID).plus(outboxRelayPolicy.retryDelay(retryCount));
         outboxEventRepository.markPendingForRetry(outboxEvent.eventId(), retryCount, nextRetryAt);
-        LOGGER.warn("Outbox 事件投递失败，等待退避重试，eventId={}, eventType={}, applicationNo={}, retryCount={}, "
+        log.warn("Outbox 事件投递失败，等待退避重试，eventId={}, eventType={}, applicationNo={}, retryCount={}, "
                         + "nextRetryAt={}", outboxEvent.eventId(), outboxEvent.eventType(), outboxEvent.applicationNo(),
                 retryCount, nextRetryAt, exception);
     }

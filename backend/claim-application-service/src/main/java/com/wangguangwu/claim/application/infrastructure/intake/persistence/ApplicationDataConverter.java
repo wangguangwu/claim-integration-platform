@@ -2,6 +2,7 @@ package com.wangguangwu.claim.application.infrastructure.intake.persistence;
 
 import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,14 +15,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class ApplicationDataConverter {
 
     private final PersonInfoJsonConverter personInfoJsonConverter;
-
-    public ApplicationDataConverter(PersonInfoJsonConverter personInfoJsonConverter) {
-        this.personInfoJsonConverter = personInfoJsonConverter;
-    }
 
     /**
      * 转换为持久化数据对象；创建与更新时间由数据库维护，不随领域对象写入。
@@ -33,21 +31,15 @@ public class ApplicationDataConverter {
         if (application == null) {
             return null;
         }
-        ApplicationDO applicationDO = new ApplicationDO();
-        applicationDO.setId(application.getId());
-        applicationDO.setTenantCode(application.getTenantCode());
-        applicationDO.setApplicationNo(application.getApplicationNo());
-        applicationDO.setExternalApplicationNo(application.getExternalApplicationNo());
-        applicationDO.setApplicationAttempt(application.getApplicationAttempt());
         ApplicationStatus status = application.getStatus();
-        if (status != null) {
-            applicationDO.setStatus(status.name());
-        }
-        applicationDO.setApplicantJson(personInfoJsonConverter.toJson(application.getApplicant()));
-        applicationDO.setPrimaryInsuredJson(personInfoJsonConverter.toJson(application.getPrimaryInsured()));
-        applicationDO.setAccidentPersonJson(personInfoJsonConverter.toJson(application.getAccidentPerson()));
-        applicationDO.setPayeeJson(personInfoJsonConverter.toJson(application.getPayee()));
-        return applicationDO;
+        return ApplicationDO.builder().id(application.getId()).tenantCode(application.getTenantCode())
+                .applicationNo(application.getApplicationNo())
+                .externalApplicationNo(application.getExternalApplicationNo())
+                .applicationAttempt(application.getApplicationAttempt()).status(status == null ? null : status.name())
+                .applicantJson(personInfoJsonConverter.toJson(application.getApplicant()))
+                .primaryInsuredJson(personInfoJsonConverter.toJson(application.getPrimaryInsured()))
+                .accidentPersonJson(personInfoJsonConverter.toJson(application.getAccidentPerson()))
+                .payeeJson(personInfoJsonConverter.toJson(application.getPayee())).build();
     }
 
     /**

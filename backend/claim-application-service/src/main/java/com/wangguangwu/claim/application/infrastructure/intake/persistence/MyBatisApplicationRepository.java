@@ -8,6 +8,7 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Repository;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Repository
 public class MyBatisApplicationRepository implements ApplicationRepository {
 
@@ -26,12 +28,6 @@ public class MyBatisApplicationRepository implements ApplicationRepository {
 
     private final ApplicationDOMapper applicationMapper;
     private final ApplicationDataConverter applicationDataConverter;
-
-    public MyBatisApplicationRepository(ApplicationDOMapper applicationMapper,
-                                        ApplicationDataConverter applicationDataConverter) {
-        this.applicationMapper = applicationMapper;
-        this.applicationDataConverter = applicationDataConverter;
-    }
 
     /**
      * 按租户与外部申请号查询理赔申请，唯一键保证最多一行。

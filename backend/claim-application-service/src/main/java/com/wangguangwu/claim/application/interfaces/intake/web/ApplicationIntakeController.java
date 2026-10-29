@@ -8,6 +8,7 @@ import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/application/v1/applications")
 public class ApplicationIntakeController {
@@ -28,14 +30,6 @@ public class ApplicationIntakeController {
     private final TenantProtocolPipelineFactory pipelineFactory;
     private final ApplicationIntakeUseCase applicationIntakeUseCase;
     private final TenantApplicationResponseRouter responseRouter;
-
-    public ApplicationIntakeController(TenantProtocolPipelineFactory pipelineFactory,
-                                       ApplicationIntakeUseCase applicationIntakeUseCase,
-                                       TenantApplicationResponseRouter responseRouter) {
-        this.pipelineFactory = pipelineFactory;
-        this.applicationIntakeUseCase = applicationIntakeUseCase;
-        this.responseRouter = responseRouter;
-    }
 
     /**
      * 接收租户私有报文，经协议流水线归一化为受理命令后执行标准化签收，并按租户渲染响应结构。

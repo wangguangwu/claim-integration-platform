@@ -5,8 +5,8 @@ import com.wangguangwu.claim.application.domain.claim.exception.ApplicationIntak
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,17 +19,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice(basePackages = "com.wangguangwu.claim.application.interfaces.intake.web")
 public class ApplicationIntakeExceptionHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ApplicationIntakeExceptionHandler.class);
     private static final String SYSTEM_ERROR_MESSAGE = "申请签收处理失败";
 
     private final TenantApplicationResponseRouter responseRouter;
-
-    public ApplicationIntakeExceptionHandler(TenantApplicationResponseRouter responseRouter) {
-        this.responseRouter = responseRouter;
-    }
 
     /**
      * 返回调用方可处理的业务错误，并记录已脱敏的错误上下文。
@@ -42,7 +39,7 @@ public class ApplicationIntakeExceptionHandler {
     public ResponseEntity<Object> handleBusinessException(ApplicationIntakeException exception,
                                                           HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        LOGGER.warn("申请签收业务异常，traceId={}，errorCode={}，message={}", traceId,
+        log.warn("申请签收业务异常，traceId={}，errorCode={}，message={}", traceId,
                 exception.getErrorCode().name(), exception.getMessage());
         return responseRouter.renderFailure(TenantContext.get(), traceId,
                 exception.getErrorCode(), exception.getMessage());
@@ -58,7 +55,7 @@ public class ApplicationIntakeExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleSystemException(Exception exception, HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
-        LOGGER.error("申请签收处理异常，traceId={}", traceId, exception);
+        log.error("申请签收处理异常，traceId={}", traceId, exception);
         return responseRouter.renderFailure(TenantContext.get(), traceId,
                 ApplicationIntakeErrorCode.APPLICATION_INTAKE_SYSTEM_ERROR, SYSTEM_ERROR_MESSAGE);
     }

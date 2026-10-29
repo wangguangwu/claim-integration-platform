@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.integration.messaging;
 import com.wangguangwu.claim.application.domain.integration.outbox.ApplicationEventType;
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventPublisher;
 import com.wangguangwu.claim.application.shared.contract.ApplicationEventEnvelope;
+import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -14,14 +15,11 @@ import org.springframework.stereotype.Component;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Component
 public class RocketMqOutboxPublisher implements OutboxEventPublisher {
 
     private final StreamBridge streamBridge;
-
-    public RocketMqOutboxPublisher(StreamBridge streamBridge) {
-        this.streamBridge = streamBridge;
-    }
 
     /**
      * 发送信封；绑定发送失败时抛出异常，交由投递用例记录退避重试。

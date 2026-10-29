@@ -5,6 +5,7 @@ import com.wangguangwu.claim.application.domain.claim.ApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.record.ApplicationLifecycleRecordFactory;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,20 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @Service
 public class UnderwritingTransactionService {
 
     private final ApplicationRepository applicationRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final ApplicationLifecycleRecordFactory recordFactory;
-
-    public UnderwritingTransactionService(ApplicationRepository applicationRepository,
-                                          OutboxEventRepository outboxEventRepository,
-                                          ApplicationLifecycleRecordFactory recordFactory) {
-        this.applicationRepository = applicationRepository;
-        this.outboxEventRepository = outboxEventRepository;
-        this.recordFactory = recordFactory;
-    }
 
     /**
      * 把有有效保单的申请推进到等待审核签收，并写入审核交付事件。

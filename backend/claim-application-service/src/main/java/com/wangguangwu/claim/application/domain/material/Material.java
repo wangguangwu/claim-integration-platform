@@ -1,15 +1,20 @@
 package com.wangguangwu.claim.application.domain.material;
 
 import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
+import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 
 /**
  * 理赔申请材料，记录租户初始地址及后续上传地址。
  *
+ * <p>字段装配只通过本类的领域工厂完成，材料状态由本域的迁移方法决定。</p>
+ *
  * @author wangguangwu
  * @since 2026-10-27
  */
 @Getter
+@Builder(access = AccessLevel.PRIVATE)
 public class Material {
 
     /** 数据库主键，仅用于持久化更新条件。 */
@@ -36,9 +41,6 @@ public class Material {
     /** 是否为重新申请时逻辑删除的历史材料。 */
     private boolean deleted;
 
-    private Material() {
-    }
-
     /**
      * 创建待处理的首次或补充材料。
      *
@@ -50,13 +52,8 @@ public class Material {
      */
     public static Material createPending(String applicationNo, String batchNo, String materialType,
                                          String originalFileUrl) {
-        Material material = new Material();
-        material.applicationNo = applicationNo;
-        material.batchNo = batchNo;
-        material.materialType = materialType;
-        material.originalFileUrl = originalFileUrl;
-        material.status = MaterialStatus.PENDING_PROCESS;
-        return material;
+        return Material.builder().applicationNo(applicationNo).batchNo(batchNo).materialType(materialType)
+                .originalFileUrl(originalFileUrl).status(MaterialStatus.PENDING_PROCESS).build();
     }
 
     /**
@@ -87,16 +84,9 @@ public class Material {
     public static Material restore(Long id, String applicationNo, String batchNo, String materialType,
                                    String originalFileUrl, String uploadedFileUrl, MaterialStatus status,
                                    boolean deleted) {
-        Material material = new Material();
-        material.id = id;
-        material.applicationNo = applicationNo;
-        material.batchNo = batchNo;
-        material.materialType = materialType;
-        material.originalFileUrl = originalFileUrl;
-        material.uploadedFileUrl = uploadedFileUrl;
-        material.status = status;
-        material.deleted = deleted;
-        return material;
+        return Material.builder().id(id).applicationNo(applicationNo).batchNo(batchNo).materialType(materialType)
+                .originalFileUrl(originalFileUrl).uploadedFileUrl(uploadedFileUrl).status(status).deleted(deleted)
+                .build();
     }
 
     /**

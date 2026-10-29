@@ -3,6 +3,7 @@ package com.wangguangwu.claim.application.support.mock.interfaces.web;
 import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResult;
 import com.wangguangwu.claim.application.support.mock.infrastructure.MockUnderwritingStore;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,15 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
  * @author wangguangwu
  * @since 2026-10-27
  */
+@RequiredArgsConstructor
 @RestController
 @ConditionalOnProperty(name = "claim.mock.enabled", havingValue = "true")
 public class MockUnderwritingController {
 
     private final MockUnderwritingStore mockUnderwritingStore;
-
-    public MockUnderwritingController(MockUnderwritingStore mockUnderwritingStore) {
-        this.mockUnderwritingStore = mockUnderwritingStore;
-    }
 
     /**
      * 登记有效保单，重复登记覆盖。
