@@ -1,4 +1,4 @@
-# 002 Application 本地基础设施、数据基线与集成契约任务
+# 002 理赔申请本地基础设施、数据基线与集成契约任务
 
 ## T1 Spec 评审与契约冻结
 
@@ -28,7 +28,7 @@
 - 产物：`scripts/docker-start.sh` 中的 Topic 创建命令
 - 完成条件：Broker 禁用自动建 Topic 仍可成功创建 `claim_application_material_process_v1` 和 `claim_application_audit_delivery_v1`；两个 Topic 均配置 8 个读写队列
 
-## T5 Application 本地连接配置
+## T5 理赔申请本地连接配置
 
 - 状态：已完成
 - 对应 design：§改动模块、§对现有功能的影响
@@ -47,7 +47,7 @@
 - 状态：已完成
 - 对应 design：§本地服务设计、§核心数据模型、§MQ 契约设计、§对现有功能的影响
 - 产物：验证记录
-- 完成条件：Docker Compose 配置校验通过；空卷启动后服务健康、数据库结构和 Topic 配置符合设计；Application 服务以 local profile 启动且能连接 MySQL、Redis、RocketMQ；`mvn -B test` 与 `mvn -B -DskipTests package` 通过
+- 完成条件：Docker Compose 配置校验通过；空卷启动后服务健康、数据库结构和 Topic 配置符合设计；理赔申请服务以 local profile 启动且能连接 MySQL、Redis、RocketMQ；`mvn -B test` 与 `mvn -B -DskipTests package` 通过
 
 ## 验证记录
 
@@ -59,5 +59,5 @@
 - 使用 Corretto 21 执行 `mvn -B clean test` 通过，9 个现有测试全部通过；执行 `mvn -B -DskipTests package` 通过。
 - 使用 Corretto 21 启动 `claim-application-service` 可执行 Jar，`http://127.0.0.1:8081/actuator/health` 返回 `{"status":"UP"}`；验证后已停止该 Java 进程。
 - `scripts/docker-start.sh` 与 `scripts/docker-stop.sh` 均通过 Shell 语法检查，并完成一次停止后重启验证；停止过程保留命名数据卷，重启后四项常驻服务恢复健康。
-- RocketMQ Dashboard 已启动并通过 HTTP 健康检查，可通过 `http://127.0.0.1:8082` 使用本地环境文件中的账号登录；`docs/environment/local-infrastructure-health-check.md` 已列出 MySQL、Redis、RocketMQ、Dashboard 和 Application 的检查命令与预期结果。
+- RocketMQ Dashboard 已启动并通过 HTTP 健康检查，可通过 `http://127.0.0.1:8082` 使用本地环境文件中的账号登录；`docs/environment/local-infrastructure-health-check.md` 已列出 MySQL、Redis、RocketMQ、Dashboard 和理赔申请的检查命令与预期结果。
 - 已确认并实际运行 `mysql:8.4.13`、`redis:7.4.11-alpine`、`apache/rocketmq:5.5.0`、`apacherocketmq/rocketmq-dashboard:2.1.0` 的 `arm64/linux` 变体；Compose 已移除 Dashboard 的 AMD64 强制平台配置，Dashboard HTTP 健康检查通过。

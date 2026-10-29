@@ -1,4 +1,4 @@
-# Application 材料处理与承保异步链路本地验证说明
+# 理赔申请材料处理与承保异步链路本地验证说明
 
 ## 文档位置
 
@@ -34,12 +34,12 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 
 ## 提交申请
 
-`demo-insurer-a` 租户报文要求申请人、被保险人、出险人、领款人四个人员节点与 `attachments` 材料数组，性别只支持 `M`、`F`。
+`tenant-a` 租户报文要求申请人、被保险人、出险人、领款人四个人员节点与 `attachments` 材料数组，性别只支持 `M`、`F`。
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
   -H 'Content-Type: application/json' \
-  -H 'X-Tenant-Code: demo-insurer-a' \
+  -H 'X-Tenant-Code: tenant-a' \
   -H 'X-Protocol-Version: v1' \
   -H 'X-Request-Id: verify-004-001' \
   -H 'X-Trace-Id: trace-004-001' \
@@ -59,7 +59,7 @@ curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
 
 ```bash
 APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/application/v1/applications \
-  -H 'Content-Type: application/json' -H 'X-Tenant-Code: demo-insurer-a' -H 'X-Protocol-Version: v1' \
+  -H 'Content-Type: application/json' -H 'X-Tenant-Code: tenant-a' -H 'X-Protocol-Version: v1' \
   -H 'X-Request-Id: verify-004-001' -H 'X-Trace-Id: trace-004-001' -d @request.json \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["applicationNo"])')
 echo "$APP_NO"

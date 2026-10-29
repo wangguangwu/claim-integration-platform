@@ -61,7 +61,7 @@ spring:
           content-type: application/json
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 默认连接 deploy/docker-compose.yml 创建的 Application 私有库和最小权限账号。
+    # 默认连接 deploy/docker-compose.yml 创建的理赔申请私有库和最小权限账号。
     url: ${CLAIM_APPLICATION_DB_URL:jdbc:mysql://127.0.0.1:3306/claim_application_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${CLAIM_APPLICATION_DB_USERNAME:claim_app}
     password: ${CLAIM_APPLICATION_DB_PASSWORD:claim_app}

@@ -2,7 +2,7 @@
 
 ## 项目背景与目标
 
-本文档定义 `claim-application-service` 在 `v1` 阶段使用的 HTTP 与 RocketMQ 公共契约。业务报文字段由后续 Application 业务 Spec 补充；本文档固定地址、方法、公共请求头、关联标识、Topic、消费者组和消息信封。
+本文档定义 `claim-application-service` 在 `v1` 阶段使用的 HTTP 与 RocketMQ 公共契约。业务报文字段由后续理赔申请业务 Spec 补充；本文档固定地址、方法、公共请求头、关联标识、Topic、消费者组和消息信封。
 
 ## HTTP 契约
 
@@ -19,11 +19,11 @@
 
 | 接口 | 方法 | 调用方 | 用途 | 关联字段 |
 |---|---|---|---|---|
-| `/api/application/v1/applications` | `POST` | 租户系统 | 提交理赔申请 | `externalApplicationNo` |
+| `/api/application/v1/applications` | `POST` | 租户系统 | 提交理赔申请| `externalApplicationNo` |
 | `/api/application/v1/applications/{applicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `applicationNo`、`batchNo` |
-| `/api/application/v1/applications/{applicationNo}/revoke` | `POST` | 租户系统 | 发起 Application 撤销 | `applicationNo` |
+| `/api/application/v1/applications/{applicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `applicationNo` |
 | `/api/application/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `applicationNo`、`X-Request-Id` |
-| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部 Case | `applicationNo`、`caseNos`、`X-Request-Id` |
+| `/api/application/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `applicationNo`、`caseNos`、`X-Request-Id` |
 | `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `applicationNo`、`issueNo`、`X-Request-Id` |
 
 成功响应：
@@ -70,7 +70,7 @@
 }
 ```
 
-`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `applicationNo` 读取 Application 私有数据。
+`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `applicationNo` 读取理赔申请私有数据。
 
 ## InteractionLog 行为分组
 

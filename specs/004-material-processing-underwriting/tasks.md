@@ -4,7 +4,7 @@
 
 - 状态：已完成
 - 对应 design：§数据模型、§并发控制、事务与异常处理
-- 产物：`Application` 生命周期迁移方法、`Material` 结果写入方法；`ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 的查询与条件更新方法；`ConsumedEventRepository` 端口与 MyBatis-Plus 实现；`ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery`、`MaterialFileProcessor` 端口；`PolicySnapshot`、`UnderwritingResult` 值对象；003 事件载荷补充 `traceId`
+- 产物：`ClaimApplication` 生命周期迁移方法、`Material` 结果写入方法；`ApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` 的查询与条件更新方法；`ConsumedEventRepository` 端口与 MyBatis-Plus 实现；`ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery`、`MaterialFileProcessor` 端口；`PolicySnapshot`、`UnderwritingResult` 值对象；003 事件载荷补充 `traceId`
 - 完成条件：状态迁移均为带期望状态与尝试次数的条件更新，影响行数 0 表示重复推进；材料结果只作用于未删除且处于 `PENDING_PROCESS` 的记录；持久化实现只使用 BaseMapper 与 Wrapper，不出现手写 SQL；不新增表和列
 
 ## T2 Outbox 投递器与 MQ 生产者
@@ -25,7 +25,7 @@
 
 - 状态：已完成
 - 对应 design：§核心链路设计、§并发控制、事务与异常处理
-- 产物：`MaterialProcessConsumer`、消息信封模型、`MaterialProcessingUseCase`、`MaterialProcessingTransactionService`、`ApplicationPersonReader`、`ApplicationLifecycleRecordFactory`
+- 产物：`MaterialProcessConsumer`、消息信封模型、`MaterialProcessingUseCase`、`MaterialProcessingTransactionService`、`ApplicationLifecycleRecordFactory`
 - 完成条件：消费前校验尝试次数与 `PENDING_ACCEPT` 状态，不匹配只记录 `REUSED` 轨迹并确认消息；全部材料成功推进 `ACCEPTED`，任一失败推进 `ACCEPT_FAILED`；外部失败保持 `PENDING_ACCEPT`；材料结果、状态、交互事件与消费登记同事务；重复消息不重复处理材料
 
 ## T5 承保分流与自动承保

@@ -6,10 +6,10 @@
 
 | 服务 | 宿主机端口 | 用途 |
 |---|---:|---|
-| MySQL 8.4.13 | `3306` | Application 私有数据库 `claim_application_db` |
+| MySQL 8.4.13 | `3306` | 理赔申请私有数据库 `claim_application_db` |
 | Redis 7.4.11 | `6379` | 缓存、协调与幂等辅助能力 |
 | RocketMQ NameServer 5.5.0 | `9876` | RocketMQ 路由发现 |
-| RocketMQ Broker 5.5.0 | `10911`、`10909` | Application 异步命令 Topic |
+| RocketMQ Broker 5.5.0 | `10911`、`10909` | 理赔申请异步命令 Topic |
 | RocketMQ Dashboard 2.1.0 | `8082` | 查看 NameServer、Broker、Topic 和消费者状态 |
 
 ## Apple Silicon（M 系列芯片）
@@ -23,7 +23,7 @@ docker pull --platform linux/arm64 apacherocketmq/rocketmq-dashboard:2.1.0
 docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml up -d --force-recreate rocketmq-dashboard
 ```
 
-本地 RocketMQ 不持久化 Broker 数据，重启容器后 `scripts/docker-start.sh` 会通过 `mqadmin` 重新创建两个 Application Topic。这样不需要额外的初始化容器；该取舍仅适用于本地开发，生产环境必须独立规划 Broker 数据持久化与权限管理。
+本地 RocketMQ 不持久化 Broker 数据，重启容器后 `scripts/docker-start.sh` 会通过 `mqadmin` 重新创建两个理赔申请Topic。这样不需要额外的初始化容器；该取舍仅适用于本地开发，生产环境必须独立规划 Broker 数据持久化与权限管理。
 
 ## 启动与停止
 
@@ -61,7 +61,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 MySQL 首次创建数据卷时按文件名顺序执行 `deploy/mysql/init/` 下的 SQL：
 
 - `01-create-database.sql`：创建 `claim_application_db` 与 `claim_app` 应用账号。
-- `02-application-schema.sql`：创建 Application 域七张 `t_` 前缀基础表、索引和唯一约束。
+- `02-application-schema.sql`：创建理赔申请域七张 `t_` 前缀基础表、索引和唯一约束。
 
 服务默认连接信息：
 
@@ -91,7 +91,7 @@ Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动
 ./scripts/docker-start.sh
 ```
 
-## Application 本地配置
+## 理赔申请本地配置
 
 `claim-application-service` 在 local profile 下默认使用本编排提供的地址。以下环境变量可覆盖默认连接信息：
 
@@ -107,5 +107,9 @@ Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动
 | `CLAIM_APPLICATION_ROCKETMQ_NAME_SERVER` | `127.0.0.1:9876` |
 
 Docker 服务端口可通过 `MYSQL_PORT`、`REDIS_PORT`、`ROCKETMQ_NAMESRV_PORT`、`ROCKETMQ_BROKER_PORT`、`ROCKETMQ_BROKER_FAST_PORT` 覆盖。若宿主机连接 RocketMQ 需要非默认网卡地址，可设置 `ROCKETMQ_BROKER_IP1` 后再启动编排。
+
+Broker 默认以 `127.0.0.1` 注册，宿主机客户端可直连；Dashboard 运行在容器内，因此编排附带 `rocketmq-dashboard-broker-proxy` 把 Dashboard 自身的 `127.0.0.1:10911` 转发到 Broker，Dashboard 才能查询 Broker 与 Topic。
+
+Dashboard 启动时按 `ROCKETMQ_DASHBOARD_USERNAME`、`ROCKETMQ_DASHBOARD_PASSWORD` 写入 `users.properties`，修改账号后需要重新创建容器才生效。
 
 各服务的容器、命令行与 Dashboard 检查方式见 [本地基础服务检查说明](local-infrastructure-health-check.md)。

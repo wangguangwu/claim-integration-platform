@@ -8,15 +8,15 @@
 
 核心业务关系：
 
-- 一个 Application 可以关联多个 Case。
-- 一个 Case 归属于一个 Application。
+- 一个理赔申请可以关联多个案件。
+- 一个案件归属于一个理赔申请。
 
 ### 1.1 核心能力
 
 - **统一接入**：适配不同租户的协议、报文、字段、签名和加解密方式，统一转换为平台业务模型。
-- **申请处理**：完成申请校验、签收、影像处理、自动承保、审核交付等 Application 链路。
-- **案件编排**：按报案、影像、理算等阶段推进 Case，支持同步处理、异步回调和中断恢复。
-- **全链路追踪**：贯通 Application、Case、阶段执行、外部调用、回执及异常记录。
+- **申请处理**：完成申请校验、签收、影像处理、自动承保、审核交付等理赔申请链路。
+- **案件编排**：按报案、影像、理算等阶段推进案件，支持同步处理、异步回调和中断恢复。
+- **全链路追踪**：贯通理赔申请、案件、阶段执行、外部调用、回执及异常记录。
 - **异常诊断**：基于运行证据自主调查异常，完成根因分析、影响判断和处置建议。
 
 ### 1.2 技术栈
@@ -49,9 +49,9 @@
 - 基础框架及依赖版本由根工程统一管理。
 - 文件能力通过 FileStorage 接口隔离具体存储实现，业务代码不依赖具体存储产品。
 
-### 1.3 Application 业务域
+### 1.3 理赔申请业务域
 
-Application 负责理赔申请从外部接入到内部审核交付的完整处理链路。
+理赔申请负责理赔申请从外部接入到内部审核交付的完整处理链路。
 
 核心链路：
 
@@ -63,17 +63,17 @@ Application 负责理赔申请从外部接入到内部审核交付的完整处�
 - 参数校验
 - 幂等判断
 - applicationNo 生成
-- Application 落库
+- 理赔申请落库
 
 落库成功后立即返回 applicationNo，后续影像、承保和审核流程异步执行。
 
 关键状态：
 
 - **同步签收成功**：申请完成校验及落库，平台返回 applicationNo。
-- **待受理**：Application 已进入平台，等待影像处理。
+- **待受理**：理赔申请已进入平台，等待影像处理。
 - **受理成功**：影像处理完成，可以进入后续业务处理。
 - **受理失败**：影像处理失败，停止后续流程并记录异常。
-- **签收完成**：审核系统成功接收申请并返回案件信息，建立 Application 与 Case 的关联。
+- **签收完成**：审核系统成功接收申请并返回案件信息，建立理赔申请与案件的关联。
 
 核心职责：
 
@@ -81,25 +81,25 @@ Application 负责理赔申请从外部接入到内部审核交付的完整处�
 - 申请校验
 - 申请幂等
 - applicationNo 生成
-- Application 状态管理
+- 理赔申请状态管理
 - 影像处理
 - 自动承保
 - 审核交付
 - 问题件及补材
 - 申请撤销
-- Case 关联
+- 案件关联
 - 处理轨迹及异常记录
 
 架构原则：
 
 - **同步签收、异步受理**，避免影像处理和内部系统调用阻塞外部请求。
-- 影像处理成功作为 Application 的受理成功边界。
+- 影像处理成功作为理赔申请的受理成功边界。
 - 自动承保和审核交付属于受理后的内部处理。
 - 异步流程通过状态驱动，失败后根据当前状态进行重试、恢复或补偿。
 
-### 1.4 Case 业务域
+### 1.4 案件业务域
 
-Case 负责案件进入平台后的规则判断、阶段编排、外部交付和回执处理。
+案件负责案件进入平台后的规则判断、阶段编排、外部交付和回执处理。
 
 核心链路：
 
@@ -120,7 +120,7 @@ Case 负责案件进入平台后的规则判断、阶段编排、外部交付和
 
 核心职责：
 
-- Case 管理
+- 案件管理
 - 推送规则判断
 - 阶段编排
 - 调度
@@ -133,7 +133,7 @@ Case 负责案件进入平台后的规则判断、阶段编排、外部交付和
 
 ### 1.5 AI 异常诊断
 
-构建面向理赔业务异常的 Diagnosis Agent，对 Application 和 Case 的运行异常进行自主调查、根因分析和处置判断。
+构建面向理赔业务异常的 Diagnosis Agent，对理赔申请和案件的运行异常进行自主调查、根因分析和处置判断。
 
 核心链路：
 
@@ -141,9 +141,9 @@ Case 负责案件进入平台后的规则判断、阶段编排、外部交付和
 
 Agent 可以根据异常上下文自主查询：
 
-- Application 状态
-- Case 状态及当前阶段
-- Application / Case 处理轨迹
+- 理赔申请状态
+- 案件状态及当前阶段
+- 理赔申请/案件处理轨迹
 - 外部调用记录
 - 回执记录
 - 重试及补偿记录
@@ -209,7 +209,7 @@ Remediation Tool 负责实际处置，例如：
 - 知识库负责提供协议、错误码和历史故障知识。
 - Policy Engine 负责动作授权。
 - Remediation Tool 负责执行允许的处置动作。
-- LLM 不直接修改 Application、Case 或核心业务状态。
+- LLM 不直接修改理赔申请、案件或核心业务状态。
 - Root Cause 必须关联实际 Evidence。
 - 证据不足或置信度过低时转人工处理。
 
@@ -217,15 +217,15 @@ Remediation Tool 负责实际处置，例如：
 
 ### 2.1 业务链路
 
-#### Application 链路
+#### 理赔申请链路
 
-**外部系统 → Application → 申请校验 → 签收落库 → 影像处理 → 自动承保 → 审核交付 → 签收完成**
+**外部系统 → 理赔申请 → 申请校验 → 签收落库 → 影像处理 → 自动承保 → 审核交付 → 签收完成**
 
-Application 负责外部申请进入平台后的标准化、受理和内部交付。
+理赔申请负责外部申请进入平台后的标准化、受理和内部交付。
 
-#### Case 链路
+#### 案件链路
 
-**Application → Case → 规则判断 → 阶段编排 → 外部系统**
+**理赔申请 → 案件 → 规则判断 → 阶段编排 → 外部系统**
 
 典型阶段：
 
@@ -235,7 +235,7 @@ Application 负责外部申请进入平台后的标准化、受理和内部交�
 
 #### 异常诊断链路
 
-**Application / Case → 运行证据 → Diagnosis Agent → 根因判断 → 处置决策**
+**理赔申请/案件 → 运行证据 → Diagnosis Agent → 根因判断 → 处置决策**
 
 ### 2.2 Tenant
 
@@ -267,9 +267,9 @@ Tenant 是平台内部的业务隔离单位，主要隔离：
 - 失败补偿
 - 全链路可追踪
 
-Application 的异步受理机制由 Application 业务域设计文档定义。
+理赔申请的异步受理机制由理赔申请业务域设计文档定义。
 
-Case 的阶段等待、异步回调、重试和恢复机制由 Case 业务域设计文档定义。
+案件的阶段等待、异步回调、重试和恢复机制由案件业务域设计文档定义。
 
 ## 三、工程架构
 
@@ -326,7 +326,7 @@ claim-web
    └─ utils
 ```
 
-Application 详情主要展示：
+理赔申请详情主要展示：
 
 - 基本信息
 - 签收轨迹
@@ -335,12 +335,12 @@ Application 详情主要展示：
 - 承保结果
 - 审核交付结果
 - 异常记录
-- 关联 Case
+- 关联案件
 
-Case 详情主要展示：
+案件详情主要展示：
 
 - 基本信息
-- 来源 Application
+- 来源理赔申请
 - 当前阶段
 - 阶段轨迹
 - 外部调用
@@ -369,7 +369,7 @@ Gateway 只处理入口层能力，不处理租户协议转换及业务规则。
 
 业务域：
 
-**Application**
+**理赔申请**
 
 数据库：
 
@@ -409,9 +409,9 @@ adapter
 
 协议路由：
 
-**tenantCode + protocolVersion → TenantApplicationPipeline**
+**tenantCode + protocolVersion → TenantProtocolPipelineFactory → TenantProtocolPipelineRegistry → TenantProtocolPipeline**
 
-TenantApplicationPipeline 由解析器、校验器、转换器组成，负责处理租户接入协议差异：
+TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → 转换”执行，负责处理租户接入协议差异；验签与解密提供默认直通实现，真实租户按需覆写：
 
 - 协议解析
 - 参数校验
@@ -422,15 +422,15 @@ TenantApplicationPipeline 由解析器、校验器、转换器组成，负责处
 
 请求链路：
 
-**外部请求 → Tenant 识别 → 协议路由 → TenantApplicationPipeline（Parser → Validator → Converter） → Application UseCase**
+**外部请求 → Tenant 识别 → TenantProtocolPipelineFactory → TenantProtocolPipelineRegistry → TenantProtocolPipeline（验签 → 解密 → Parser → Validator → Converter） → 理赔申请用例 → ClaimApplication**
 
-Application 内部的聚合、实体、值对象、领域服务、Repository、状态机及表结构由 Application 业务域设计文档定义。
+理赔申请内部的聚合、实体、值对象、领域服务、Repository、状态机及表结构由理赔申请业务域设计文档定义。
 
 ### 3.4 claim-case-service
 
 业务域：
 
-**Case**
+**案件**
 
 数据库：
 
@@ -440,7 +440,7 @@ Application 内部的聚合、实体、值对象、领域服务、Repository、�
 
 **com.wangguangwu.claim.cases**
 
-说明：`case` 是 Java 关键字，不能作为包名，Case 服务统一使用 `cases`。
+说明：`case` 是 Java 关键字，不能作为包名，案件服务统一使用 `cases`。
 
 目录结构：
 
@@ -494,7 +494,7 @@ TenantDeliveryAdapter 负责：
 - 返回码映射
 - 回执解析
 
-Case 内部的聚合、实体、阶段模型、状态机、领域服务、Repository 及表结构由 Case 业务域设计文档定义。
+案件内部的聚合、实体、阶段模型、状态机、领域服务、Repository 及表结构由案件业务域设计文档定义。
 
 ### 3.5 claim-ai-service
 
@@ -517,7 +517,7 @@ claim-ai-service
 各模块职责：
 
 - **agent**：诊断流程、假设生成和 Tool 调度。
-- **tool**：查询 Application、Case、轨迹、外部调用等实时业务数据。
+- **tool**：查询理赔申请、案件、轨迹、外部调用等实时业务数据。
 - **evidence**：证据标准化、聚合和关联。
 - **knowledge**：租户协议、错误码和历史故障知识检索。
 - **policy**：AUTO / APPROVAL / MANUAL 动作授权。
@@ -525,8 +525,8 @@ claim-ai-service
 
 输入：
 
-- Application 异常
-- Case 异常
+- 理赔申请异常
+- 案件异常
 - 外部调用记录
 - 回执记录
 - Trace
@@ -565,27 +565,27 @@ claim-foundation
 
 核心业务关系：
 
-- 一个 Application 可以关联多个 Case。
-- 一个 Case 归属于一个 Application。
+- 一个理赔申请可以关联多个案件。
+- 一个案件归属于一个理赔申请。
 
 核心业务编号：
 
-- Application：applicationNo
-- Case：caseNo
+- 理赔申请：applicationNo
+- 案件：caseNo
 
-Case 保存 sourceApplicationNo，用于追溯来源 Application。
+案件保存 sourceApplicationNo，用于追溯来源理赔申请。
 
 服务边界：
 
-- Application 业务域由 claim-application-service 承载。
-- Case 业务域由 claim-case-service 承载。
+- 理赔申请业务域由 claim-application-service 承载。
+- 案件业务域由 claim-case-service 承载。
 - 两个业务域独立维护自己的业务状态和数据。
 - 不直接访问对方数据库。
 - 跨业务域通过消息或服务接口协作。
 
-### 4.2 Case 阶段边界
+### 4.2 案件阶段边界
 
-Case 维护案件当前阶段，阶段 Handler 负责执行具体阶段逻辑。
+案件维护案件当前阶段，阶段 Handler 负责执行具体阶段逻辑。
 
 典型链路：
 
@@ -600,14 +600,14 @@ Case 维护案件当前阶段，阶段 Handler 负责执行具体阶段逻辑。
 
 **提交影像 → 等待回调 → 处理回调 → 推进下一阶段**
 
-具体阶段模型、状态迁移、回调幂等和恢复机制由 Case 业务域设计文档定义。
+具体阶段模型、状态迁移、回调幂等和恢复机制由案件业务域设计文档定义。
 
 ### 4.3 数据边界
 
 数据库按业务域拆分：
 
-- **claim_application_db**：Application 业务域数据。
-- **claim_case_db**：Case 业务域数据。
+- **claim_application_db**：理赔申请业务域数据。
+- **claim_case_db**：案件业务域数据。
 
 跨域只通过业务编号、消息或服务接口建立关联。
 
@@ -623,8 +623,8 @@ Tenant 负责平台内部的数据、配置、权限、协议和资源隔离。
 
 进行路由：
 
-- Application → TenantApplicationPipeline
-- Case → TenantDeliveryAdapter
+- 理赔申请 → TenantProtocolPipeline
+- 案件 → TenantDeliveryAdapter
 
 租户差异应收敛在租户协议接入层，不进入核心业务逻辑。
 

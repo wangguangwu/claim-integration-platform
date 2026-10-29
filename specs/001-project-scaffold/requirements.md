@@ -9,10 +9,10 @@
 骨架阶段的规则是结构规则，全部可直接检查：
 
 1. 模块归属唯一：每个后端模块都在根 POM 的 `<modules>` 中登记，不存在未登记模块；不单独建 BOM 模块，第三方版本只写在根 POM 的 `dependencyManagement`。
-2. 骨架只固定到一级包：Application / Case 为 `interfaces`、`usecase`、`domain`、`infrastructure`；AI 服务为 `agent`、`tool`、`evidence`、`knowledge`、`policy`、`remediation`；网关为 `auth`、`tenant`、`filter`、`route`、`config`。二级及以下包由对应业务域 spec 定义后再建，骨架不预置。
+2. 骨架只固定到一级包：理赔申请/案件为 `interfaces`、`usecase`、`domain`、`infrastructure`；AI 服务为 `agent`、`tool`、`evidence`、`knowledge`、`policy`、`remediation`；网关为 `auth`、`tenant`、`filter`、`route`、`config`。二级及以下包由对应业务域 spec 定义后再建，骨架不预置。
 3. 基准只有三样：POM、实际存在的文件、依赖关系。目录以文件中声明的包为准，foundation 里的子包只因类已存在而存在。
 4. 依赖方向单向：`interfaces → usecase → domain ← infrastructure`；`domain` 不依赖 Spring Web、MyBatis-Plus、Redis；foundation 不依赖任何服务模块；服务模块之间没有 Maven 依赖。
-5. 包名必须是合法 Java 标识符：`case` 是关键字，Case 服务使用 `com.wangguangwu.claim.cases`。
+5. 包名必须是合法 Java 标识符：`case` 是关键字，案件服务使用 `com.wangguangwu.claim.cases`。
 6. 租户差异只允许出现在 `infrastructure` 下的 adapter；骨架不预置 `tenant-a` 一类示例目录。
 7. 服务各自持有数据库，不跨库直连；跨域只通过消息或服务接口协作。
 8. 文件能力统一走 FileStorage 接口，业务代码不依赖具体存储产品。

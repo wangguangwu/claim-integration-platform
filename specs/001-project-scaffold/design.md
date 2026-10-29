@@ -9,8 +9,8 @@
 | `claim-foundation-tenant` | Tenant 上下文、租户配置、协议版本 | common、Servlet API(provided) |
 | `claim-foundation-observability` | Trace、Metric、操作日志、审计日志 | common、Actuator、Micrometer Tracing |
 | `claim-gateway` | 认证、Tenant 识别、路由、流量治理、TraceId | foundation 三件套、Gateway WebFlux、Nacos、Sentinel、LoadBalancer |
-| `claim-application-service` | Application 业务域 | foundation 三件套、Web、Redis、MyBatis-Plus、MySQL、Nacos、RocketMQ、XXL-JOB |
-| `claim-case-service` | Case 业务域 | 同上 |
+| `claim-application-service` | 理赔申请业务域 | foundation 三件套、Web、Redis、MyBatis-Plus、MySQL、Nacos、RocketMQ、XXL-JOB |
+| `claim-case-service` | 案件业务域 | 同上 |
 | `claim-ai-service` | AI 异常诊断 | foundation 三件套、Web、Spring AI、Nacos、OpenFeign、LoadBalancer |
 
 网关只做入口层能力，不做租户协议转换与业务规则。服务之间不直连数据库。
@@ -187,7 +187,7 @@ claim-foundation-observability
 
 ## 12. 租户适配约定
 
-Application 接入适配与 Case 交付适配都放在各自 `infrastructure` 下，按 `{tenantCode}/{protocolVersion}` 组织，公共逻辑上提到 `Abstract*Adapter`。具体子包随实现类一起创建，骨架不预置目录，避免占位目录被误当成真实实现。
+理赔申请接入适配与案件交付适配都放在各自 `infrastructure` 下，按 `{tenantCode}/{protocolVersion}` 组织，公共逻辑上提到 `Abstract*Adapter`。具体子包随实现类一起创建，骨架不预置目录，避免占位目录被误当成真实实现。
 
 ## 13. 前端结构
 

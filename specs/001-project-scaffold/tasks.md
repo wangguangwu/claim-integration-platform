@@ -32,7 +32,7 @@
 
 - 状态：已完成
 - 对应 design：§11、§12
-- 产物：Application / Case 的 `interfaces`、`usecase`、`domain`、`infrastructure`；AI 的 `agent`、`tool`、`evidence`、`knowledge`、`policy`、`remediation`；网关的 `auth`、`tenant`、`filter`、`route`、`config`；前端 `views` / `layouts` / `api` / `router` 等一级目录
+- 产物：理赔申请/案件的 `interfaces`、`usecase`、`domain`、`infrastructure`；AI 的 `agent`、`tool`、`evidence`、`knowledge`、`policy`、`remediation`；网关的 `auth`、`tenant`、`filter`、`route`、`config`；前端 `views` / `layouts` / `api` / `router` 等一级目录
 - 完成条件：只有上述一级包，不存在二级及以下空目录；foundation 子包均有对应类，没有为未实现能力预留的空壳
 
 ## T6 前端骨架与构建

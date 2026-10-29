@@ -14,7 +14,7 @@
     <artifactId>claim-application-service</artifactId>
 
     <name>claim-application-service</name>
-    <description>Application 业务域：申请接入、受理、承保与交付</description>
+    <description>理赔申请业务域：申请接入、受理、承保与交付</description>
 
     <dependencies>
         <dependency>

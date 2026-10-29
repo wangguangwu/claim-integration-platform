@@ -1,25 +1,26 @@
-# Application 接入 JMeter 压测说明
+# 理赔申请对外接入 JMeter 压测说明
 
 ## 文档位置
 
-压测脚本位于 `scripts/jmeter/`，该目录只保留可执行的 `.jmx` 文件；完整的准备、执行、报告和数据核对说明已迁移至本文件。
+压测脚本位于 `scripts/jmeter/`，该目录只保留可执行的 `.jmx` 文件；完整的准备、执行和报告说明已迁移至本文件。
 
 后续仅在 `docs/testing/` 维护压测说明，脚本目录不再放置 README。
 
 ## 压测目标与安全边界
 
-脚本调用本地示例协议 `demo-insurer-a/v1`，验证唯一外部申请号的并发创建吞吐，以及同一外部申请号的幂等控制。压测会向 `claim_application_db` 写入 `t_claim_application`、`t_claim_application_material`、`t_claim_interaction_log`、`t_claim_outbox_event` 数据；仅允许使用本地 Docker 开发库和虚构数据，禁止指向生产、测试共享库或真实个人信息环境。
+脚本以租户调用方身份请求 `claim-gateway` 暴露的 `POST /api/application/v1/applications`，验证唯一外部申请号的并发创建吞吐和同一外部申请号的幂等控制。压测覆盖网关 TraceId 生成、租户请求头校验、路由转发和理赔申请服务响应，不直接调用数据库、Repository、MQ 或应用服务 `8081` 端口。仅允许使用本地环境和虚构数据，禁止指向生产、测试共享环境或真实个人信息环境。
 
 | 脚本 | 验证场景 | 默认负载 | 预期业务结果 |
 |---|---|---|---|
-| `application-intake-throughput.jmx` | 每次请求产生不同 `requestNo` | 10 线程，5 秒升压，每线程 10 次 | 每个请求创建一条 Application |
-| `application-intake-idempotency.jmx` | 所有线程提交相同 `requestNo` | 20 线程，1 秒升压，每线程 1 次 | 全部请求返回同一个 applicationNo，只创建一条 Application |
+| `application-intake-throughput.jmx` | 每次请求产生不同 `requestNo` | 10 线程，5 秒升压，每线程 10 次 | 全部返回 HTTP 200、`code=SUCCESS` 和 `X-Trace-Id` |
+| `application-intake-idempotency.jmx` | 所有线程提交相同 `requestNo` | 20 线程，1 秒升压，每线程 1 次 | 全部返回 HTTP 200、`code=SUCCESS` 和 `X-Trace-Id`；脚本提取并断言所有响应中的 `applicationNo` 一致 |
 
 ## 前置准备
 
 1. 启动本地服务：`./scripts/docker-start.sh`，并按 [本地基础服务检查说明](../environment/local-infrastructure-health-check.md) 确认依赖健康。
-2. 使用 JDK 21 启动 `claim-application-service`，并通过 `curl -fsS http://127.0.0.1:8081/actuator/health` 确认 `UP`。
-3. 安装 Apache JMeter 5.6+：`brew install jmeter`，再执行 `jmeter --version` 验证。
+2. 使用 JDK 21 启动 `claim-application-service`，确认 `http://127.0.0.1:8081/actuator/health` 返回 `UP`。
+3. 启动 `claim-gateway`，确认 `http://127.0.0.1:8080/actuator/health` 返回 `UP`。local profile 默认将理赔申请路由到 `http://127.0.0.1:8081`；非本地环境必须显式设置 `CLAIM_APPLICATION_SERVICE_URI`。
+4. 安装 Apache JMeter 5.6+：`brew install jmeter`，再执行 `jmeter --version` 验证。
 
 ## 执行压测
 
@@ -41,7 +42,7 @@ jmeter -n -t scripts/jmeter/application-intake-throughput.jmx -JTHREADS=50 -JRAM
 jmeter -n -t scripts/jmeter/application-intake-idempotency.jmx -JTHREADS=50 -JRAMP_UP_SECONDS=1 -JLOOPS=1 -JEXTERNAL_APPLICATION_NO=IDEMPOTENCY-20261028-001 -l scripts/jmeter/results/idempotency-20261028-001.jtl -e -o scripts/jmeter/results/idempotency-20261028-001-report
 ```
 
-总请求量为 `THREADS × LOOPS`。每次幂等压测使用新的 `EXTERNAL_APPLICATION_NO`；脚本不自动测试重新申请，因为该场景需要 Application 先处于 `ACCEPT_FAILED`。
+总请求量为 `THREADS × LOOPS`。脚本默认请求 `127.0.0.1:8080`；压测其他环境时通过 `-JHOST`、`-JPORT` 修改网关地址。每次幂等压测使用新的 `EXTERNAL_APPLICATION_NO`；脚本不自动测试重新申请，因为该场景需要理赔申请先处于 `ACCEPT_FAILED`。
 
 ## 查看压测报告
 
@@ -52,30 +53,12 @@ open scripts/jmeter/results/throughput-50x20-report/index.html
 open scripts/jmeter/results/idempotency-20261028-001-report/index.html
 ```
 
-重点检查 `Error %` 是否为 `0%`、吞吐量、90%/95%/99% 高分位延迟及并发线程曲线。JTL 为 CSV 格式，使用以下命令查找失败样本：
+重点检查 `Error %` 是否为 `0%`、吞吐量、90%/95%/99% 高分位延迟及并发线程曲线。每个成功样本还必须同时通过 HTTP 200、`code=SUCCESS` 与 `X-Trace-Id` 响应头断言；这证明请求经过了网关入口。JTL 为 CSV 格式，使用以下命令查找失败样本：
 
 ```bash
 rg ',false,' scripts/jmeter/results/idempotency-20261028-001.jtl
 ```
 
-## 查看业务数据
-
-以下查询以外部申请号 `IDEMPOTENCY-20261028-001` 为例。先获取 Application：
-
-```bash
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT id, tenant_code, application_no, external_application_no, status, application_attempt, created_at FROM t_claim_application WHERE tenant_code = 'demo-insurer-a' AND external_application_no = 'IDEMPOTENCY-20261028-001';"
-```
-
-幂等压测预期只返回一行，`status=PENDING_ACCEPT`、`application_attempt=1`。将查询结果中的 `application_no` 替换为 `<APPLICATION_NO>`，继续核对材料、交互日志与 Outbox：
-
-```bash
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT application_no, batch_no, material_type, original_file_url, uploaded_file_url, status, deleted, created_at FROM t_claim_application_material WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT interaction_no, action, result_status, request_id, trace_id, occurred_at FROM t_claim_interaction_log WHERE application_no = '<APPLICATION_NO>' ORDER BY interaction_no, occurred_at;"
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SELECT event_id, event_type, event_version, status, retry_count, created_at FROM t_claim_outbox_event WHERE application_no = '<APPLICATION_NO>' ORDER BY id;"
-```
-
-首次签收应有同一材料批次、`PENDING_PROCESS` 材料、`STARTED + COMPLETED` 交互行为组和一条 `APPLICATION_CREATED` Outbox。幂等重复请求应产生 `STARTED + REUSED` 行为组，但不得新增 Material 或 Outbox。
-
 ## 清理压测数据
 
-仅在确认目标为本地开发库且不再需要结果时，按 `tenant_code` 与外部申请号手动删除。本项目不提供自动清理脚本，避免误删其他本地调试数据。
+压测通过对外接口产生的数据由本地环境生命周期统一清理；本压测不以直接查询、插入或删除数据库作为执行步骤或验收依据。本项目不提供自动清理脚本，避免误删其他本地调试数据。

@@ -7,7 +7,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Application 业务域启动类。
+ * 理赔申请业务域启动类。
  *
  * @author wangguangwu
  * @since 2026-10-27

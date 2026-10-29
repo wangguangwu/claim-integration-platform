@@ -12,7 +12,7 @@ flowchart LR
     MQ --> CONSUMER["MaterialProcessConsumer"]
     CONSUMER --> PROCESS["MaterialProcessingUseCase"]
     PROCESS --> FILE["MaterialFileProcessor"]
-    PROCESS --> DB["MySQL：Application / Material / InteractionLog / Outbox"]
+    PROCESS --> DB["MySQL：理赔申请/ Material / InteractionLog / Outbox"]
     PROCESS --> UNDERWRITING["UnderwritingUseCase"]
     UNDERWRITING --> POLICY["ValidPolicyQuery"]
     UNDERWRITING --> AUTO["AutoUnderwritingRequester"]
@@ -50,7 +50,7 @@ sequenceDiagram
     S->>O: status=PUBLISHED
 
     MQ->>C: APPLICATION_CREATED 或 APPLICATION_REAPPLIED
-    C->>DB: 读取 Application 与未删除材料
+    C->>DB: 读取理赔申请与未删除材料
     alt 状态或尝试次数不匹配
         C->>DB: 写 REUSED 交互事件
         C-->>MQ: 确认消息
@@ -58,7 +58,7 @@ sequenceDiagram
         C->>U: 执行材料处理
         U->>F: 逐条处理当前批次材料（事务外）
         F-->>U: 上传后地址或失败原因
-        U->>DB: 同一事务：材料结果、Application 状态、交互事件、consumed_event
+        U->>DB: 同一事务：材料结果、理赔申请状态、交互事件、consumed_event
         U-->>C: ACCEPTED 或 ACCEPT_FAILED
         C-->>MQ: 确认消息
         U->>U: ACCEPTED 时继续承保分流
@@ -91,14 +91,18 @@ sequenceDiagram
 
 ## 改动模块
 
+模块名按 005 的层级优先目录记录：根包是 `interfaces`、`usecase`、`domain`、`infrastructure` 四层，业务域是层内第二级（申请聚合在 `domain` 层叫 `claim`）。
+
 | 模块 | 改动内容 | 职责 |
 |---|---|---|
-| `domain` | `Application`、`ApplicationRepository`、`Material`、`MaterialRepository`、`OutboxEventRepository` 能力扩展；新增 `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery`、`MaterialFileProcessor`、`ConsumedEventRepository` 端口与 `PolicySnapshot`、`UnderwritingResult` 值对象 | 维护状态迁移前置条件与外部能力抽象，不依赖 Spring、MQ、Feign |
-| `usecase` | `MaterialProcessingUseCase`、`UnderwritingUseCase`、`UnderwritingCallbackUseCase`、`OutboxRelayUseCase`、`ApplicationCompensationUseCase`，各自的事务服务、记录工厂与错误码 | 事务边界、幂等判断、状态守卫与跨组件编排 |
-| `infrastructure` | Outbox 投递器与 MQ 生产者、材料处理消费者、Feign 文件与承保客户端、模拟文件系统与模拟承保存储、Repository 扩展实现 | 实现领域端口与消息收发，不含业务规则 |
-| `interfaces` | 承保完成回调接口、模拟文件系统接口、模拟承保接口、异步链路异常处理器 | 只做 HTTP 协议适配与参数校验 |
+| `domain/claim` | `ClaimApplication` 生命周期迁移方法、`ApplicationRepository` 查询与条件更新、`PersonInfo` 证件号读取 | 维护状态迁移前置条件，不依赖 Spring、MQ、Feign |
+| `domain/material` + `usecase/material` + `interfaces/material` + `infrastructure/material` | `Material`、`MaterialRepository`、`MaterialStatus`、`MaterialFileProcessor` 端口；材料处理用例与事务服务；`MaterialProcessConsumer`；材料持久化与 Feign 文件客户端 | 材料聚合、消息接收与文件处理编排 |
+| `domain/underwriting` + `usecase/underwriting` + `interfaces/underwriting` + `infrastructure/underwriting` | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` 端口与 `PolicySnapshot`、`UnderwritingResult` 值对象；承保分流、回调用例与事务服务；回调 HTTP 接口；Feign 承保客户端 | 保单查询、自动承保发起与承保完成确认 |
+| `domain/integration` + `usecase/integration` + `interfaces/integration` + `infrastructure/integration` | `OutboxEventRepository`、`ConsumedEventRepository`、`InteractionLogRepository` 端口与实现；`ApplicationLifecycleRecordFactory` 记录装配；`OutboxRelayUseCase` 与 MQ 投递器；`ApplicationCompensationUseCase` 补偿调度；`OutboxRelayPolicy`、`ApplicationCompensationPolicy` 策略端口及其 `infrastructure/integration/config` 配置适配器 | 平台异步内核：投递、消费去重、交互轨迹与滞留补偿，允许编排业务域用例 |
+| `shared` | `ApplicationEventEnvelope`、`UnderwritingCompletedCommand` 跨域契约；统一响应模型与异步错误码、异常 | 多域复用的消息与协议构件，不含业务规则 |
+| `support` | 模拟文件系统与模拟承保存储及其 HTTP 接口 | 仅 `claim.mock.enabled` 打开时生效的外部系统模拟 |
 | `application.yml` | Feign 地址与超时、MQ 绑定、投递与补偿阈值、模拟外部能力开关 | 本地可运行、生产可覆盖 |
-| 根 POM 与 Application POM | 引入 `spring-cloud-starter-openfeign` | 声明式外部调用 |
+| 根 POM 与理赔申请POM | 引入 `spring-cloud-starter-openfeign` | 声明式外部调用 |
 
 ## 主要类职责
 
@@ -110,13 +114,13 @@ sequenceDiagram
 | `RocketMqOutboxPublisher` | 基于 `StreamBridge` 实现投递端口 |
 | `MaterialProcessConsumer` | 订阅材料处理 Topic，解析信封并调用材料处理用例 |
 | `MaterialProcessingUseCase` | 校验事件与当前申请一致性，编排材料处理与后续承保分流 |
-| `MaterialProcessingTransactionService` | 单事务写入材料结果、Application 状态、交互事件与消费登记 |
+| `MaterialProcessingTransactionService` | 单事务写入材料结果、理赔申请状态、交互事件与消费登记 |
 | `UnderwritingUseCase` | 事务外查询保单，按结果推进到 `WAIT_AUDIT` 或 `UNDERWRITING` 并发起自动承保 |
 | `UnderwritingTransactionService` | 条件推进 `ACCEPTED → WAIT_AUDIT` 或 `ACCEPTED → UNDERWRITING`，需要时写入审核交付事件 |
 | `UnderwritingCallbackUseCase` | 承保完成通知幂等处理，推进 `UNDERWRITING → WAIT_AUDIT` |
 | `ApplicationCompensationUseCase` | 恢复投递滞留、`ACCEPTED` 滞留与 `UNDERWRITING` 超时 |
 | `ApplicationLifecycleRecordFactory` | 构建交互事件与 `AUDIT_DELIVERY_REQUESTED` 事件，不访问数据库 |
-| `ApplicationPersonReader` | 从四个人员 JSON 中读取被保人证件号，供保单查询使用 |
+| `ClaimApplication` | 平台统一理赔申请模型，持有四类 `PersonInfo` 人员值对象；保单查询通过 `primaryInsuredCertificateNo()` 读取主被保险人证件号 |
 | `MaterialFileProcessor` | 材料文件上传端口，返回上传后地址或失败原因 |
 | `ValidPolicyQuery`、`AutoUnderwritingRequester`、`UnderwritingResultQuery` | 承保能力端口：保单查询、发起自动承保、查询承保结果，用例层只依赖这三个接口 |
 | `FeignMaterialFileProcessor`、`FeignValidPolicyQuery`、`FeignAutoUnderwritingRequester`、`FeignUnderwritingResultQuery` | 端口适配器：把领域请求转换为 Feign 报文，异常向上抛出表示外部系统不可用 |
@@ -218,7 +222,7 @@ sequenceDiagram
 ## 并发控制、事务与异常处理
 
 - 状态迁移一律使用条件更新：`WHERE application_no = ? AND status = ? AND application_attempt = ?`；影响行数为 0 表示已被其他执行者推进，按重复处理并记录轨迹。
-- 材料处理结果、Application 状态、交互事件与消费登记写入同一本地事务，避免出现"材料已处理但状态未推进"。
+- 材料处理结果、理赔申请状态、交互事件与消费登记写入同一本地事务，避免出现"材料已处理但状态未推进"。
 - 文件处理、保单查询、自动承保请求都在事务外执行；外部调用失败不进入失败状态，只保留原状态等待重试。
 - 文件上传与自动承保请求必须幂等：上传按 `applicationNo + batchNo + materialType + originalFileUrl` 去重，自动承保按 `applicationNo` 去重；进程崩溃后消息重投不得产生重复数据或覆盖已完成结果。
 - 所有外部调用收紧超时：Feign 连接 1 秒、读取 2 秒，避免消费线程长时间占用。

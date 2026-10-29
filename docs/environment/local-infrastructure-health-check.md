@@ -2,7 +2,7 @@
 
 ## 运行检查目标
 
-本文档说明 `claim-local` 编排中 MySQL、Redis、RocketMQ 和 Application 服务的检查方式。先在仓库根目录运行 `./scripts/docker-start.sh`，再执行对应检查。
+本文档说明 `claim-local` 编排中 MySQL、Redis、RocketMQ 和理赔申请服务的检查方式。先在仓库根目录运行 `./scripts/docker-start.sh`，再执行对应检查。
 
 ## 通用容器状态
 
@@ -80,15 +80,15 @@ docker exec claim-rocketmq-broker sh mqadmin topicList -n rocketmq-namesrv:9876
 | 页面 | 检查内容 |
 |---|---|
 | `Cluster` | NameServer 与 `broker-a` 是否在线 |
-| `Topic` | 两个 Application Topic 是否存在、读写队列是否均为 8 |
+| `Topic` | 两个理赔申请Topic 是否存在、读写队列是否均为 8 |
 | `Consumer` | 后续业务 Spec 接入后检查消费者组和消费堆积 |
 | `Message` | 后续产生消息后按 Topic、Key 或时间检索消息 |
 
 Dashboard 仅用于本地开发与排查，不替代生产环境的监控、权限与审计能力。
 
-## Application 服务
+## 理赔申请服务
 
-Application 服务启动后执行：
+理赔申请服务启动后执行：
 
 ```bash
 curl -fsS http://127.0.0.1:8081/actuator/health
