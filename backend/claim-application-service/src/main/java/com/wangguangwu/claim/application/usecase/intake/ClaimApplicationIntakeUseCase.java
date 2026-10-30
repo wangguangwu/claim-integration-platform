@@ -1,9 +1,12 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationExistenceQuery;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookup;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookupKind;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakePolicy;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeSnapshotQuery;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import java.util.Optional;
@@ -15,7 +18,7 @@ import org.springframework.stereotype.Service;
  * 理赔申请统一接入签收用例入口，负责并发锁、事务外准备数据与唯一冲突恢复。
  *
  * <p>报文必填由租户 request 上的 Bean Validation 约束负责，领域不变式由聚合与值对象在构造处自守，
- * 本类不重复字段校验，只编排锁、存在性判断、编号生成与事务落库。</p>
+ * 本类不重复字段校验，只编排锁、签收判定、编号生成与事务落库。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -24,15 +27,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class ClaimApplicationIntakeUseCase {
 
-    private static final int MAX_UNIQUE_KEY_RETRY_TIMES = 3;
-
     private final ClaimApplicationIntakeLock claimApplicationIntakeLock;
-    private final ClaimApplicationExistenceQuery claimApplicationExistenceQuery;
+    private final ClaimApplicationIntakeSnapshotQuery claimApplicationIntakeSnapshotQuery;
     private final ClaimApplicationNoGenerator claimApplicationNoGenerator;
+    private final ClaimApplicationIntakePolicy claimApplicationIntakePolicy;
     private final ClaimApplicationIntakeTransactionService transactionService;
 
     /**
-     * 创建理赔申请，并在同一外部申请号锁内签收，成功提交后失效存在性缓存。
+     * 创建理赔申请，并在同一外部申请号锁内完成签收。
      *
      * @param command   租户协议归一化后的受理命令
      * @param requestId 请求标识
@@ -48,38 +50,48 @@ public class ClaimApplicationIntakeUseCase {
     }
 
     /**
-     * 在锁内于事务外完成存在性判断与编号生成，再交由事务服务落库。
+     * 在锁内完成签收判定，可复用结论只写轨迹，其余结论交由事务服务落库。
      *
-     * <p>存在性缓存与实际数据不一致或唯一键冲突时，淘汰缓存并在下一次重试中重新判断；
-     * 唯一键冲突且已存在同外部申请号记录时，直接按重复请求处理。</p>
+     * <p>唯一键冲突说明并发请求已创建同一外部申请号，先按重复请求解析；解析不到时重新判定并重试，
+     * 重试上限由配置给出。判定缓存与实际数据不一致时也不淘汰缓存：安全状态单调不可逆，
+     * 最多让本次请求多读一次库。</p>
+     *
+     * <p>事务内读到的安全状态随产物返回，事务提交后再把存在标记升级为可复用快照，
+     * 使后续重复请求不再回源。</p>
      *
      * @param claimApplication 待签收的理赔申请
-     * @param requestId   请求标识
-     * @param traceId     链路标识
+     * @param requestId        请求标识
+     * @param traceId          链路标识
      * @return 签收结果
      */
     private ClaimApplicationIntakeResult executeInLock(ClaimApplication claimApplication, String requestId, String traceId) {
         boolean forceCreate = false;
-        for (int retryTimes = 0; retryTimes < MAX_UNIQUE_KEY_RETRY_TIMES; retryTimes++) {
+        for (int retryTimes = 0; retryTimes < claimApplicationIntakePolicy.uniqueKeyRetryTimes(); retryTimes++) {
             try {
-                boolean existed = !forceCreate && claimApplicationExistenceQuery.exists(claimApplication.getTenantCode(),
-                        claimApplication.getExternalClaimApplicationNo());
-                String candidateClaimApplicationNo = existed ? null : claimApplicationNoGenerator.nextClaimApplicationNo();
-                ClaimApplicationIntakeResult result = transactionService.intake(claimApplication, existed,
+                ClaimApplicationIntakeLookup lookup = forceCreate
+                        ? ClaimApplicationIntakeLookup.absent()
+                        : claimApplicationIntakeSnapshotQuery.lookup(claimApplication.getTenantCode(),
+                                claimApplication.getExternalClaimApplicationNo());
+                if (lookup.kind() == ClaimApplicationIntakeLookupKind.REUSABLE) {
+                    return transactionService.recordReused(lookup.snapshot().claimApplicationNo(), requestId, traceId);
+                }
+                boolean absent = lookup.kind() == ClaimApplicationIntakeLookupKind.ABSENT;
+                String candidateClaimApplicationNo = absent ? claimApplicationNoGenerator.nextClaimApplicationNo() : null;
+                ClaimApplicationIntakeOutcome outcome = transactionService.intake(claimApplication, lookup.kind(),
                         candidateClaimApplicationNo, requestId, traceId);
-                evictAfterChanged(result, claimApplication);
-                return result;
+                if (absent) {
+                    markMutable(claimApplication);
+                }
+                return upgradedResult(claimApplication, outcome);
             } catch (ClaimApplicationExistenceMismatchException exception) {
-                claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
                 forceCreate = true;
             } catch (DuplicateKeyException exception) {
-                Optional<ClaimApplicationIntakeResult> resolvedResult = transactionService.resolveAfterDuplicateKey(
+                Optional<ClaimApplicationIntakeOutcome> resolvedOutcome = transactionService.resolveAfterDuplicateKey(
                         claimApplication, requestId, traceId);
-                if (resolvedResult.isPresent()) {
-                    evictAfterChanged(resolvedResult.get(), claimApplication);
-                    return resolvedResult.get();
+                if (resolvedOutcome.isPresent()) {
+                    markMutable(claimApplication);
+                    return upgradedResult(claimApplication, resolvedOutcome.get());
                 }
-                claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
                 claimApplicationNoGenerator.synchronizeDailyCounter();
                 forceCreate = false;
             }
@@ -89,14 +101,26 @@ public class ClaimApplicationIntakeUseCase {
     }
 
     /**
-     * 仅在创建或重新申请已完成提交后失效存在性缓存。
+     * 返回对外结果，并顺带把事务内观察到的可复用快照写入判定缓存。
      *
-     * @param result      签收结果
-     * @param claimApplication 待签收的理赔申请
+     * @param claimApplication 本次签收的理赔申请
+     * @param outcome          事务产物
+     * @return 对外签收结果
      */
-    private void evictAfterChanged(ClaimApplicationIntakeResult result, ClaimApplication claimApplication) {
-        if (result.changed()) {
-            claimApplicationExistenceQuery.evict(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo());
-        }
+    private ClaimApplicationIntakeResult upgradedResult(ClaimApplication claimApplication,
+                                                        ClaimApplicationIntakeOutcome outcome) {
+        outcome.reusableSnapshot().ifPresent(snapshot -> claimApplicationIntakeSnapshotQuery.markReusable(
+                claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo(), snapshot));
+        return outcome.result();
+    }
+
+    /**
+     * 把新创建或并发已创建的申请标记为存在且状态可变，覆盖之前的空标记。
+     *
+     * @param claimApplication 已存在的理赔申请
+     */
+    private void markMutable(ClaimApplication claimApplication) {
+        claimApplicationIntakeSnapshotQuery.markMutable(claimApplication.getTenantCode(),
+                claimApplication.getExternalClaimApplicationNo());
     }
 }

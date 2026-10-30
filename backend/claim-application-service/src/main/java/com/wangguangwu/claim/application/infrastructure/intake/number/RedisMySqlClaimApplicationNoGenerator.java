@@ -2,6 +2,7 @@ package com.wangguangwu.claim.application.infrastructure.intake.number;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.infrastructure.intake.resilience.RedisAvailabilityCircuit;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -16,6 +17,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * 基于 Redis 当前日计数、MySQL 最大申请编号兜底的理赔申请编号生成器。
+ *
+ * <p>Redis 熔断打开时改走本节点串行降级路径：在 {@code synchronized} 段内取「数据库当天最大尾号与本节点已分配尾号」
+ * 的较大者加一，不写 Redis。分配与落库不在同一临界区，只读最大尾号会让并发请求拿到同一个号，
+ * 记住本节点已分配尾号才能保证同节点连续分配递增；跨节点冲突仍由唯一键约束与用例重试收敛。
+ * 熔断关闭后的首次发号先把计数器抬升到数据库最大尾号，再继续 {@code INCR}。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -36,6 +42,11 @@ public class RedisMySqlClaimApplicationNoGenerator implements ClaimApplicationNo
 
     private final RedissonClient redissonClient;
     private final ClaimApplicationRepository claimApplicationRepository;
+    private final RedisAvailabilityCircuit redisAvailabilityCircuit;
+
+    /** 降级发号的本节点已分配尾号，与 {@link #lastAllocatedSequence} 一起只在串行化方法内读写。 */
+    private String lastAllocatedDate;
+    private long lastAllocatedSequence;
 
     /**
      * 生成 A 加日期加八位序列的理赔申请编号。
@@ -46,14 +57,48 @@ public class RedisMySqlClaimApplicationNoGenerator implements ClaimApplicationNo
     public String nextClaimApplicationNo() {
         LocalDate sequenceDate = LocalDate.now(BUSINESS_ZONE_ID);
         String formattedDate = sequenceDate.format(DATE_FORMATTER);
+        if (!redisAvailabilityCircuit.tryAcquire()) {
+            return nextClaimApplicationNoDegraded(formattedDate);
+        }
         try {
-            RAtomicLong counter = redissonClient.getAtomicLong(NUMBER_KEY_PREFIX + formattedDate);
-            if (!initializeCounterIfAbsent(formattedDate, counter)) {
-                return nextClaimApplicationNoFromMySql(formattedDate);
-            }
-            return formatClaimApplicationNo(formattedDate, counter.incrementAndGet());
+            String claimApplicationNo = nextClaimApplicationNoFromRedis(formattedDate);
+            redisAvailabilityCircuit.recordSuccess();
+            return claimApplicationNo;
         } catch (RedisException exception) {
-            return nextClaimApplicationNoFromMySql(formattedDate);
+            redisAvailabilityCircuit.recordFailure();
+            return nextClaimApplicationNoDegraded(formattedDate);
+        }
+    }
+
+    /**
+     * 走 Redis 计数发号；熔断刚关闭时先抬升计数器，避免编号回退撞号。
+     *
+     * @param formattedDate 格式化后的序列日期
+     * @return 理赔申请编号
+     */
+    private String nextClaimApplicationNoFromRedis(String formattedDate) {
+        RAtomicLong counter = redissonClient.getAtomicLong(NUMBER_KEY_PREFIX + formattedDate);
+        if (redisAvailabilityCircuit.consumeRecoveryRequired()) {
+            raiseCounterTo(counter, currentDailySequence(formattedDate));
+        }
+        if (!initializeCounterIfAbsent(formattedDate, counter)) {
+            return nextClaimApplicationNoDegraded(formattedDate);
+        }
+        return formatClaimApplicationNo(formattedDate, counter.incrementAndGet());
+    }
+
+    /**
+     * 降级发号：本节点串行分配尾号，并在降级日志中记录当前降级并发。
+     *
+     * @param formattedDate 格式化后的序列日期
+     * @return 理赔申请编号
+     */
+    private String nextClaimApplicationNoDegraded(String formattedDate) {
+        redisAvailabilityCircuit.enterDegraded("发号");
+        try {
+            return nextClaimApplicationNoSerialized(formattedDate);
+        } finally {
+            redisAvailabilityCircuit.exitDegraded();
         }
     }
 
@@ -129,15 +174,22 @@ public class RedisMySqlClaimApplicationNoGenerator implements ClaimApplicationNo
     }
 
     /**
-     * Redis 不可用时，依据 MySQL 已落库理赔申请的当天最大尾号生成候选编号。
+     * Redis 不可用时，同节点降级发号串行化。
      *
-     * <p>该路径不写 Redis。理赔申请表的全局唯一约束和用例层的冲突重试共同防止并发降级时重复落库。</p>
+     * <p>分配与落库不在同一临界区，只读数据库最大尾号会让并发请求拿到同一个号；
+     * 记住本节点已分配的尾号后，同一节点连续分配必然递增。</p>
      *
      * @param formattedDate 格式化后的序列日期
      * @return 待持久化的理赔申请编号
      */
-    private String nextClaimApplicationNoFromMySql(String formattedDate) {
-        return formatClaimApplicationNo(formattedDate, currentDailySequence(formattedDate) + 1);
+    private synchronized String nextClaimApplicationNoSerialized(String formattedDate) {
+        long persistedSequence = currentDailySequence(formattedDate);
+        long sequence = formattedDate.equals(lastAllocatedDate)
+                ? Math.max(persistedSequence, lastAllocatedSequence) + 1
+                : persistedSequence + 1;
+        lastAllocatedDate = formattedDate;
+        lastAllocatedSequence = sequence;
+        return formatClaimApplicationNo(formattedDate, sequence);
     }
 
     /**

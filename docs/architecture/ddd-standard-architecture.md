@@ -46,14 +46,14 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | `domain` | `ClaimApplicationStatus`、`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
 | 枚举自带的业务映射 | 枚举字段与方法 | `domain` | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
 | 仓储端口 | `*Repository` | `domain/<聚合>/port`（该域只有一个端口时直接放聚合包） | `ClaimApplicationRepository`、`MaterialRepository`、`OutboxEventRepository` |
-| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ServiceAuditSystemPort`（17 个端口，其中 13 个在 `port` 子包） |
+| 外部能力端口 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `domain/<聚合>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`ClaimApplicationIntakeSnapshotQuery`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ClaimApplicationIntakePolicy`、`ServiceAuditSystemPort`（18 个端口，其中 13 个在 `port` 子包） |
 | 配置适配器 | `*Properties`（实现 `domain` 的 `*Policy` 端口） | `infrastructure/<域>/config` | `OutboxRelayProperties`、`ClaimApplicationCompensationProperties` |
 | 仓储实现 | `MyBatis*Repository` | `infrastructure/<域>/persistence` | `infrastructure/intake/persistence/MyBatisClaimApplicationRepository` |
 | 持久化对象 | `*DO` | `infrastructure/<域>/persistence` | `ClaimApplicationDO`、`MaterialDO`、`OutboxEventDO` |
 | ORM 映射 | `*DOMapper` | `infrastructure/<域>/persistence` | `ClaimApplicationDOMapper` |
 | DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
 | 外部系统实现 | 进程内本地实现用 `Local*`；接入真实系统时另加适配器 | `infrastructure/<域>/external` | `LocalMaterialFileProcessor`、`LocalValidPolicyQuery`、`LocalAutoUnderwritingRequester`、`LocalUnderwritingResultQuery`、`LocalAuditSystemClient` |
-| 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging}` | `RedisClaimApplicationExistenceQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher` |
+| 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging,resilience}` | `RedisClaimApplicationIntakeSnapshotQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher`、`RedisAvailabilityCircuit` |
 | 业务异常与错误码 | `*Exception`、`*ErrorCode`，常见错误用枚举命名的静态工厂 | `domain/<聚合>/exception`（跨域的进 `shared/contract`） | `ClaimApplicationIntakeException`、`ClaimApplicationIntakeException.invalid(...)`、`ClaimApplicationAsyncException` |
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |

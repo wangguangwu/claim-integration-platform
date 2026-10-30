@@ -103,16 +103,14 @@ if (actualClaimApplicationNo == null || actualClaimApplicationNo.isBlank()) {
     AssertionResult.setFailureMessage(&quot;响应未返回 data.claimApplicationNo&quot;);
     return;
 }
-String propertyKey = &quot;claim.application.intake.idempotency.&quot;
-        + props.getProperty(&quot;EXTERNAL_APPLICATION_NO&quot;, &quot;IDEMPOTENCY-001&quot;);
+String propertyKey = &quot;claim.application.intake.idempotency.&quot; + props.getProperty(&quot;EXTERNAL_APPLICATION_NO&quot;, &quot;IDEMPOTENCY-001&quot;);
 synchronized (props) {
     String expectedClaimApplicationNo = props.getProperty(propertyKey);
     if (expectedClaimApplicationNo == null) {
         props.setProperty(propertyKey, actualClaimApplicationNo);
     } else if (!expectedClaimApplicationNo.equals(actualClaimApplicationNo)) {
         AssertionResult.setFailure(true);
-        AssertionResult.setFailureMessage(&quot;幂等响应编号不一致，expected=&quot; + expectedClaimApplicationNo
-                + &quot;, actual=&quot; + actualClaimApplicationNo);
+        AssertionResult.setFailureMessage(&quot;幂等响应编号不一致，expected=&quot; + expectedClaimApplicationNo + &quot;, actual=&quot; + actualClaimApplicationNo);
     }
 }</stringProp>
             <stringProp name="parameters"></stringProp>

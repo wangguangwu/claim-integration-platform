@@ -11,10 +11,11 @@
 | RocketMQ NameServer 5.5.0 | `9876` | RocketMQ 路由发现 |
 | RocketMQ Broker 5.5.0 | `10911`、`10909` | 理赔申请异步命令 Topic |
 | RocketMQ Dashboard 2.1.0 | `8090` | 查看 NameServer、Broker、Topic 和消费者状态 |
+| Sentinel Dashboard 1.8.9 | `8858` | 查看网关限流规则、机器心跳与接口 QPS |
 
 ## Apple Silicon（M 系列芯片）
 
-本编排使用的 MySQL、Redis、RocketMQ 和 RocketMQ Dashboard 均提供 `linux/arm64` 镜像。不要在 `deploy/docker-compose.yml` 中添加 `platform: linux/amd64`，否则 Docker Desktop 会显示 AMD64 标识并使用 Rosetta/QEMU 模拟，启动速度和资源效率都会下降。
+本编排使用的 MySQL、Redis、RocketMQ、RocketMQ Dashboard 和 Sentinel Dashboard 均提供 `linux/arm64` 镜像。不要在 `deploy/docker-compose.yml` 中添加 `platform: linux/amd64`，否则 Docker Desktop 会显示 AMD64 标识并使用 Rosetta/QEMU 模拟，启动速度和资源效率都会下降。
 
 如果此前拉取过 AMD64 Dashboard 镜像，在仓库根目录执行以下命令后重新启动：
 
@@ -106,10 +107,24 @@ Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动
 | `CLAIM_APPLICATION_REDIS_PASSWORD` | `claim_redis` |
 | `CLAIM_APPLICATION_ROCKETMQ_NAME_SERVER` | `127.0.0.1:9876` |
 
-Docker 服务端口可通过 `MYSQL_PORT`、`REDIS_PORT`、`ROCKETMQ_NAMESRV_PORT`、`ROCKETMQ_BROKER_PORT`、`ROCKETMQ_BROKER_FAST_PORT` 覆盖。若宿主机连接 RocketMQ 需要非默认网卡地址，可设置 `ROCKETMQ_BROKER_IP1` 后再启动编排。
+Docker 服务端口可通过 `MYSQL_PORT`、`REDIS_PORT`、`ROCKETMQ_NAMESRV_PORT`、`ROCKETMQ_BROKER_PORT`、`ROCKETMQ_BROKER_FAST_PORT`、`SENTINEL_DASHBOARD_PORT` 覆盖。若宿主机连接 RocketMQ 需要非默认网卡地址，可设置 `ROCKETMQ_BROKER_IP1` 后再启动编排。
 
 Broker 默认以 `127.0.0.1` 注册，宿主机客户端可直连；Dashboard 运行在容器内，因此编排附带 `rocketmq-dashboard-broker-proxy` 把 Dashboard 自身的 `127.0.0.1:10911` 转发到 Broker，Dashboard 才能查询 Broker 与 Topic。
 
 Dashboard 启动时按 `ROCKETMQ_DASHBOARD_USERNAME`、`ROCKETMQ_DASHBOARD_PASSWORD` 写入 `users.properties`，修改账号后需要重新创建容器才生效。
+
+## Sentinel 控制台
+
+访问 [http://127.0.0.1:8858](http://127.0.0.1:8858)，使用 `deploy/.env` 或 `deploy/.env.example` 中的 `SENTINEL_DASHBOARD_USERNAME`、`SENTINEL_DASHBOARD_PASSWORD` 登录。
+
+| 配置项 | 默认值 |
+|---|---|
+| 宿主机端口 | `8858` |
+| 用户名 | `SENTINEL_DASHBOARD_USERNAME`（默认 `claim_admin`） |
+| 密码 | `SENTINEL_DASHBOARD_PASSWORD`（默认 `claim_sentinel`） |
+
+- 控制台只做观测：限流规则由 `claim-gateway` 启动时按 `claim.gateway.rate-limit.*` 从配置加载，控制台上的临时改动在网关重启后失效。
+- 网关默认上报 `127.0.0.1:8858`，命令端口 `8719`；心跳地址由 Sentinel 自动探测宿主机网卡 IP，因为控制台只接受字面 IP，主机名会被判为 `invalid ip` 而注册失败。需要固定地址时设置 `CLAIM_GATEWAY_SENTINEL_CLIENT_IP`。
+- 网关必须先收到一笔业务请求才会初始化 Sentinel 并开始心跳，控制台此时才会出现 `claim-gateway`。
 
 各服务的容器、命令行与 Dashboard 检查方式见 [本地基础服务检查说明](local-infrastructure-health-check.md)。

@@ -1,8 +1,10 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookupKind;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeSnapshot;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
@@ -36,18 +38,22 @@ public class ClaimApplicationIntakeTransactionService {
     /**
      * 在本地事务中完成首次签收、重复复用或受理失败后的重新申请。
      *
-     * @param submitted              协议转换后的理赔申请
-     * @param existed                存在性提示：true 表示数据库中已有同外部申请号记录
-     * @param candidateClaimApplicationNo 存在性提示为 false 时必须提供的候选平台申请编号
-     * @param requestId              请求标识
-     * @param traceId                链路标识
-     * @return 签收结果
+     * <p>存在但状态可变时读到的聚合状态即是回源观察结论：安全状态随结果返回可复用快照，
+     * 供用例在事务提交后升级判定缓存，避免同一申请号反复回源。</p>
+     *
+     * @param submitted                   协议转换后的理赔申请
+     * @param lookupKind                  签收判定结论：不存在时创建，存在时读取聚合判定
+     * @param candidateClaimApplicationNo 判定为不存在时必须提供的候选平台申请编号
+     * @param requestId                   请求标识
+     * @param traceId                     链路标识
+     * @return 签收结果与回源观察到的可复用快照
      */
     @Transactional
-    public ClaimApplicationIntakeResult intake(ClaimApplication submitted, boolean existed,
-                                          String candidateClaimApplicationNo, String requestId, String traceId) {
-        if (!existed) {
-            return create(submitted, candidateClaimApplicationNo, requestId, traceId);
+    public ClaimApplicationIntakeOutcome intake(ClaimApplication submitted, ClaimApplicationIntakeLookupKind lookupKind,
+                                                String candidateClaimApplicationNo, String requestId, String traceId) {
+        if (lookupKind == ClaimApplicationIntakeLookupKind.ABSENT) {
+            return ClaimApplicationIntakeOutcome.withoutSnapshot(
+                    create(submitted, candidateClaimApplicationNo, requestId, traceId));
         }
         return claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(submitted.getTenantCode(),
                         submitted.getExternalClaimApplicationNo())
@@ -61,14 +67,30 @@ public class ClaimApplicationIntakeTransactionService {
      * @param submitted 协议转换后的理赔申请
      * @param requestId 请求标识
      * @param traceId   链路标识
-     * @return 已存在申请的结果；不存在时返回空
+     * @return 已存在申请的签收产物；不存在时返回空
      */
     @Transactional
-    public Optional<ClaimApplicationIntakeResult> resolveAfterDuplicateKey(ClaimApplication submitted,
-                                                                      String requestId, String traceId) {
+    public Optional<ClaimApplicationIntakeOutcome> resolveAfterDuplicateKey(ClaimApplication submitted,
+                                                                          String requestId, String traceId) {
         return claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(submitted.getTenantCode(),
                         submitted.getExternalClaimApplicationNo())
                 .map(claimApplication -> processExisting(claimApplication, submitted, requestId, traceId));
+    }
+
+    /**
+     * 命中可复用快照时只写交互轨迹，不读取聚合、不更新业务数据。
+     *
+     * @param claimApplicationNo 平台申请编号
+     * @param requestId          请求标识
+     * @param traceId            链路标识
+     * @return 复用结果
+     */
+    @Transactional
+    public ClaimApplicationIntakeResult recordReused(String claimApplicationNo, String requestId, String traceId) {
+        String interactionNo = lifecycleRecordFactory.newInteractionNo();
+        recordStarted(claimApplicationNo, interactionNo, requestId, traceId);
+        recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
+        return new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED);
     }
 
     /**
@@ -103,29 +125,50 @@ public class ClaimApplicationIntakeTransactionService {
      * @param submitted   协议转换后的理赔申请
      * @param requestId   请求标识
      * @param traceId     链路标识
-     * @return 复用或重新申请结果
+     * @return 复用或重新申请结果，以及读到的可复用快照
      */
-    private ClaimApplicationIntakeResult processExisting(ClaimApplication claimApplication, ClaimApplication submitted,
-                                                    String requestId, String traceId) {
+    private ClaimApplicationIntakeOutcome processExisting(ClaimApplication claimApplication,
+                                                         ClaimApplication submitted,
+                                                         String requestId, String traceId) {
         String claimApplicationNo = claimApplication.getClaimApplicationNo();
         String interactionNo = lifecycleRecordFactory.newInteractionNo();
         recordStarted(claimApplicationNo, interactionNo, requestId, traceId);
         if (claimApplication.getStatus() != ClaimApplicationStatus.ACCEPT_FAILED) {
             recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
-            return new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED);
+            return outcome(new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED),
+                    claimApplication);
         }
 
         claimApplication.reapply(submitted);
         if (!claimApplicationRepository.updateForReapply(claimApplication)) {
             recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
-            return new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED);
+            return ClaimApplicationIntakeOutcome.withoutSnapshot(
+                    new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED));
         }
 
         materialRepository.softDeleteByClaimApplicationNo(claimApplicationNo);
         materialRepository.insertAll(materialFactory.createMaterials(claimApplicationNo, submitted.getMaterials()));
         outboxEventRepository.insert(lifecycleRecordFactory.claimApplicationReappliedEvent(claimApplication, traceId));
         recordFinished(claimApplicationNo, interactionNo, requestId, traceId, true);
-        return new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REAPPLIED);
+        return ClaimApplicationIntakeOutcome.withoutSnapshot(
+                new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REAPPLIED));
+    }
+
+    /**
+     * 状态属于安全集合时随结果带出可复用快照。
+     *
+     * @param result           复用结果
+     * @param claimApplication 回源读到的理赔申请
+     * @return 带或不带快照的产物
+     */
+    private ClaimApplicationIntakeOutcome outcome(ClaimApplicationIntakeResult result,
+                                                  ClaimApplication claimApplication) {
+        ClaimApplicationStatus status = claimApplication.getStatus();
+        if (!ClaimApplicationIntakeSnapshot.isReusableStatus(status)) {
+            return ClaimApplicationIntakeOutcome.withoutSnapshot(result);
+        }
+        return ClaimApplicationIntakeOutcome.withSnapshot(result,
+                new ClaimApplicationIntakeSnapshot(claimApplication.getClaimApplicationNo(), status));
     }
 
     private void recordStarted(String claimApplicationNo, String interactionNo, String requestId, String traceId) {

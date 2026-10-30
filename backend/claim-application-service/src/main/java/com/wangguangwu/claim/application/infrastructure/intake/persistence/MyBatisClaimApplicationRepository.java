@@ -46,20 +46,6 @@ public class MyBatisClaimApplicationRepository implements ClaimApplicationReposi
     }
 
     /**
-     * 判断同租户外部申请号是否已落库。
-     *
-     * @param tenantCode 租户编码
-     * @param externalClaimApplicationNo 外部申请编号
-     * @return 存在时为 true
-     */
-    @Override
-    public boolean exists(String tenantCode, String externalClaimApplicationNo) {
-        return claimApplicationMapper.exists(Wrappers.lambdaQuery(ClaimApplicationDO.class)
-                .eq(ClaimApplicationDO::getTenantCode, tenantCode)
-                .eq(ClaimApplicationDO::getExternalClaimApplicationNo, externalClaimApplicationNo));
-    }
-
-    /**
      * 按平台申请编号查询理赔申请，编号全局唯一。
      *
      * @param claimApplicationNo 平台申请编号

@@ -32,15 +32,6 @@ public interface ClaimApplicationRepository {
     Optional<ClaimApplication> findByClaimApplicationNo(String claimApplicationNo);
 
     /**
-     * 判断同租户外部申请号是否已落库。
-     *
-     * @param tenantCode            租户编码
-     * @param externalClaimApplicationNo 外部申请编号
-     * @return 存在时为 true
-     */
-    boolean exists(String tenantCode, String externalClaimApplicationNo);
-
-    /**
      * 按编号前缀倒序取第一条，得到当天已生成的最大申请编号。
      *
      * @param numberPrefix 理赔申请编号前缀

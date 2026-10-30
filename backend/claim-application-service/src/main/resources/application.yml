@@ -94,6 +94,26 @@ claim:
     accepted-stall-timeout: ${CLAIM_APPLICATION_COMPENSATION_ACCEPTED_STALL_TIMEOUT:5m}
     underwriting-timeout: ${CLAIM_APPLICATION_COMPENSATION_UNDERWRITING_TIMEOUT:1m}
     pending-accept-timeout: ${CLAIM_APPLICATION_COMPENSATION_PENDING_ACCEPT_TIMEOUT:5m}
+  intake:
+    snapshot-cache:
+      # 已过受理的安全状态单调不可逆，可复用快照可以缓存较久。
+      reusable-ttl: ${CLAIM_APPLICATION_INTAKE_SNAPSHOT_REUSABLE_TTL:1h}
+      # 存在但状态可变的申请只缓存短标记，必须回源确认状态。
+      mutable-ttl: ${CLAIM_APPLICATION_INTAKE_SNAPSHOT_MUTABLE_TTL:1m}
+      # 不存在标记用于防穿透，创建成功后会被存在标记覆盖。
+      absent-ttl: ${CLAIM_APPLICATION_INTAKE_SNAPSHOT_ABSENT_TTL:1m}
+      local-ttl: ${CLAIM_APPLICATION_INTAKE_SNAPSHOT_LOCAL_TTL:5s}
+      local-max-entries: ${CLAIM_APPLICATION_INTAKE_SNAPSHOT_LOCAL_MAX_ENTRIES:10000}
+    # Redis 降级期间单节点签收并发上限，超出直接失败而不排队。
+    degraded-max-concurrency: ${CLAIM_APPLICATION_INTAKE_DEGRADED_MAX_CONCURRENCY:10}
+    # 唯一键冲突重试次数，覆盖降级发号时多节点撞号。
+    unique-key-retry-times: ${CLAIM_APPLICATION_INTAKE_UNIQUE_KEY_RETRY_TIMES:5}
+  redis:
+    circuit:
+      # Redis 连续失败达到阈值后熔断，熔断期间锁、缓存、发号直接走降级路径。
+      failure-threshold: ${CLAIM_APPLICATION_REDIS_CIRCUIT_FAILURE_THRESHOLD:3}
+      open-duration: ${CLAIM_APPLICATION_REDIS_CIRCUIT_OPEN_DURATION:10s}
+      log-interval: ${CLAIM_APPLICATION_REDIS_CIRCUIT_LOG_INTERVAL:10s}
   integration:
     local:
       # 每次外部调用的模拟耗时，用于观察异步链路与消费耗时。

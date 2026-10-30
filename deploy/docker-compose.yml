@@ -169,6 +169,28 @@ services:
       - TCP:rocketmq-broker:10911
     network_mode: "service:rocketmq-dashboard"
 
+  # Sentinel 控制台只做观测：限流规则仍由网关配置在启动时加载，控制台改动重启后失效。
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.9
+    # 镜像提供 linux/arm64 变体，Apple Silicon 无需强制 AMD64。
+    container_name: claim-sentinel-dashboard
+    environment:
+      # Spring Boot 环境变量绑定，覆盖镜像内置的 sentinel/sentinel。
+      AUTH_USERNAME: ${SENTINEL_DASHBOARD_USERNAME:-claim_admin}
+      AUTH_PASSWORD: ${SENTINEL_DASHBOARD_PASSWORD:-claim_sentinel}
+      TZ: Asia/Shanghai
+    ports:
+      # 容器内端口与宿主机一致，网关默认的控制台地址不用改。
+      - "${SENTINEL_DASHBOARD_PORT:-8858}:8858"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8858/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - claim-local-network
+
 networks:
   claim-local-network:
     # 服务只在独立本地网络中互相发现，宿主机通过 ports 访问。

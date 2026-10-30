@@ -10,15 +10,16 @@
 docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml ps -a
 ```
 
-`mysql`、`redis`、`rocketmq-namesrv`、`rocketmq-broker`、`rocketmq-dashboard` 应显示为 `healthy`。本编排不保留额外的初始化容器；Topic 由 `scripts/docker-start.sh` 在 Broker 健康后创建。
+`mysql`、`redis`、`rocketmq-namesrv`、`rocketmq-broker`、`rocketmq-dashboard`、`sentinel-dashboard` 应显示为 `healthy`。本编排不保留额外的初始化容器；Topic 由 `scripts/docker-start.sh` 在 Broker 健康后创建。
 
 在 Apple Silicon 上，Dashboard 不应显示 `AMD64` 标签。可执行以下命令确认容器架构：
 
 ```bash
 docker image inspect apacherocketmq/rocketmq-dashboard:2.1.0 --format '{{.Architecture}}/{{.Os}}'
+docker image inspect bladex/sentinel-dashboard:1.8.9 --format '{{.Architecture}}/{{.Os}}'
 ```
 
-预期输出为 `arm64/linux`，Docker Desktop 容器卡片不出现 AMD64 模拟标识。
+预期输出均为 `arm64/linux`，Docker Desktop 容器卡片不出现 AMD64 模拟标识。
 
 若创建了本地 `deploy/.env`，将上述命令中的 `deploy/.env.example` 替换为 `deploy/.env`。
 
@@ -85,6 +86,22 @@ docker exec claim-rocketmq-broker sh mqadmin topicList -n rocketmq-namesrv:9876
 | `Message` | 后续产生消息后按 Topic、Key 或时间检索消息 |
 
 Dashboard 仅用于本地开发与排查，不替代生产环境的监控、权限与审计能力。
+
+## Sentinel 控制台
+
+访问 [http://127.0.0.1:8858](http://127.0.0.1:8858)，使用 `deploy/.env` 或 `deploy/.env.example` 中的 `SENTINEL_DASHBOARD_USERNAME`、`SENTINEL_DASHBOARD_PASSWORD` 登录。
+
+先向网关发一笔签收请求（Sentinel 在首次业务调用时初始化并开始每 10 秒心跳），然后检查：
+
+| 页面 | 检查内容 |
+|---|---|
+| 机器列表 | 出现 `claim-gateway`，地址是宿主机网卡 IP 与命令端口 `8719`，状态 `healthy` |
+| 网关流控规则 | 路由兜底 1 条（资源 `claim-application-service`，50）与签收接口租户配额（资源 `claim-application-intake`，参数 `X-Tenant-Code`=`tenant-a`，20） |
+| 实时监控 | `claim-application-intake` 的 `passQps` 与 `blockQps` |
+
+控制台只做观测，规则由网关启动时从配置加载，控制台上的临时改动在网关重启后失效。
+
+控制台校验心跳 IP 必须是字面 IP：主机名会被判为 `invalid ip` 而注册失败，且客户端只记一条静默失败。默认留空 `CLAIM_GATEWAY_SENTINEL_CLIENT_IP`，由 Sentinel 自动探测宿主机网卡 IP；跨网段或容器化部署时显式设置为控制台可达的宿主机 IP。
 
 ## 理赔申请服务
 

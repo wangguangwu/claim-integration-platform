@@ -66,6 +66,36 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 }
 ```
 
+### 网关拒绝与限流
+
+网关在转发前完成租户校验与租户限流，被拒绝的请求不进入理赔申请服务，也不产生 InteractionLog。这两种拒绝体不含 `traceId` 字段，`traceId` 通过响应头 `X-Trace-Id` 返回：
+
+| 场景 | HTTP 状态 | 响应体 |
+|---|---|---|
+| 缺少 `X-Tenant-Code` 或 `X-Protocol-Version` | 400 | `{"code":"TENANT_HEADER_MISSING","message":"缺少租户标识或协议版本"}` |
+| 超过接口级租户配额或路由兜底阈值 | 429 | `{"code":"CLAIM_APPLICATION_RATE_LIMITED","message":"租户请求超过限流阈值"}` |
+
+限流只在签收路由 `claim-application-service` 生效，其他路由不受影响。限流分两层：路由兜底阈值和接口级租户配额，实际生效值取两者较小值。
+
+- 路由兜底：`claim.gateway.rate-limit.default-qps`（默认 50），不区分接口与租户，是所有租户的公共上界。
+- 接口级租户配额：`claim.gateway.rate-limit.apis.<接口名>.tenants.<租户编码>`（默认 `tenant-a: 20`），只能更严，配置值大于 `default-qps` 时网关启动失败；接口未配置的租户只受兜底约束。
+- 接口级配额按路径匹配，当前只有签收接口 `claim-application-intake` 配置了租户配额（`/api/claim/v1/application/intake`），同一租户的承保回调不受该配额影响。
+
+阈值口径是**单节点 QPS**：租户全局上界 = 单节点阈值 × 网关节点数，配置里不得写期望的全局值。规则随网关启动从配置加载；Sentinel 控制台只做观测，控制台上的临时规则在网关重启后失效。
+
+### 签收幂等判定
+
+- 首次提交创建申请并返回新 `claimApplicationNo`；同一 `externalClaimApplicationNo` 的重复提交返回同一 `claimApplicationNo`。
+- 状态为 `ACCEPT_FAILED` 的申请允许用同一外部申请号重新提交，平台覆盖当前内容并沿用原 `claimApplicationNo`。
+- 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT` 三种单调状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT` 与 `ACCEPT_FAILED` 每次都回源数据库确认，因此受理失败仍可重新提交。
+- 该缓存不改变对调用方可见的响应结构与响应码。
+
+### Redis 降级
+
+- 连续失败达到 3 次后熔断打开 10 秒，期间签收不依赖 Redis：锁降级为无锁、判定快照只走进程内缓存与 MySQL、编号改为本节点串行取当天最大尾号加一。
+- 降级期间本节点签收并发受信号量限制（默认 10），超出时返回 HTTP 500 与 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`，调用方可按原重试策略重试。
+- 降级不改变编号格式与长度；跨节点并发产生的唯一键冲突由平台内部重试（上限 5 次）消化，重试耗尽同样返回 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`。
+
 ## MQ 契约
 
 | Topic | 事件类型 | 消费者组 | 职责 |

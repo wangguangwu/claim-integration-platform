@@ -38,6 +38,24 @@ claim:
       application-service: lb://claim-application-service
       case-service: lb://claim-case-service
       ai-service: lb://claim-ai-service
+    # 路由兜底：统计 /api/claim/** 全部请求，是整条路由的单节点上界。
+    # 接口级配额按租户细分，同一租户在不同接口上的额度互不影响；两类规则同时命中时取较小值。
+    # 阈值口径是单节点 QPS：租户全局上界 = 单节点阈值 × 网关节点数。
+    rate-limit:
+      default-qps: ${CLAIM_APPLICATION_RATE_LIMIT_DEFAULT_QPS:50}
+      apis:
+        claim-application-intake:
+          path: ${CLAIM_APPLICATION_RATE_LIMIT_INTAKE_PATH:/api/claim/v1/application/intake}
+          match-strategy: exact
+          tenants:
+            tenant-a: ${CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS:20}
+    # 控制台只做观测：规则仍由本文件在启动时加载，控制台改动在网关重启后失效。
+    # dashboard-server 留空表示关闭心跳上报，避免控制台未启动时每 10 秒刷一条失败 WARN。
+    sentinel:
+      dashboard-server: ${CLAIM_GATEWAY_SENTINEL_DASHBOARD_SERVER:127.0.0.1:8858}
+      # 控制台按心跳地址回连命令端口，必须是容器可达的字面 IP；留空表示由 Sentinel 自动探测宿主机网卡。
+      client-ip: ${CLAIM_GATEWAY_SENTINEL_CLIENT_IP:}
+      api-port: ${CLAIM_GATEWAY_SENTINEL_API_PORT:8719}
 
 ---
 spring:
