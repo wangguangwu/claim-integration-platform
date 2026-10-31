@@ -1,11 +1,10 @@
 package com.wangguangwu.claim.application.usecase.issue;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueException;
+import com.wangguangwu.claim.application.domain.issue.service.IssueDomainService;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueCloseCommand;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 问题件关闭用例：校验问题件状态、幂等判断、关闭问题件并回退申请状态。
+ * 问题件关闭用例：幂等判断、事务管理、委托领域服务执行业务逻辑。
  *
- * <p>整个用例在一个事务内完成，保证问题件状态变更与申请状态回退的原子性。</p>
+ * <p>职责：
+ * <ul>
+ *   <li>幂等性检查（应用层关注点）</li>
+ *   <li>事务管理（应用层关注点）</li>
+ *   <li>委托领域服务执行跨聚合业务规则</li>
+ * </ul>
  *
  * @author wangguangwu
  * @since 2026-10-31
@@ -26,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ClaimApplicationIssueCloseUseCase {
 
+    private final IssueDomainService issueDomainService;
     private final ClaimApplicationIssueRepository claimApplicationIssueRepository;
-    private final ClaimApplicationRepository claimApplicationRepository;
 
     /**
      * 处理一次问题件关闭请求。
@@ -49,18 +53,7 @@ public class ClaimApplicationIssueCloseUseCase {
             return new ClaimApplicationIssueCloseResult(command.issueNo(), false);
         }
 
-        issue.close(command.auditor());
-        claimApplicationIssueRepository.update(issue);
-
-        ClaimApplication claimApplication = claimApplicationRepository
-                .findByClaimApplicationNo(issue.getClaimApplicationNo())
-                .orElseThrow(() -> new ClaimApplicationIssueException(
-                        ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND,
-                        "问题件关联的申请不存在，issueNo=" + command.issueNo()
-                                + "，claimApplicationNo=" + issue.getClaimApplicationNo()));
-
-        claimApplication.transitionToWaitAudit();
-        claimApplicationRepository.updateStatus(claimApplication, claimApplication.getStatus());
+        issueDomainService.closeIssue(command.issueNo(), command.auditor());
 
         log.info("问题件关闭成功，issueNo={}，claimApplicationNo={}", command.issueNo(), issue.getClaimApplicationNo());
         return new ClaimApplicationIssueCloseResult(command.issueNo(), true);
