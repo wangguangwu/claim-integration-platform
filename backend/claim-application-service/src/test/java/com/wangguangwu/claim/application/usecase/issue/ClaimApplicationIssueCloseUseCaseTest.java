@@ -61,7 +61,7 @@ class ClaimApplicationIssueCloseUseCaseTest {
 
         assertThat(result.issueNo()).isEqualTo(ISSUE_NO);
         assertThat(result.closed()).isTrue();
-        verify(issueDomainService).closeIssue(eq(ISSUE_NO), eq(AUDITOR));
+        verify(issueDomainService).closeIssue(eq(issue), eq(AUDITOR));
     }
 
     @Test

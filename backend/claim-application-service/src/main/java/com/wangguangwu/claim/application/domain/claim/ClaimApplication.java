@@ -143,7 +143,7 @@ public class ClaimApplication {
      * @param submitted 新一次提交的理赔申请
      */
     public void reapply(ClaimApplication submitted) {
-        if (status != ClaimApplicationStatus.ACCEPT_FAILED) {
+        if (!isReapplicable()) {
             throw new IllegalStateException("仅受理失败的申请允许重新申请");
         }
         status = ClaimApplicationStatus.PENDING_ACCEPT;
@@ -191,26 +191,66 @@ public class ClaimApplication {
     }
 
     /**
-     * 审核系统下发问题件，进入问题件状态。
+     * 审核系统下发问题件，申请挂起等待租户补材。
+     *
+     * <p>业务语义是"进入问题件等待补材阶段"，不暴露状态机实现细节。</p>
      */
-    public void transitionToIssue() {
+    public void enterIssue() {
         transitionTo(ClaimApplicationStatus.WAIT_AUDIT, ClaimApplicationStatus.ISSUE);
     }
 
     /**
-     * 问题件关闭，回退到等待审核状态。
+     * 问题件关闭，申请恢复审核。
      */
-    public void transitionToWaitAudit() {
+    public void resumeAudit() {
         transitionTo(ClaimApplicationStatus.ISSUE, ClaimApplicationStatus.WAIT_AUDIT);
     }
 
     /**
-     * 判断当前状态是否为等待审核。
+     * 判断申请是否处于等待审核，下游据此决定能否下发问题件或交付审核。
      *
      * @return 状态为 WAIT_AUDIT 时为 true
      */
-    public boolean isWaitAudit() {
+    public boolean isAwaitingAudit() {
         return status == ClaimApplicationStatus.WAIT_AUDIT;
+    }
+
+    /**
+     * 判断申请是否可被租户重新提交。
+     *
+     * <p>只有受理失败的申请允许复用原平台编号重新签收，其余状态一律按重复请求复用。</p>
+     *
+     * @return 状态为 ACCEPT_FAILED 时为 true
+     */
+    public boolean isReapplicable() {
+        return status == ClaimApplicationStatus.ACCEPT_FAILED;
+    }
+
+    /**
+     * 判断申请是否已签收但材料尚未处理完成。
+     *
+     * @return 状态为 PENDING_ACCEPT 时为 true
+     */
+    public boolean isPendingAccept() {
+        return status == ClaimApplicationStatus.PENDING_ACCEPT;
+    }
+
+    /**
+     * 判断申请是否已通过签收，可以进入承保分流。
+     *
+     * @return 状态为 ACCEPTED 时为 true
+     */
+    public boolean isAccepted() {
+        return status == ClaimApplicationStatus.ACCEPTED;
+    }
+
+    /**
+     * 判断申请是否处于自动承保处理中。
+     *
+     * @return 状态为 UNDERWRITING 时为 true
+     */
+    public boolean isUnderwriting() {
+        return status == ClaimApplicationStatus.UNDERWRITING;
     }
 
     /**
@@ -224,16 +264,6 @@ public class ClaimApplication {
             throw new IllegalStateException("主被保险人缺少证件号，claimApplicationNo=" + claimApplicationNo);
         }
         return primaryInsured.certificateNo();
-    }
-
-    /**
-     * 判断当前状态是否为期望状态，供用例在调用外部系统前做前置校验。
-     *
-     * @param expectedStatus 期望状态
-     * @return 状态一致时为 true
-     */
-    public boolean isInStatus(ClaimApplicationStatus expectedStatus) {
-        return status == expectedStatus;
     }
 
     private void transitionTo(ClaimApplicationStatus expectedStatus, ClaimApplicationStatus targetStatus) {

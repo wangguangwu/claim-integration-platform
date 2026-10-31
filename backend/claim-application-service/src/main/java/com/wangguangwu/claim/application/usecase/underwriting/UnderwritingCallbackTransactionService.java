@@ -46,7 +46,7 @@ public class UnderwritingCallbackTransactionService {
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command, ClaimApplication claimApplication,
                                                String interactionNo) {
         recordStarted(command, interactionNo);
-        if (!claimApplication.isInStatus(ClaimApplicationStatus.UNDERWRITING)) {
+        if (!claimApplication.isUnderwriting()) {
             recordFinished(command, interactionNo, InteractionAction.REUSED);
             return new UnderwritingCallbackResult(command.claimApplicationNo(), UnderwritingCallbackDisposition.REUSED);
         }

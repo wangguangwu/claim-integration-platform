@@ -133,7 +133,7 @@ public class ClaimApplicationIntakeTransactionService {
         String claimApplicationNo = claimApplication.getClaimApplicationNo();
         String interactionNo = lifecycleRecordFactory.newInteractionNo();
         recordStarted(claimApplicationNo, interactionNo, requestId, traceId);
-        if (claimApplication.getStatus() != ClaimApplicationStatus.ACCEPT_FAILED) {
+        if (!claimApplication.isReapplicable()) {
             recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
             return outcome(new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED),
                     claimApplication);

@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
 import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
@@ -45,7 +44,7 @@ public class UnderwritingUseCase {
     public void dispatch(String claimApplicationNo, String traceId) {
         ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(claimApplicationNo)
                 .orElseThrow(() -> new IllegalStateException("承保分流对应的申请不存在，claimApplicationNo=" + claimApplicationNo));
-        if (!claimApplication.isInStatus(ClaimApplicationStatus.ACCEPTED)) {
+        if (!claimApplication.isAccepted()) {
             log.info("申请不处于已受理状态，跳过承保分流，claimApplicationNo={}，status={}", claimApplicationNo,
                     claimApplication.getStatus());
             return;

@@ -45,9 +45,10 @@
 - 产物：修改 `ClaimApplication.java`
 - 路径：`backend/claim-application-service/src/main/java/com/wangguangwu/claim/application/domain/claim/ClaimApplication.java`
 - 完成条件：
-  - 新增 transitionToIssue()：校验当前状态为 WAIT_AUDIT，变更为 ISSUE
-  - 新增 transitionToWaitAudit()：校验当前状态为 ISSUE，变更为 WAIT_AUDIT
-  - 新增 isWaitAudit()：判断状态是否为 WAIT_AUDIT
+  - 新增 enterIssue()：校验当前状态为 WAIT_AUDIT，变更为 ISSUE
+  - 新增 resumeAudit()：校验当前状态为 ISSUE，变更为 WAIT_AUDIT
+  - 新增 isAwaitingAudit()：判断状态是否为 WAIT_AUDIT
+  - 移除通用 isInStatus(status)，改用业务语义状态判定
   - 中文 JavaDoc
   - 编译通过
 
@@ -127,13 +128,11 @@
   - Command：封装 claimApplicationNo、issueNo、reason、auditor、issueContent
   - Result：封装 issueNo、claimApplicationNo、created
   - UseCase：
-    - 依赖 ClaimApplicationRepository、ClaimApplicationIssueRepository
+    - 依赖 IssueDomainService、ClaimApplicationIssueRepository
     - receive(command) 方法
-    - 校验申请存在且状态为 WAIT_AUDIT
     - 幂等判断：issueNo 已存在则返回 created=false
-    - 校验无未关闭问题件
-    - 创建问题件并保存
-    - 申请状态变更为 ISSUE 并保存
+    - 委托 IssueDomainService.raiseIssue 执行业务规则
+    - 捕获 DuplicateKeyException 作为并发幂等兜底
     - 返回 created=true
     - 使用 @Transactional
   - 中文 JavaDoc
@@ -149,12 +148,11 @@
   - Command：封装 issueNo、auditor
   - Result：封装 issueNo、closed
   - UseCase：
-    - 依赖 ClaimApplicationIssueRepository、ClaimApplicationRepository
+    - 依赖 IssueDomainService、ClaimApplicationIssueRepository
     - close(command) 方法
     - 查询问题件，不存在则抛 ISSUE_NOT_FOUND
     - 幂等判断：已 CLOSED 则返回 closed=false
-    - 关闭问题件并保存
-    - 查询关联申请，状态变更为 WAIT_AUDIT 并保存
+    - 委托 IssueDomainService.closeIssue 关闭问题件并恢复申请审核
     - 返回 closed=true
     - 使用 @Transactional
   - 中文 JavaDoc
@@ -239,11 +237,9 @@
 - 产物：`ClaimApplicationIssueIntakeUseCaseTest.java`
 - 路径：`backend/claim-application-service/src/test/java/com/wangguangwu/claim/application/usecase/issue/ClaimApplicationIssueIntakeUseCaseTest.java`
 - 完成条件：
-  - 首次下发：申请状态为 WAIT_AUDIT → 创建成功，状态变更为 ISSUE
-  - 幂等下发：issueNo 已存在 → 返回成功，不重复创建
-  - 申请不存在：抛 ISSUE_APPLICATION_NOT_FOUND
-  - 申请状态不匹配：抛 ISSUE_APPLICATION_STATUS_INVALID
-  - 已有未关闭问题件：抛 ISSUE_ALREADY_OPEN
+  - 幂等下发：issueNo 已存在 → 返回 created=false，不调用领域服务
+  - 首次下发：委托领域服务成功 → 返回 created=true
+  - 并发创建触发唯一约束：捕获 DuplicateKeyException → 返回 created=false
   - 使用 Mockito
   - 测试通过
 
@@ -251,10 +247,21 @@
 - 产物：`ClaimApplicationIssueCloseUseCaseTest.java`
 - 路径：`backend/claim-application-service/src/test/java/com/wangguangwu/claim/application/usecase/issue/ClaimApplicationIssueCloseUseCaseTest.java`
 - 完成条件：
-  - 首次关闭：问题件状态为 OPEN → 关闭成功，申请状态回退 WAIT_AUDIT
-  - 幂等关闭：问题件已 CLOSED → 返回成功，不重复处理
+  - 首次关闭：问题件状态为 OPEN → 委托领域服务，返回 closed=true
+  - 幂等关闭：问题件已 CLOSED → 返回 closed=false，不调用领域服务
   - 问题件不存在：抛 ISSUE_NOT_FOUND
   - 使用 Mockito
+  - 测试通过
+
+#### T20.1：问题件领域服务测试
+- 产物：`IssueDomainServiceTest.java`
+- 路径：`backend/claim-application-service/src/test/java/com/wangguangwu/claim/application/domain/issue/service/IssueDomainServiceTest.java`
+- 完成条件：
+  - 下发：正常、申请不存在、状态不合法、已有未关闭问题件、条件更新冲突
+  - 关闭：正常、关联申请不存在、条件更新冲突
+  - 校验以迁移前状态做条件更新
+  - 校验领域事件通过 IssueDomainEventPublisher 端口发布
+  - 使用 Mockito、AssertJ
   - 测试通过
 
 ### Batch 7：构建验证
@@ -275,10 +282,37 @@
   - 删除无用空行
   - 代码风格统一
 
+## 补充任务（DDD 分层收敛）
+
+#### T23：问题件领域服务
+- 产物：`IssueDomainService.java`
+- 路径：`backend/claim-application-service/src/main/java/com/wangguangwu/claim/application/domain/issue/service/`
+- 完成条件：
+  - `raiseIssue(...)`：校验申请存在、处于等待审核、无未关闭问题件，创建问题件并挂起申请
+  - `closeIssue(issue, auditor)`：关闭问题件并恢复申请审核
+  - 状态推进以迁移前状态做条件更新，条件未命中抛业务异常
+  - 不含事务管理与幂等判断
+  - 中文 JavaDoc
+  - 编译通过
+
+#### T24：领域事件与发布端口
+- 产物：
+  - `IssueDomainEvent.java`、`IssueRaisedEvent.java`、`IssueClosedEvent.java`、`IssueDomainEventPublisher.java`
+  - `SpringIssueDomainEventPublisher.java`
+- 路径：
+  - 端口与事件：`domain/issue/event/`
+  - 适配器：`infrastructure/issue/event/`
+- 完成条件：
+  - 事件实现 IssueDomainEvent 标记
+  - 领域服务只依赖端口，不依赖 Spring 事件 API
+  - 基础设施实现将事件转交 ApplicationEventPublisher
+  - 中文 JavaDoc
+  - 编译通过
+
 ## 任务依赖
 
 ```
-T1-T5（领域模型） → T6-T9（基础设施） → T10-T11（异常） → T12-T13（用例） → T14-T16（接口） → T17-T20（测试） → T21-T22（验证）
+T1-T5（领域模型） → T6-T9（基础设施） → T10-T11（异常） → T12-T13、T23-T24（领域服务与用例） → T14-T16（接口） → T17-T20、T20.1（测试） → T21-T22（验证）
 ```
 
 ## 预估工作量

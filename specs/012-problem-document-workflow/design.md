@@ -20,20 +20,23 @@
 审核系统 → HTTP POST /api/application/v1/callbacks/audit-issues
   → ClaimApplicationIssueIntakeController.receiveIssue()
     → ClaimApplicationIssueIntakeUseCase.receive(command)
-      → ClaimApplicationRepository.findByNo(claimApplicationNo)
-        → 校验申请存在 & 状态为 WAIT_AUDIT
       → ClaimApplicationIssueRepository.findByIssueNo(issueNo)
-        → 幂等判断：已存在则返回成功
+        → 幂等判断：已存在则返回 created=false
+    → IssueDomainService.raiseIssue(claimApplicationNo, issueNo, reason, auditor, issueContent)
+      → ClaimApplicationRepository.findByClaimApplicationNo(claimApplicationNo)
+        → 校验申请存在 & isAwaitingAudit()
       → ClaimApplicationIssueRepository.hasOpenIssue(claimApplicationNo)
         → 校验无未关闭问题件
-      → ClaimApplicationIssue.create(issueNo, claimApplicationNo, reason, auditor, issueContent)
-      → ClaimApplicationIssueRepository.save(issue)
-      → ClaimApplication.transitionToIssue()
-      → ClaimApplicationRepository.save(application)
+      → ClaimApplicationIssue.create(...)
+      → ClaimApplicationIssueRepository.insert(issue)
+      → ClaimApplication.enterIssue()
+      → ClaimApplicationRepository.updateStatus(application, WAIT_AUDIT)
+        → 以迁移前状态为条件更新，未命中即抛业务异常回滚
+      → IssueDomainEventPublisher.publish(IssueRaisedEvent)
     → 返回成功响应
 ```
 
-事务边界：整个用例方法在一个事务内完成，保证问题件创建与申请状态变更的原子性。
+事务边界：用例方法在一个事务内完成，保证问题件创建与申请挂起的原子性。幂等判断与唯一约束冲突兜底都在用例层。
 
 ### 2.2 问题件关闭
 
@@ -43,16 +46,18 @@
     → ClaimApplicationIssueCloseUseCase.close(command)
       → ClaimApplicationIssueRepository.findByIssueNo(issueNo)
         → 校验问题件存在
-      → 幂等判断：已 CLOSED 则返回成功
+      → 幂等判断：isClosed() 则返回 closed=false
+    → IssueDomainService.closeIssue(issue, auditor)
       → ClaimApplicationIssue.close(auditor)
-      → ClaimApplicationIssueRepository.save(issue)
-      → ClaimApplicationRepository.findByIssueNo(issueNo)
-      → ClaimApplication.transitionToWaitAudit()
-      → ClaimApplicationRepository.save(application)
+      → ClaimApplicationIssueRepository.update(issue)
+      → ClaimApplicationRepository.findByClaimApplicationNo(...)
+      → ClaimApplication.resumeAudit()
+      → ClaimApplicationRepository.updateStatus(application, ISSUE)
+      → IssueDomainEventPublisher.publish(IssueClosedEvent)
     → 返回成功响应
 ```
 
-事务边界：整个用例方法在一个事务内完成。
+事务边界：用例方法在一个事务内完成。问题件已关闭的幂等判断只在用例层，领域服务只处理"未关闭问题件如何关闭"的业务规则。
 
 ## 3. 主要类职责
 
@@ -74,16 +79,31 @@
 **ClaimApplicationIssueRepository**（端口）
 - `findByIssueNo(issueNo)`：按问题件编号查询
 - `hasOpenIssue(claimApplicationNo)`：判断申请是否有未关闭问题件
-- `save(issue)`：保存问题件
+- `insert(issue)` / `update(issue)`：写入问题件
+
+**IssueDomainService**（领域服务）
+- 职责：协调问题件聚合与申请聚合的跨聚合规则，两个聚合各自守住自身不变式
+- `raiseIssue(...)`：校验申请存在、处于等待审核、无未关闭问题件，创建问题件并挂起申请
+- `closeIssue(issue, auditor)`：关闭问题件并恢复申请审核
+- 状态推进统一以迁移前状态做条件更新，条件未命中抛业务异常由用例事务回滚
+- 不承担事务管理与幂等判断
+
+**IssueRaisedEvent / IssueClosedEvent**（领域事件）
+- 实现 `IssueDomainEvent` 标记，描述问题件下发与关闭两个业务事实
+
+**IssueDomainEventPublisher**（端口）
+- `publish(event)`：领域层发布事实的出口，基础设施提供进程内或消息队列实现
 
 ### 3.2 领域层（domain/claim）
 
 **ClaimApplication**（聚合根，修改）
-- 新增状态值：ISSUE
 - 新增方法：
-  - `transitionToIssue()`：WAIT_AUDIT → ISSUE
-  - `transitionToWaitAudit()`：ISSUE → WAIT_AUDIT
-  - `isWaitAudit()`：判断状态是否为 WAIT_AUDIT
+  - `enterIssue()`：等待审核 → 问题件
+  - `resumeAudit()`：问题件 → 等待审核
+  - `isAwaitingAudit()`：判断是否等待审核
+  - `isReapplicable()`：判断是否允许重新提交
+  - `isPendingAccept()` / `isAccepted()` / `isUnderwriting()`：业务语义状态判定
+- 移除通用状态判断 `isInStatus(status)`，应用层不再直接读取状态枚举做分支
 
 **ClaimApplicationStatus**（枚举，修改）
 - 新增 ISSUE 值
@@ -91,15 +111,15 @@
 ### 3.3 用例层（usecase/issue）
 
 **ClaimApplicationIssueIntakeUseCase**
-- 职责：编排问题件下发流程
+- 职责：幂等判断、唯一约束冲突兜底、事务边界，业务规则委托领域服务
 - 方法：`receive(ClaimApplicationIssueIntakeCommand)`
-- 依赖：ClaimApplicationRepository、ClaimApplicationIssueRepository
+- 依赖：IssueDomainService、ClaimApplicationIssueRepository
 - 事务：@Transactional
 
 **ClaimApplicationIssueCloseUseCase**
-- 职责：编排问题件关闭流程
+- 职责：问题件存在性校验、已关闭幂等判断、事务边界，业务规则委托领域服务
 - 方法：`close(ClaimApplicationIssueCloseCommand)`
-- 依赖：ClaimApplicationIssueRepository、ClaimApplicationRepository
+- 依赖：IssueDomainService、ClaimApplicationIssueRepository
 - 事务：@Transactional
 
 **ClaimApplicationIssueIntakeCommand / ClaimApplicationIssueCloseCommand**（值对象）
@@ -346,9 +366,9 @@ Content-Type: application/json
 
 ### 7.2 ClaimApplication 聚合根
 
-- 新增 `transitionToIssue()` 和 `transitionToWaitAudit()` 方法。
-- 新增 `isWaitAudit()` 判断方法。
-- 不影响现有方法。
+- 新增 `enterIssue()` 和 `resumeAudit()` 两个业务语义迁移方法。
+- 新增 `isAwaitingAudit()`、`isReapplicable()`、`isPendingAccept()`、`isAccepted()`、`isUnderwriting()` 状态判定。
+- 移除通用的 `isInStatus(status)`，签收、材料处理、承保分流、审核交付改用语义方法，聚合的状态模型可独立演进。
 
 ### 7.3 数据库
 
@@ -364,16 +384,19 @@ Content-Type: application/json
 
 ### 8.1 单元测试
 
-**ClaimApplicationIssueIntakeUseCaseTest**
-- 首次下发：申请状态为 WAIT_AUDIT → 创建成功，状态变更为 ISSUE
-- 幂等下发：issueNo 已存在 → 返回成功，不重复创建
-- 申请不存在：抛 ISSUE_APPLICATION_NOT_FOUND
-- 申请状态不匹配：抛 ISSUE_APPLICATION_STATUS_INVALID
-- 已有未关闭问题件：抛 ISSUE_ALREADY_OPEN
+**IssueDomainServiceTest**（跨聚合规则）
+- 下发：正常、申请不存在、状态不合法、已有未关闭问题件、条件更新冲突
+- 关闭：正常、关联申请不存在、条件更新冲突
+- 条件更新以迁移前状态为条件；领域事件经端口发布
 
-**ClaimApplicationIssueCloseUseCaseTest**
-- 首次关闭：问题件状态为 OPEN → 关闭成功，申请状态回退 WAIT_AUDIT
-- 幂等关闭：问题件已 CLOSED → 返回成功，不重复处理
+**ClaimApplicationIssueIntakeUseCaseTest**（应用层编排）
+- 幂等下发：issueNo 已存在 → created=false，不调用领域服务
+- 首次下发：委托领域服务成功 → created=true
+- 并发唯一约束冲突：DuplicateKeyException → created=false
+
+**ClaimApplicationIssueCloseUseCaseTest**（应用层编排）
+- 首次关闭：问题件 OPEN → 委托领域服务，closed=true
+- 幂等关闭：问题件已 CLOSED → closed=false，不调用领域服务
 - 问题件不存在：抛 ISSUE_NOT_FOUND
 
 **ClaimApplicationIssueTest**（领域模型）
@@ -381,10 +404,11 @@ Content-Type: application/json
 - 关闭问题件：状态变更为 CLOSED，记录 closedAt
 - 重复关闭：抛异常
 
-**ClaimApplicationTest**（状态流转）
-- WAIT_AUDIT → ISSUE：合法流转
-- ISSUE → WAIT_AUDIT：合法流转
+**ClaimApplicationIssueTransitionTest**（聚合状态流转）
+- 等待审核 → 问题件：合法流转
+- 问题件 → 等待审核：合法流转
 - 其他流转：抛异常
+- isAwaitingAudit / isReapplicable / isPendingAccept / isAccepted / isUnderwriting 按状态返回
 
 ### 8.2 集成测试
 

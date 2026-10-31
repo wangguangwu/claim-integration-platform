@@ -3,7 +3,6 @@ package com.wangguangwu.claim.application.usecase.audit;
 import com.wangguangwu.claim.application.domain.audit.AuditDeliveryRequest;
 import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
@@ -52,7 +51,7 @@ public class AuditDeliveryUseCase {
                         "审核交付事件对应的申请不存在，可能 outbox 事件早于申请落库到达，claimApplicationNo="
                                 + command.claimApplicationNo() + "，eventId=" + command.eventId()));
         String interactionNo = recordFactory.newInteractionNo();
-        if (!claimApplication.isInStatus(ClaimApplicationStatus.WAIT_AUDIT)) {
+        if (!claimApplication.isAwaitingAudit()) {
             log.info("审核交付事件与当前申请不匹配，按重复事件处理，claimApplicationNo={}，status={}",
                     command.claimApplicationNo(), claimApplication.getStatus());
             transactionService.recordReused(command, interactionNo);

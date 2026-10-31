@@ -53,7 +53,7 @@ public class ClaimApplicationIssueCloseUseCase {
             return new ClaimApplicationIssueCloseResult(command.issueNo(), false);
         }
 
-        issueDomainService.closeIssue(command.issueNo(), command.auditor());
+        issueDomainService.closeIssue(issue, command.auditor());
 
         log.info("问题件关闭成功，issueNo={}，claimApplicationNo={}", command.issueNo(), issue.getClaimApplicationNo());
         return new ClaimApplicationIssueCloseResult(command.issueNo(), true);

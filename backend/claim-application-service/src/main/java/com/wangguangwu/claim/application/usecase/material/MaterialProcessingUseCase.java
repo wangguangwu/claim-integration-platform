@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.usecase.material;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import com.wangguangwu.claim.application.domain.material.FileUploadResult;
@@ -97,7 +96,7 @@ public class MaterialProcessingUseCase {
     }
 
     private boolean isProcessable(ClaimApplication claimApplication, int eventClaimApplicationAttempt) {
-        return claimApplication.isInStatus(ClaimApplicationStatus.PENDING_ACCEPT)
+        return claimApplication.isPendingAccept()
                 && Objects.equals(claimApplication.getClaimApplicationAttempt(), eventClaimApplicationAttempt);
     }
 

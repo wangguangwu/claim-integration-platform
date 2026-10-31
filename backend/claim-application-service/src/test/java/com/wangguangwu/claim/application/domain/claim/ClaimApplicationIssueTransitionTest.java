@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 申请状态流转单元测试：验证问题件相关的状态迁移。
+ * 申请状态流转单元测试：验证问题件相关的状态迁移与业务语义判定。
  *
  * @author wangguangwu
  * @since 2026-10-31
@@ -26,59 +26,59 @@ class ClaimApplicationIssueTransitionTest {
     private static final String CLAIM_APPLICATION_NO = "A2026103100000001";
 
     @Test
-    @DisplayName("WAIT_AUDIT → ISSUE：合法流转")
-    void transitionToIssue_fromWaitAudit_succeeds() {
+    @DisplayName("等待审核 → 进入问题件：合法流转")
+    void enterIssue_fromAwaitingAudit_succeeds() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.WAIT_AUDIT);
 
-        application.transitionToIssue();
+        application.enterIssue();
 
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.ISSUE);
     }
 
     @Test
-    @DisplayName("ISSUE → WAIT_AUDIT：合法流转")
-    void transitionToWaitAudit_fromIssue_succeeds() {
+    @DisplayName("问题件 → 恢复审核：合法流转")
+    void resumeAudit_fromIssue_succeeds() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.ISSUE);
 
-        application.transitionToWaitAudit();
+        application.resumeAudit();
 
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.WAIT_AUDIT);
     }
 
     @Test
-    @DisplayName("isWaitAudit：状态为 WAIT_AUDIT 时返回 true")
-    void isWaitAudit_whenStatusIsWaitAudit_returnsTrue() {
+    @DisplayName("isAwaitingAudit：状态为 WAIT_AUDIT 时返回 true")
+    void isAwaitingAudit_whenStatusIsAwaitingAudit_returnsTrue() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.WAIT_AUDIT);
 
-        assertThat(application.isWaitAudit()).isTrue();
+        assertThat(application.isAwaitingAudit()).isTrue();
     }
 
     @Test
-    @DisplayName("isWaitAudit：状态不为 WAIT_AUDIT 时返回 false")
-    void isWaitAudit_whenStatusIsNotWaitAudit_returnsFalse() {
+    @DisplayName("isAwaitingAudit：状态不为 WAIT_AUDIT 时返回 false")
+    void isAwaitingAudit_whenStatusIsIssue_returnsFalse() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.ISSUE);
 
-        assertThat(application.isWaitAudit()).isFalse();
+        assertThat(application.isAwaitingAudit()).isFalse();
     }
 
     @Test
-    @DisplayName("WAIT_AUDIT → ISSUE 后再 → WAIT_AUDIT：完整流转")
-    void fullTransition_waitAudit_to_issue_to_waitAudit_succeeds() {
+    @DisplayName("完整流转：等待审核 → 问题件 → 恢复审核")
+    void fullTransition_awaitingAudit_to_issue_to_awaitingAudit_succeeds() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.WAIT_AUDIT);
 
-        application.transitionToIssue();
+        application.enterIssue();
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.ISSUE);
 
-        application.transitionToWaitAudit();
+        application.resumeAudit();
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.WAIT_AUDIT);
     }
 
     @Test
-    @DisplayName("非法流转：PENDING_ACCEPT → ISSUE 抛异常")
-    void transitionToIssue_fromPendingAccept_throwsException() {
+    @DisplayName("非法流转：待受理 → 问题件 抛异常")
+    void enterIssue_fromPendingAccept_throwsException() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.PENDING_ACCEPT);
 
-        assertThatThrownBy(application::transitionToIssue)
+        assertThatThrownBy(application::enterIssue)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("申请状态不允许迁移")
                 .hasMessageContaining("期望状态=WAIT_AUDIT")
@@ -86,16 +86,36 @@ class ClaimApplicationIssueTransitionTest {
     }
 
     @Test
-    @DisplayName("非法流转：WAIT_AUDIT → WAIT_AUDIT 抛异常")
-    void transitionToWaitAudit_fromWaitAudit_throwsException() {
+    @DisplayName("非法流转：等待审核 → 恢复审核 抛异常")
+    void resumeAudit_fromAwaitingAudit_throwsException() {
         ClaimApplication application = createApplicationInStatus(ClaimApplicationStatus.WAIT_AUDIT);
 
-        assertThatThrownBy(application::transitionToWaitAudit)
+        assertThatThrownBy(application::resumeAudit)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("申请状态不允许迁移")
                 .hasMessageContaining("期望状态=ISSUE")
-                .hasMessageContaining("实际状态=WAIT_AUDIT")
-                .hasMessageContaining("WAIT_AUDIT");
+                .hasMessageContaining("实际状态=WAIT_AUDIT");
+    }
+
+    @Test
+    @DisplayName("isReapplicable：只有受理失败允许重新提交")
+    void isReapplicable_onlyWhenAcceptFailed() {
+        assertThat(createApplicationInStatus(ClaimApplicationStatus.PENDING_ACCEPT).isReapplicable()).isFalse();
+        assertThat(createApplicationInStatus(ClaimApplicationStatus.ACCEPT_FAILED).isReapplicable()).isTrue();
+        assertThat(createApplicationInStatus(ClaimApplicationStatus.WAIT_AUDIT).isReapplicable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("isPendingAccept / isAccepted / isUnderwriting：按状态返回")
+    void statusPredicates_matchCurrentStatus() {
+        ClaimApplication pendingAccept = createApplicationInStatus(ClaimApplicationStatus.PENDING_ACCEPT);
+        ClaimApplication accepted = createApplicationInStatus(ClaimApplicationStatus.ACCEPTED);
+        ClaimApplication underwriting = createApplicationInStatus(ClaimApplicationStatus.UNDERWRITING);
+
+        assertThat(pendingAccept.isPendingAccept()).isTrue();
+        assertThat(accepted.isAccepted()).isTrue();
+        assertThat(underwriting.isUnderwriting()).isTrue();
+        assertThat(accepted.isPendingAccept()).isFalse();
     }
 
     private ClaimApplication createApplicationInStatus(ClaimApplicationStatus status) {
@@ -109,21 +129,21 @@ class ClaimApplicationIssueTransitionTest {
                 List.of(new MaterialSubmission("POLICY", "https://example.com/policy.pdf"))
         );
         application.bindClaimApplicationNo(CLAIM_APPLICATION_NO);
-        
-        // 通过状态迁移方法达到目标状态
-        if (status == ClaimApplicationStatus.PENDING_ACCEPT) {
-            // 已经是 PENDING_ACCEPT
+        if (status == ClaimApplicationStatus.ACCEPT_FAILED) {
+            application.failAccept();
         } else if (status == ClaimApplicationStatus.ACCEPTED) {
             application.accept();
         } else if (status == ClaimApplicationStatus.WAIT_AUDIT) {
             application.accept();
             application.waitAudit();
+        } else if (status == ClaimApplicationStatus.UNDERWRITING) {
+            application.accept();
+            application.startUnderwriting();
         } else if (status == ClaimApplicationStatus.ISSUE) {
             application.accept();
             application.waitAudit();
-            application.transitionToIssue();
+            application.enterIssue();
         }
-        
         return application;
     }
 }

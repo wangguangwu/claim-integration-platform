@@ -123,7 +123,7 @@ class AuditDeliveryUseCaseTest {
 
     private ClaimApplication mockClaimApplication(ClaimApplicationStatus status) {
         ClaimApplication claimApplication = mock(ClaimApplication.class);
-        when(claimApplication.isInStatus(status)).thenReturn(true);
+        when(claimApplication.isAwaitingAudit()).thenReturn(status == ClaimApplicationStatus.WAIT_AUDIT);
         when(claimApplication.getStatus()).thenReturn(status);
         return claimApplication;
     }

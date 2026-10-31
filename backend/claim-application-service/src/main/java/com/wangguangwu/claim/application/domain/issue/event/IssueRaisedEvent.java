@@ -21,5 +21,5 @@ public record IssueRaisedEvent(
         String reason,
         String auditor,
         LocalDateTime raisedAt
-) {
+) implements IssueDomainEvent {
 }

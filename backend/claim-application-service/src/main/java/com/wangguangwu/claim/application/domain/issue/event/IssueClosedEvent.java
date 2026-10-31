@@ -19,5 +19,5 @@ public record IssueClosedEvent(
         String claimApplicationNo,
         String auditor,
         LocalDateTime closedAt
-) {
+) implements IssueDomainEvent {
 }
