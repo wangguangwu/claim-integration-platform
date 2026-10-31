@@ -191,6 +191,29 @@ public class ClaimApplication {
     }
 
     /**
+     * 审核系统下发问题件，进入问题件状态。
+     */
+    public void transitionToIssue() {
+        transitionTo(ClaimApplicationStatus.WAIT_AUDIT, ClaimApplicationStatus.ISSUE);
+    }
+
+    /**
+     * 问题件关闭，回退到等待审核状态。
+     */
+    public void transitionToWaitAudit() {
+        transitionTo(ClaimApplicationStatus.ISSUE, ClaimApplicationStatus.WAIT_AUDIT);
+    }
+
+    /**
+     * 判断当前状态是否为等待审核。
+     *
+     * @return 状态为 WAIT_AUDIT 时为 true
+     */
+    public boolean isWaitAudit() {
+        return status == ClaimApplicationStatus.WAIT_AUDIT;
+    }
+
+    /**
      * 读取主被保险人证件号，供保单查询与自动承保使用。
      *
      * @return 主被保险人证件号
