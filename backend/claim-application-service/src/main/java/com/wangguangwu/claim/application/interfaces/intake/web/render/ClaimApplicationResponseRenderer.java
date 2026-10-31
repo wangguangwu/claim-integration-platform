@@ -50,6 +50,7 @@ public class ClaimApplicationResponseRenderer {
         return switch (errorCode) {
             case CLAIM_APPLICATION_INTAKE_BUSY -> HttpStatus.SERVICE_UNAVAILABLE;
             case CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case AUDIT_DELIVERY_APPLICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case TENANT_PROTOCOL_UNSUPPORTED, TENANT_PROTOCOL_AMBIGUOUS,
                  CLAIM_APPLICATION_INTAKE_INVALID -> HttpStatus.BAD_REQUEST;
         };

@@ -3,8 +3,7 @@ package com.wangguangwu.claim.application.infrastructure.underwriting.external;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
 import com.wangguangwu.claim.application.infrastructure.integration.config.LocalIntegrationProperties;
-import java.time.Duration;
-import lombok.RequiredArgsConstructor;
+import com.wangguangwu.claim.application.infrastructure.integration.local.AbstractLocalIntegration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +16,17 @@ import org.springframework.stereotype.Component;
  * @since 2026-10-29
  */
 @Slf4j
-@RequiredArgsConstructor
 @Component
-public class LocalValidPolicyQuery implements ValidPolicyQuery {
+public class LocalValidPolicyQuery extends AbstractLocalIntegration implements ValidPolicyQuery {
 
-    private static final InteractionType INTERACTION_TYPE = InteractionType.UNDERWRITING;
-    private static final String CLAIM_APPLICATION_NO_PLACEHOLDER = "-";
-
-    private final LocalIntegrationProperties properties;
+    /**
+     * 装配本地实现，指定交互类型与配置。
+     *
+     * @param properties 本地集成配置
+     */
+    public LocalValidPolicyQuery(LocalIntegrationProperties properties) {
+        super(InteractionType.UNDERWRITING, properties);
+    }
 
     /**
      * 查询被保人是否存在有效保单，返回值由本地配置决定。
@@ -35,23 +37,7 @@ public class LocalValidPolicyQuery implements ValidPolicyQuery {
      */
     @Override
     public boolean hasValidPolicy(String tenantCode, String insuredCertificateNo) {
-        pause();
-        return properties.validPolicy();
-    }
-
-    private void pause() {
-        Duration delay = properties.delay();
-        log.info("外部系统本地实现调用，targetSystem={}，interactionType={}，claimApplicationNo={}，delay={}",
-                INTERACTION_TYPE.targetSystem(), INTERACTION_TYPE, CLAIM_APPLICATION_NO_PLACEHOLDER, delay);
-        if (delay.isZero()) {
-            return;
-        }
-        try {
-            Thread.sleep(delay);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("外部系统本地实现休眠被中断，targetSystem=" + INTERACTION_TYPE.targetSystem(),
-                    exception);
-        }
+        pause(CLAIM_APPLICATION_NO_PLACEHOLDER);
+        return properties().validPolicy();
     }
 }

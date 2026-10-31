@@ -4,8 +4,7 @@ import com.wangguangwu.claim.application.domain.audit.AuditDeliveryRequest;
 import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
 import com.wangguangwu.claim.application.infrastructure.integration.config.LocalIntegrationProperties;
-import java.time.Duration;
-import lombok.RequiredArgsConstructor;
+import com.wangguangwu.claim.application.infrastructure.integration.local.AbstractLocalIntegration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -18,13 +17,17 @@ import org.springframework.stereotype.Component;
  * @since 2026-10-29
  */
 @Slf4j
-@RequiredArgsConstructor
 @Component
-public class LocalAuditSystemClient implements ServiceAuditSystemPort {
+public class LocalAuditSystemClient extends AbstractLocalIntegration implements ServiceAuditSystemPort {
 
-    private static final InteractionType INTERACTION_TYPE = InteractionType.AUDIT_DELIVERY;
-
-    private final LocalIntegrationProperties properties;
+    /**
+     * 装配本地实现，指定交互类型与配置。
+     *
+     * @param properties 本地集成配置
+     */
+    public LocalAuditSystemClient(LocalIntegrationProperties properties) {
+        super(InteractionType.AUDIT_DELIVERY, properties);
+    }
 
     /**
      * 交付申请给审核系统；本地实现不发起外部请求，失败开关开启时抛出异常。
@@ -34,26 +37,10 @@ public class LocalAuditSystemClient implements ServiceAuditSystemPort {
     @Override
     public void deliver(AuditDeliveryRequest request) {
         pause(request.claimApplicationNo());
-        if (properties.failAuditDelivery()) {
-            log.error("外部系统本地实现交付失败，targetSystem={}，claimApplicationNo={}", INTERACTION_TYPE.targetSystem(),
+        if (properties().failAuditDelivery()) {
+            log.error("外部系统本地实现交付失败，targetSystem={}，claimApplicationNo={}", interactionType().targetSystem(),
                     request.claimApplicationNo());
             throw new IllegalStateException("审核系统本地实现交付失败，claimApplicationNo=" + request.claimApplicationNo());
-        }
-    }
-
-    private void pause(String claimApplicationNo) {
-        Duration delay = properties.delay();
-        log.info("外部系统本地实现调用，targetSystem={}，interactionType={}，claimApplicationNo={}，delay={}",
-                INTERACTION_TYPE.targetSystem(), INTERACTION_TYPE, claimApplicationNo, delay);
-        if (delay.isZero()) {
-            return;
-        }
-        try {
-            Thread.sleep(delay);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("外部系统本地实现休眠被中断，claimApplicationNo=" + claimApplicationNo,
-                    exception);
         }
     }
 }

@@ -4,6 +4,8 @@ import com.wangguangwu.claim.application.domain.audit.AuditDeliveryRequest;
 import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditDeliveryCommand;
@@ -45,8 +47,10 @@ public class AuditDeliveryUseCase {
         }
         ClaimApplication claimApplication = claimApplicationRepository
                 .findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new IllegalStateException("审核交付事件对应的申请不存在，claimApplicationNo="
-                        + command.claimApplicationNo()));
+                .orElseThrow(() -> new ClaimApplicationIntakeException(
+                        ClaimApplicationIntakeErrorCode.AUDIT_DELIVERY_APPLICATION_NOT_FOUND,
+                        "审核交付事件对应的申请不存在，可能 outbox 事件早于申请落库到达，claimApplicationNo="
+                                + command.claimApplicationNo() + "，eventId=" + command.eventId()));
         String interactionNo = recordFactory.newInteractionNo();
         if (!claimApplication.isInStatus(ClaimApplicationStatus.WAIT_AUDIT)) {
             log.info("审核交付事件与当前申请不匹配，按重复事件处理，claimApplicationNo={}，status={}",
