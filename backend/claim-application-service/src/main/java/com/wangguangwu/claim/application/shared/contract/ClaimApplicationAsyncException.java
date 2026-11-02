@@ -1,11 +1,14 @@
 package com.wangguangwu.claim.application.shared.contract;
 
+import lombok.Getter;
+
 /**
  * 异步链路中的可预期业务异常。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Getter
 public class ClaimApplicationAsyncException extends RuntimeException {
 
     private final ClaimApplicationAsyncErrorCode errorCode;
@@ -19,14 +22,5 @@ public class ClaimApplicationAsyncException extends RuntimeException {
     public ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
-    }
-
-    /**
-     * 获取业务错误码。
-     *
-     * @return 错误码
-     */
-    public ClaimApplicationAsyncErrorCode getErrorCode() {
-        return errorCode;
     }
 }

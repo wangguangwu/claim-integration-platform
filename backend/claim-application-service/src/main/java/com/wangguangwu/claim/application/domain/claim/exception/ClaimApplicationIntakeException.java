@@ -1,11 +1,14 @@
 package com.wangguangwu.claim.application.domain.claim.exception;
 
+import lombok.Getter;
+
 /**
  * 统一接入过程中的可预期业务异常。
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
+@Getter
 public class ClaimApplicationIntakeException extends RuntimeException {
 
     private final ClaimApplicationIntakeErrorCode errorCode;
@@ -52,14 +55,5 @@ public class ClaimApplicationIntakeException extends RuntimeException {
      */
     public static ClaimApplicationIntakeException invalid(String message, Throwable cause) {
         return new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID, message, cause);
-    }
-
-    /**
-     * 获取业务错误码。
-     *
-     * @return 错误码
-     */
-    public ClaimApplicationIntakeErrorCode getErrorCode() {
-        return errorCode;
     }
 }
