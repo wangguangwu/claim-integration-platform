@@ -14,6 +14,11 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @SpringBootApplication
 public class AiServiceApplication {
 
+    /**
+     * 启动 AI 异常诊断服务并启用 Feign 客户端。
+     *
+     * @param args 启动参数
+     */
     public static void main(String[] args) {
         SpringApplication.run(AiServiceApplication.class, args);
     }

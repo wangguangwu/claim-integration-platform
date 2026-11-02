@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.interfaces.intake.web.issue;
+package com.wangguangwu.claim.application.interfaces.issue.web;
 
 import com.wangguangwu.claim.application.interfaces.intake.web.render.ClaimApplicationIssueResponseRenderer;
 import com.wangguangwu.claim.application.usecase.issue.ClaimApplicationIssueCloseUseCase;

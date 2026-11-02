@@ -1,9 +1,9 @@
 package com.wangguangwu.claim.application.interfaces.intake.web.render;
 
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.interfaces.intake.web.issue.ClaimApplicationIssueCloseResponse;
-import com.wangguangwu.claim.application.interfaces.intake.web.issue.ClaimApplicationIssueIntakeResponse;
-import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
+import com.wangguangwu.claim.application.interfaces.issue.web.ClaimApplicationIssueCloseResponse;
+import com.wangguangwu.claim.application.interfaces.issue.web.ClaimApplicationIssueIntakeResponse;
+import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueIntakeResult;
 import org.springframework.http.HttpStatus;

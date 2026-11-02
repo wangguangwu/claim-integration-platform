@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.shared.interfaces.web;
+package com.wangguangwu.claim.application.interfaces.web;
 
 /**
  * 申请服务的统一 HTTP 响应结构。

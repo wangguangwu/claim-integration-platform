@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.interfaces.intake.web.issue;
+package com.wangguangwu.claim.application.interfaces.issue.web;
 
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueException;

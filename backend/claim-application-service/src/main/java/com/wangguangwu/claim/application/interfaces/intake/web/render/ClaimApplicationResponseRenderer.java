@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.interfaces.intake.web.render;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.interfaces.intake.web.ClaimApplicationIntakeResponse;
-import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
+import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

@@ -40,6 +40,11 @@ public class TraceIdGlobalFilter implements GlobalFilter, Ordered {
         return chain.filter(exchange.mutate().request(request).build());
     }
 
+    /**
+     * 最先执行，确保后续网关过滤器、下游服务和响应日志共享同一 TraceId。
+     *
+     * @return 最高优先级
+     */
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE;

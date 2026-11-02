@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.interfaces.intake.web.issue;
+package com.wangguangwu.claim.application.interfaces.issue.web;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

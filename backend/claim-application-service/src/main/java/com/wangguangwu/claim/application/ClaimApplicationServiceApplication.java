@@ -16,6 +16,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ClaimApplicationServiceApplication {
 
+    /**
+     * 启动理赔申请服务，并启用配置属性扫描和定时任务。
+     *
+     * @param args 启动参数
+     */
     public static void main(String[] args) {
         SpringApplication.run(ClaimApplicationServiceApplication.class, args);
     }

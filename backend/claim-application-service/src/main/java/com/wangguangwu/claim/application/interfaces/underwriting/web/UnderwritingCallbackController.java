@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.underwriting.web;
 
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
-import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
+import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingCallbackUseCase;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;

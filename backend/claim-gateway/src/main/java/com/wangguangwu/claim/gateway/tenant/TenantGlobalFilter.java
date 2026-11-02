@@ -59,6 +59,11 @@ public class TenantGlobalFilter implements GlobalFilter, Ordered {
         return response.writeWith(Mono.just(body));
     }
 
+    /**
+     * 在 TraceId 写入后执行，并在路由前拒绝缺少租户上下文的请求。
+     *
+     * @return 次高优先级
+     */
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE + 10;

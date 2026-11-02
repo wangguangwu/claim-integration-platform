@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.interfaces.underwriting.web;
 
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
-import com.wangguangwu.claim.application.shared.interfaces.web.ApiResponse;
+import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.interfaces.intake.web.issue;
+package com.wangguangwu.claim.application.interfaces.issue.web;
 
 /**
  * 问题件关闭成功响应数据。

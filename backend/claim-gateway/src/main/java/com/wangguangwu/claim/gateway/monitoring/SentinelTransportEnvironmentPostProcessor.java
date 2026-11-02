@@ -34,10 +34,21 @@ public class SentinelTransportEnvironmentPostProcessor implements EnvironmentPos
 
     private final Log log;
 
+    /**
+     * 使用延迟日志工厂记录容器刷新前的 Sentinel 配置结果，避免过早初始化日志系统。
+     *
+     * @param logFactory Spring Boot 提供的延迟日志工厂
+     */
     public SentinelTransportEnvironmentPostProcessor(DeferredLogFactory logFactory) {
         this.log = logFactory.getLog(SentinelTransportEnvironmentPostProcessor.class);
     }
 
+    /**
+     * 在 Bean 创建前读取网关配置并写入 Sentinel 所需系统属性；未配置控制台地址时不注册上报。
+     *
+     * @param environment 已解析的应用环境
+     * @param application 当前 Spring 应用
+     */
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         String dashboardServer = environment.getProperty(DASHBOARD_SERVER_PROPERTY, "").trim();
