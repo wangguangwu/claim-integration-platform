@@ -113,6 +113,7 @@
 以下为本 Spec 提议、需在评审中确认的固定契约：
 
 1. 本地基础服务仅包含 MySQL、Redis、RocketMQ，不纳入 Nacos 和 XXL-Job。
-2. MQ 仅保留 `claim_application_material_process_v1` 和 `claim_application_audit_delivery_v1` 两个内部命令 Topic；承保完成、审核签收和问题件保持 HTTP 回调。
+2. MQ Topic 分为内部命令与外部事实两类：内部命令为 `claim_application_material_process_v1` 和 `claim_application_audit_delivery_v1`；审核签收使用入站事实 Topic `claim_application_audit_signed_v1`。承保完成与问题件保持 HTTP 回调，问题件路径为 `/api/claim/v1/callbacks/**`。
+   - 018 修订：原文为"MQ 仅保留 `claim_application_material_process_v1` 和 `claim_application_audit_delivery_v1` 两个内部命令 Topic；承保完成、审核签收和问题件保持 HTTP 回调"，其中"审核签收保持 HTTP 回调"不再适用；问题件路径由 `/api/application/v1/callbacks/**` 修正为 `/api/claim/v1/callbacks/**`。
 3. 回调与租户请求均经网关使用 `/api/application/v1` 前缀，统一携带租户请求头；回调以 `X-Request-Id` 作为传输级幂等标识。
 4. 理赔申请基础表在本 Spec 一次性确定，后续 Spec 只能新增必要字段或索引，修改既有约束必须先变更本 Spec。

@@ -37,4 +37,10 @@ docker exec claim-rocketmq-broker sh mqadmin updateTopic \
     -t claim_application_audit_delivery_v1 \
     -r 8 \
     -w 8
+docker exec claim-rocketmq-broker sh mqadmin updateTopic \
+    -n rocketmq-namesrv:9876 \
+    -b 127.0.0.1:10911 \
+    -t claim_application_audit_signed_v1 \
+    -r 8 \
+    -w 8
 docker compose --env-file "${env_file}" -f "${compose_file}" ps

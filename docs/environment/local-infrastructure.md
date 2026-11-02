@@ -24,7 +24,7 @@ docker pull --platform linux/arm64 apacherocketmq/rocketmq-dashboard:2.1.0
 docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml up -d --force-recreate rocketmq-dashboard
 ```
 
-本地 RocketMQ 不持久化 Broker 数据，重启容器后 `scripts/docker-start.sh` 会通过 `mqadmin` 重新创建两个理赔申请Topic。这样不需要额外的初始化容器；该取舍仅适用于本地开发，生产环境必须独立规划 Broker 数据持久化与权限管理。
+本地 RocketMQ 不持久化 Broker 数据，重启容器后 `scripts/docker-start.sh` 会通过 `mqadmin` 重新创建三个理赔申请 Topic。这样不需要额外的初始化容器；该取舍仅适用于本地开发，生产环境必须独立规划 Broker 数据持久化与权限管理。
 
 ## 启动与停止
 
@@ -85,6 +85,7 @@ MySQL 初始化脚本仅在空数据卷时自动执行。已有数据卷需要�
 |---|---|---|
 | `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` |
+| `claim_application_audit_signed_v1` | `AUDIT_SIGNED`（入站事实） | `claim-application-audit-signed-v1` |
 
 Broker 已关闭自动建 Topic。若 Topic 初始化失败，重新执行启动脚本可直接查看 `mqadmin` 的错误上下文：
 

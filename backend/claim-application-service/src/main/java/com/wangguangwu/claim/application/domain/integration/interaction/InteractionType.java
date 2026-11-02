@@ -24,7 +24,10 @@ public enum InteractionType {
     UNDERWRITING_CALLBACK(InteractionDirection.INBOUND, "UNDERWRITING_SYSTEM"),
 
     /** 理赔申请服务向审核系统交付已满足审核条件的申请。 */
-    AUDIT_DELIVERY(InteractionDirection.OUTBOUND, "AUDIT_SYSTEM");
+    AUDIT_DELIVERY(InteractionDirection.OUTBOUND, "AUDIT_SYSTEM"),
+
+    /** 审核系统回传签收结果及案件号。 */
+    AUDIT_SIGNED(InteractionDirection.INBOUND, "AUDIT_SYSTEM");
 
     private final InteractionDirection direction;
     private final String targetSystem;

@@ -21,6 +21,16 @@
 
 MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；租户私有入参字段名不受影响。
 
+### 018 审核方向接入变更
+
+| 类别 | 旧 | 新 |
+|---|---|---|
+| 审核签收传输 | HTTP `POST /api/claim/v1/callbacks/audit-signed` | MQ Topic `claim_application_audit_signed_v1`，消费者组 `claim-application-audit-signed-v1` |
+| 问题件下发路径 | `/api/application/v1/callbacks/audit-issues` | `/api/claim/v1/callbacks/audit-issues` |
+| 问题件关闭路径 | `/api/application/v1/callbacks/audit-issues/{issueNo}/close` | `/api/claim/v1/callbacks/audit-issues/{issueNo}/close` |
+| 问题件状态查询 | 无 | `GET /api/claim/v1/cases/{caseNo}/issue` |
+
+问题件是带前置条件的命令，保留 HTTP 以便审核系统同步获得 2xx/4xx 裁决；审核签收是事实通知，改为 MQ。旧问题件路径不保留兼容别名。
 
 ## HTTP 契约
 
@@ -41,8 +51,11 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `/api/claim/v1/application/{claimApplicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `claimApplicationNo`、`batchNo` |
 | `/api/claim/v1/application/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `claimApplicationNo` |
 | `/api/claim/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
-| `/api/claim/v1/callbacks/audit-signed` | `POST` | 审核系统 | 通知审核签收及全部案件 | `claimApplicationNo`、`caseNos`、`X-Request-Id` |
 | `/api/claim/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
+| `/api/claim/v1/callbacks/audit-issues/{issueNo}/close` | `POST` | 审核系统 | 关闭问题件 | `issueNo`、`X-Request-Id` |
+| `/api/claim/v1/cases/{caseNo}/issue` | `GET` | 审核系统 | 查询案件是否存在未关闭问题件 | `caseNo` |
+
+审核签收不再使用 HTTP 回调，改为消费 `claim_application_audit_signed_v1`，消息结构见下文 MQ 契约。
 
 成功响应：
 
@@ -83,6 +96,16 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 阈值口径是**单节点 QPS**：租户全局上界 = 单节点阈值 × 网关节点数，配置里不得写期望的全局值。规则随网关启动从配置加载；Sentinel 控制台只做观测，控制台上的临时规则在网关重启后失效。
 
+### 问题件状态查询
+
+`GET /api/claim/v1/cases/{caseNo}/issue` 必须携带租户请求头，按 `(X-Tenant-Code, caseNo)` 在 `t_claim_case_relation` 中反查平台申请，再读取该申请未关闭的问题件。接口只读，不写交互轨迹。
+
+| 场景 | HTTP 状态 | 响应 |
+|---|---|---|
+| 有未关闭问题件 | 200 | `hasOpenIssue=true`，返回 `issueNo`、`reason`、`raisedAt` |
+| 无未关闭问题件 | 200 | `hasOpenIssue=false`，其余问题件字段为 `null` |
+| 案件关系不存在 | 404 | 错误码 `CASE_RELATION_NOT_FOUND` |
+
 ### 签收幂等判定
 
 - 首次提交创建申请并返回新 `claimApplicationNo`；同一 `externalClaimApplicationNo` 的重复提交返回同一 `claimApplicationNo`。
@@ -102,6 +125,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 |---|---|---|---|
 | `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请或重新申请的材料 |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` | 将已具备审核条件的申请交付审核系统 |
+| `claim_application_audit_signed_v1` | `AUDIT_SIGNED` | `claim-application-audit-signed-v1` | 接收审核系统回传的签收结果与案件号 |
 
 ### 消费失败与死信
 
@@ -111,6 +135,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 |---|---|
 | `claim-application-material-processor-v1` | `%DLQ%claim-application-material-processor-v1` |
 | `claim-application-audit-delivery-v1` | `%DLQ%claim-application-audit-delivery-v1` |
+| `claim-application-audit-signed-v1` | `%DLQ%claim-application-audit-signed-v1` |
 
 平台不区分可重试与不可重试异常：事件结构非法、申请不存在这类错误同样重投后进入死信，由人工排查重放。消息幂等由 `t_claim_consumed_event` 的 `(consumer_group, event_id)` 唯一键兜底。
 
@@ -130,6 +155,33 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 ```
 
 `payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `claimApplicationNo` 读取理赔申请私有数据。
+
+### 审核签收入站消息
+
+审核系统向 `claim_application_audit_signed_v1` 发送事实通知，`eventType` 必须为 `AUDIT_SIGNED`，`payload.caseNos` 为非空字符串数组，每条案件号去空白后非空、不超过 64 字符，重复值去重后落库：
+
+```json
+{
+  "eventId": "8f0d1a52-6a3e-4f0b-9d7e-2c1b5a6e9f10",
+  "eventType": "AUDIT_SIGNED",
+  "eventVersion": 1,
+  "claimApplicationNo": "A2026110200000001",
+  "tenantCode": "tenant-a",
+  "occurredAt": "2026-11-02T10:00:00+08:00",
+  "traceId": "b3a5c1d2e4f6",
+  "payload": {
+    "caseNos": ["CASE-2026-0001", "CASE-2026-0002"]
+  }
+}
+```
+
+| 处理结果 | 条件 |
+|---|---|
+| `RECORDED` | 至少登记了一个新的案件号 |
+| `REUSED` | 申请存在，但本次全部案件号已登记过 |
+| `SKIPPED` | 同一 `eventId` 已被本消费组登记 |
+
+审核签收只登记 `t_claim_case_relation`，不改变申请状态；申请签收前后均保持 `WAIT_AUDIT`，案件生命周期由案件服务承载。
 
 ## InteractionLog 行为分组
 

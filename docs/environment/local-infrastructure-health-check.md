@@ -71,6 +71,7 @@ docker exec claim-rocketmq-broker sh mqadmin topicList -n rocketmq-namesrv:9876
 
 - `claim_application_material_process_v1`
 - `claim_application_audit_delivery_v1`
+- `claim_application_audit_signed_v1`
 
 ## RocketMQ Dashboard
 
@@ -81,7 +82,7 @@ docker exec claim-rocketmq-broker sh mqadmin topicList -n rocketmq-namesrv:9876
 | 页面 | 检查内容 |
 |---|---|
 | `Cluster` | NameServer 与 `broker-a` 是否在线 |
-| `Topic` | 两个理赔申请Topic 是否存在、读写队列是否均为 8 |
+| `Topic` | 三个理赔申请 Topic 是否存在、读写队列是否均为 8 |
 | `Consumer` | 后续业务 Spec 接入后检查消费者组和消费堆积 |
 | `Message` | 后续产生消息后按 Topic、Key 或时间检索消息 |
 

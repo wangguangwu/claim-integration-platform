@@ -24,5 +24,8 @@ public enum ClaimApplicationIssueErrorCode {
     ISSUE_INTAKE_INVALID,
 
     /** 问题件系统异常，未预期的系统错误。 */
-    ISSUE_SYSTEM_ERROR
+    ISSUE_SYSTEM_ERROR,
+
+    /** 案件关系不存在，按案件号反查不到平台申请编号。 */
+    CASE_RELATION_NOT_FOUND
 }

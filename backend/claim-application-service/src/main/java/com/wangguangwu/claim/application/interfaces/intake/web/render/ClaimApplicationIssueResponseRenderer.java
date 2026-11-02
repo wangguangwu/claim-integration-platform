@@ -3,9 +3,11 @@ package com.wangguangwu.claim.application.interfaces.intake.web.render;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.interfaces.issue.web.ClaimApplicationIssueCloseResponse;
 import com.wangguangwu.claim.application.interfaces.issue.web.ClaimApplicationIssueIntakeResponse;
+import com.wangguangwu.claim.application.interfaces.issue.web.ClaimApplicationIssueQueryResponse;
 import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueIntakeResult;
+import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -54,6 +56,26 @@ public class ClaimApplicationIssueResponseRenderer {
     }
 
     /**
+     * 渲染问题件状态查询成功响应。
+     *
+     * @param traceId 链路标识
+     * @param result  查询结果
+     * @return HTTP 响应
+     */
+    public ResponseEntity<Object> renderQuerySuccess(String traceId, ClaimApplicationIssueQueryResult result) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.success(traceId, new ClaimApplicationIssueQueryResponse(
+                        result.claimApplicationNo(),
+                        result.caseNo(),
+                        result.hasOpenIssue(),
+                        result.issueNo(),
+                        result.reason(),
+                        result.raisedAt()
+                )));
+    }
+
+    /**
      * 渲染问题件失败响应，按错误码映射 HTTP 状态。
      *
      * @param traceId      链路标识
@@ -70,7 +92,7 @@ public class ClaimApplicationIssueResponseRenderer {
 
     private HttpStatus statusOf(ClaimApplicationIssueErrorCode errorCode) {
         return switch (errorCode) {
-            case ISSUE_APPLICATION_NOT_FOUND, ISSUE_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case ISSUE_APPLICATION_NOT_FOUND, ISSUE_NOT_FOUND, CASE_RELATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ISSUE_APPLICATION_STATUS_INVALID, ISSUE_INTAKE_INVALID -> HttpStatus.BAD_REQUEST;
             case ISSUE_ALREADY_OPEN -> HttpStatus.CONFLICT;
             case ISSUE_SYSTEM_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;

@@ -27,6 +27,14 @@ public interface ClaimApplicationIssueRepository {
     boolean hasOpenIssue(String claimApplicationNo);
 
     /**
+     * 查询申请当前未关闭的问题件。
+     *
+     * @param claimApplicationNo 平台申请编号
+     * @return 未关闭问题件；无未关闭问题件时为空
+     */
+    Optional<ClaimApplicationIssue> findOpenByClaimApplicationNo(String claimApplicationNo);
+
+    /**
      * 插入新问题件。
      *
      * @param issue 待插入问题件

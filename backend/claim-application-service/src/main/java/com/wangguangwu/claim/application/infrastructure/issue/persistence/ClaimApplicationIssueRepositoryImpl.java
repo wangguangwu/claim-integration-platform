@@ -49,6 +49,20 @@ public class ClaimApplicationIssueRepositoryImpl implements ClaimApplicationIssu
     }
 
     /**
+     * 查询申请当前未关闭的问题件，唯一约束保证最多一条。
+     *
+     * @param claimApplicationNo 平台申请编号
+     * @return 未关闭问题件
+     */
+    @Override
+    public Optional<ClaimApplicationIssue> findOpenByClaimApplicationNo(String claimApplicationNo) {
+        return Optional.ofNullable(issueMapper.selectOne(Wrappers.lambdaQuery(ClaimApplicationIssueDO.class)
+                        .eq(ClaimApplicationIssueDO::getClaimApplicationNo, claimApplicationNo)
+                        .eq(ClaimApplicationIssueDO::getIsOpen, 1)))
+                .map(issueConverter::toDomain);
+    }
+
+    /**
      * 插入新问题件，并回填数据库生成主键。
      *
      * @param issue 待插入问题件

@@ -15,5 +15,8 @@ public enum ClaimApplicationAsyncErrorCode {
     CLAIM_APPLICATION_NOT_FOUND,
 
     /** 异步处理过程中发生未预期的系统故障。 */
-    CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR
+    CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR,
+
+    /** 审核签收消息载荷非法，案件号缺失或不符合约定格式。 */
+    AUDIT_SIGNED_INVALID
 }

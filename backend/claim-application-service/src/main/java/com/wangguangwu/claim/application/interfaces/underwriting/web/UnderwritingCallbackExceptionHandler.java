@@ -80,7 +80,7 @@ public class UnderwritingCallbackExceptionHandler {
 
     private HttpStatus statusOf(ClaimApplicationAsyncErrorCode errorCode) {
         return switch (errorCode) {
-            case CALLBACK_INVALID -> HttpStatus.BAD_REQUEST;
+            case CALLBACK_INVALID, AUDIT_SIGNED_INVALID -> HttpStatus.BAD_REQUEST;
             case CLAIM_APPLICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

@@ -16,8 +16,8 @@ spring:
         import-check:
           enabled: ${CLAIM_APPLICATION_NACOS_CONFIG_IMPORT_CHECK_ENABLED:true}
     function:
-      # 材料处理与审核交付消费者以函数式绑定注册，由 binder 驱动消息接收。
-      definition: materialProcess;auditDelivery
+      # 材料处理、审核交付与审核签收消费者以函数式绑定注册，由 binder 驱动消息接收。
+      definition: materialProcess;auditDelivery;auditSigned
     stream:
       rocketmq:
         binder:
@@ -30,6 +30,10 @@ spring:
               push:
                 max-reconsume-times: ${CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES:3}
           auditDelivery-in-0:
+            consumer:
+              push:
+                max-reconsume-times: ${CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES:3}
+          auditSigned-in-0:
             consumer:
               push:
                 max-reconsume-times: ${CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES:3}
@@ -47,6 +51,10 @@ spring:
           content-type: application/json
         auditDelivery-out-0:
           destination: claim_application_audit_delivery_v1
+          content-type: application/json
+        auditSigned-in-0:
+          destination: claim_application_audit_signed_v1
+          group: claim-application-audit-signed-v1
           content-type: application/json
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
