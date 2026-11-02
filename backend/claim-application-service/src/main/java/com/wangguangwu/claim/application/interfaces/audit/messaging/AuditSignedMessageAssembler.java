@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.audit.messaging;
 
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import java.util.LinkedHashSet;
@@ -74,7 +74,7 @@ public class AuditSignedMessageAssembler {
         }
     }
 
-    private ClaimApplicationAsyncException invalid(String message) {
-        return new ClaimApplicationAsyncException(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID, message);
+    private BusinessException invalid(String message) {
+        return new BusinessException(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID, message);
     }
 }

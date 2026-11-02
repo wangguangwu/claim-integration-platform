@@ -10,7 +10,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 1. **层的职责**：每一层放什么类型、不放什么类型，有明确定义。展开成三条最容易被漏掉的硬规则：
    - **聚合自己守不变式**：聚合根不得对层外暴露公开 setter，构造器私有，状态只能经命名领域方法迁移；从数据库重建聚合走 owning 域的反水化工厂，不能"先构造再逐字段 set"。写了状态机又开着 `setStatus`，等于没有状态机。
    - **创建知识只留在 owning 域**：其他层不得 `new` 本域聚合或逐字段拼装其状态，只能调用该域 `domain` 暴露的工厂方法；入站适配器也不得组装聚合——租户协议流水线的产物是 `ClaimApplicationIntakeCommand` 命令，聚合由签收用例调用 `ClaimApplication.submit(...)` 创建，否则聚合的组装知识在 `interfaces` 又有第二份；同一类记录（如异步 Outbox 事件与交互日志）只允许一个装配入口，且装配入口不得自行推断领域词汇——方向、目标系统、结果状态这类固定映射挂在说出它们的枚举上（`InteractionType.direction()`、`InteractionAction.resultStatus()`），否则用例层就成了第二套业务定义。
-   - **业务性拒绝说业务的语言**：不变式违反应抛本域业务异常与错误码，常见拒绝走异常类上的命名静态工厂（`ClaimApplicationIntakeException.invalid(...)`）统一构造，`IllegalStateException` 这类 JDK 异常留给真正的编程错误；否则入站层只能靠兜底 handler 把业务拒绝上报成系统错误。
+   - **业务性拒绝说业务的语言**：不变式违反应抛 `BusinessException` 并携带本域 `BusinessErrorCode`，领域、用例与入站适配共用同一种异常；`IllegalStateException` 这类 JDK 异常留给真正的编程错误。异常不携带 HTTP 类型：状态码由入站层 `BusinessErrorStatusRegistry` 集中映射，字段校验失败与报文不可解析使用的“请求非法”码、未预期异常使用的系统错误码由当前控制器实现 `ApiErrorCodeProvider` 声明，未声明时 ArchUnit 直接失败。局部重试信号（如同步判定与库中记录不一致）用返回值表达，不复用业务异常。
 2. **依赖方向**：`interfaces → usecase → domain ← infrastructure`，且 `domain` 不依赖任何框架。这是"依赖倒置"，是标准，不是风格。配置阈值同样是实现细节：用例需要批量、退避与滞留阈值时，在 `domain` 声明 `*Policy` 端口，由 `infrastructure/<域>/config` 的 `*Properties` 绑定配置实现；把 `@ConfigurationProperties` 挨着用例放，用例层就带上了 Spring，换配置中心要改用例。
 3. **对象角色命名**：一个类的后缀要能说明它在模式里的角色——`DO`、ORM 映射、转换器、仓储实现、端口、值对象各不相同。Fowler 的 Data Mapper 定义决定了 `*Mapper` 只能是 ORM，这就是为什么 DO↔领域对象的转换器不能叫 `Mapper`。同一后缀在整棵树上只能有一种含义：`*UseCase` 一律是用例入口具体类（不为它保留单实现接口），`*TransactionService` 一律是事务边界；两个名字只差一个词（`*Validation` 与 `*Validator`）视为职责未说清，必须改名拆分。
 
@@ -54,7 +54,8 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
 | 外部系统实现 | 进程内本地实现用 `Local*`；接入真实系统时另加适配器 | `infrastructure/<域>/external` | `LocalMaterialFileProcessor`、`LocalValidPolicyQuery`、`LocalAutoUnderwritingRequester`、`LocalUnderwritingResultQuery`、`LocalAuditSystemClient` |
 | 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging,resilience}` | `RedisClaimApplicationIntakeSnapshotQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher`、`RedisAvailabilityCircuit` |
-| 业务异常与错误码 | `*Exception`、`*ErrorCode`，常见错误用枚举命名的静态工厂 | `domain/<聚合>/exception`（跨域的进 `shared/contract`） | `ClaimApplicationIntakeException`、`ClaimApplicationIntakeException.invalid(...)`、`ClaimApplicationAsyncException` |
+| 业务异常与错误码 | `BusinessException`（唯一业务异常）+ `*ErrorCode implements BusinessErrorCode` | `shared/contract`（异常基类与跨域错误码）、`domain/<聚合>/exception`（域内错误码） | `BusinessException`、`ClaimApplicationIntakeErrorCode`、`ClaimApplicationIssueErrorCode`、`ClaimApplicationAsyncErrorCode` |
+| 入站错误码声明与异常渲染 | `ApiErrorCodeProvider`、`BusinessErrorStatusRegistry`、`WebExceptionHandler` | `interfaces/web` | 控制器声明请求非法码与系统错误码；注册表是错误码到 HTTP 状态的唯一映射；全局处理器是唯一 `@RestControllerAdvice` |
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |

@@ -13,8 +13,8 @@ import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueStatus;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueException;
 import com.wangguangwu.claim.application.domain.issue.service.IssueDomainService;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueCloseCommand;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import java.time.LocalDateTime;
@@ -87,7 +87,7 @@ class ClaimApplicationIssueCloseUseCaseTest {
         when(claimApplicationIssueRepository.findByIssueNo(ISSUE_NO)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.close(command))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND)
                 .hasMessageContaining(ISSUE_NO);
     }

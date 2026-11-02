@@ -18,7 +18,7 @@ import com.wangguangwu.claim.application.domain.issue.event.IssueClosedEvent;
 import com.wangguangwu.claim.application.domain.issue.event.IssueDomainEventPublisher;
 import com.wangguangwu.claim.application.domain.issue.event.IssueRaisedEvent;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueException;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -86,7 +86,7 @@ class IssueDomainServiceTest {
 
         assertThatThrownBy(() -> domainService.raiseIssue(
                 CLAIM_APPLICATION_NO, ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND)
                 .hasMessageContaining(CLAIM_APPLICATION_NO);
 
@@ -103,7 +103,7 @@ class IssueDomainServiceTest {
 
         assertThatThrownBy(() -> domainService.raiseIssue(
                 CLAIM_APPLICATION_NO, ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID)
                 .hasMessageContaining(CLAIM_APPLICATION_NO)
                 .hasMessageContaining("PENDING_ACCEPT");
@@ -122,7 +122,7 @@ class IssueDomainServiceTest {
 
         assertThatThrownBy(() -> domainService.raiseIssue(
                 CLAIM_APPLICATION_NO, ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN)
                 .hasMessageContaining(CLAIM_APPLICATION_NO);
 
@@ -141,7 +141,7 @@ class IssueDomainServiceTest {
 
         assertThatThrownBy(() -> domainService.raiseIssue(
                 CLAIM_APPLICATION_NO, ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID)
                 .hasMessageContaining(CLAIM_APPLICATION_NO);
 
@@ -175,7 +175,7 @@ class IssueDomainServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> domainService.closeIssue(issue, AUDITOR))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND)
                 .hasMessageContaining(ISSUE_NO)
                 .hasMessageContaining(CLAIM_APPLICATION_NO);
@@ -194,7 +194,7 @@ class IssueDomainServiceTest {
                 .thenReturn(false);
 
         assertThatThrownBy(() -> domainService.closeIssue(issue, AUDITOR))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID)
                 .hasMessageContaining(CLAIM_APPLICATION_NO);
 

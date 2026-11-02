@@ -2,8 +2,8 @@ package com.wangguangwu.claim.application.usecase.audit;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditSignedOutcome;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +38,7 @@ public class AuditSignedUseCase {
             return AuditSignedOutcome.SKIPPED;
         }
         claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new ClaimApplicationAsyncException(
+                .orElseThrow(() -> new BusinessException(
                         ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
                         "审核签收事件对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()
                                 + "，eventId=" + command.eventId()));

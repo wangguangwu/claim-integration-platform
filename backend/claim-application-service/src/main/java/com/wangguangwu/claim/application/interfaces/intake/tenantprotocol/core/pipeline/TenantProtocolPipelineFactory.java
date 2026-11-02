@@ -1,6 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.foundation.tenant.context.TenantInfo;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,8 @@ public class TenantProtocolPipelineFactory {
     public ClaimApplicationIntakeCommand execute(TenantInfo tenantInfo, String rawPayload) {
         ClaimApplicationIntakeCommand command = getPipeline(tenantInfo).execute(rawPayload);
         if (command == null || !tenantInfo.tenantCode().equals(command.tenantCode())) {
-            throw ClaimApplicationIntakeException.invalid("租户申请协议转换结果无效");
+            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
+                    "租户申请协议转换结果无效");
         }
         return command;
     }

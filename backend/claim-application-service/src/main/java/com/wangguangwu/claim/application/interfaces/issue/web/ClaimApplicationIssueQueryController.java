@@ -2,6 +2,9 @@ package com.wangguangwu.claim.application.interfaces.issue.web;
 
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.interfaces.intake.web.render.ClaimApplicationIssueResponseRenderer;
+import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.issue.ClaimApplicationIssueQueryUseCase;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import com.wangguangwu.claim.foundation.tenant.context.TenantContext;
@@ -22,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/claim/v1/cases")
-public class ClaimApplicationIssueQueryController {
+public class ClaimApplicationIssueQueryController implements ApiErrorCodeProvider {
 
     private static final String MISSING_TENANT_MESSAGE = "缺少租户上下文";
 
@@ -41,9 +44,18 @@ public class ClaimApplicationIssueQueryController {
         String traceId = httpRequest.getHeader(TraceHeaders.TRACE_ID);
         String tenantCode = TenantContext.tenantCode();
         if (tenantCode == null || tenantCode.isBlank()) {
-            return responseRenderer.renderFailure(traceId, ClaimApplicationIssueErrorCode.ISSUE_INTAKE_INVALID,
-                    MISSING_TENANT_MESSAGE);
+            throw new BusinessException(ClaimApplicationIssueErrorCode.ISSUE_INTAKE_INVALID, MISSING_TENANT_MESSAGE);
         }
         return responseRenderer.renderQuerySuccess(traceId, queryUseCase.queryByCaseNo(tenantCode, caseNo));
+    }
+
+    @Override
+    public BusinessErrorCode requestInvalidCode() {
+        return ClaimApplicationIssueErrorCode.ISSUE_INTAKE_INVALID;
+    }
+
+    @Override
+    public BusinessErrorCode systemErrorCode() {
+        return ClaimApplicationIssueErrorCode.ISSUE_SYSTEM_ERROR;
     }
 }

@@ -1,10 +1,10 @@
 package com.wangguangwu.claim.application.infrastructure.intake.lock;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
 import com.wangguangwu.claim.application.infrastructure.intake.config.ClaimApplicationIntakeProperties;
 import com.wangguangwu.claim.application.infrastructure.intake.resilience.RedisAvailabilityCircuit;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.infrastructure.Sha256Digest;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -73,7 +73,7 @@ public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntak
             locked = lock.tryLock(WAIT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
+            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
                     "申请签收等待锁被中断，请稍后重试");
         } catch (RedisException exception) {
             redisAvailabilityCircuit.recordFailure();
@@ -81,7 +81,7 @@ public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntak
         }
         redisAvailabilityCircuit.recordSuccess();
         if (!locked) {
-            throw new ClaimApplicationIntakeException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
+            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
                     "同一申请的签收请求正在处理中，请稍后重试");
         }
         try {
@@ -102,7 +102,7 @@ public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntak
         redisAvailabilityCircuit.enterDegraded("签收锁");
         try {
             if (!degradedPermits.tryAcquire()) {
-                throw new ClaimApplicationIntakeException(
+                throw new BusinessException(
                         ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR,
                         DEGRADED_CONCURRENCY_MESSAGE);
             }

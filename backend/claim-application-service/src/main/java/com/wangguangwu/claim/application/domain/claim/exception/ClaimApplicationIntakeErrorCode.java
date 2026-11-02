@@ -1,12 +1,16 @@
 package com.wangguangwu.claim.application.domain.claim.exception;
 
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+
 /**
  * 统一接入可对外返回的业务错误码。
+ *
+ * <p>枚举常量名即对外错误码字符串，HTTP 状态由入站层统一映射。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
  */
-public enum ClaimApplicationIntakeErrorCode {
+public enum ClaimApplicationIntakeErrorCode implements BusinessErrorCode {
 
     /**
      * 租户编码与协议版本不存在对应的接入流水线。
@@ -36,5 +40,15 @@ public enum ClaimApplicationIntakeErrorCode {
     /**
      * 审核交付所关联的理赔申请不存在。
      */
-    AUDIT_DELIVERY_APPLICATION_NOT_FOUND
+    AUDIT_DELIVERY_APPLICATION_NOT_FOUND;
+
+    /**
+     * 返回对外错误码字符串，与枚举常量名保持一致。
+     *
+     * @return 对外错误码
+     */
+    @Override
+    public String code() {
+        return name();
+    }
 }

@@ -53,8 +53,8 @@ public class ClaimApplicationIntakeUseCase {
      * 在锁内完成签收判定，可复用结论只写轨迹，其余结论交由事务服务落库。
      *
      * <p>唯一键冲突说明并发请求已创建同一外部申请号，先按重复请求解析；解析不到时重新判定并重试，
-     * 重试上限由配置给出。判定缓存与实际数据不一致时也不淘汰缓存：安全状态单调不可逆，
-     * 最多让本次请求多读一次库。</p>
+     * 重试上限由配置给出。事务服务返回空结果表示存在性判断与库中记录不一致，同样重建编号后重试。
+     * 判定缓存与实际数据不一致时也不淘汰缓存：安全状态单调不可逆，最多让本次请求多读一次库。</p>
      *
      * <p>事务内读到的安全状态随产物返回，事务提交后再把存在标记升级为可复用快照，
      * 使后续重复请求不再回源。</p>
@@ -77,14 +77,16 @@ public class ClaimApplicationIntakeUseCase {
                 }
                 boolean absent = lookup.kind() == ClaimApplicationIntakeLookupKind.ABSENT;
                 String candidateClaimApplicationNo = absent ? claimApplicationNoGenerator.nextClaimApplicationNo() : null;
-                ClaimApplicationIntakeOutcome outcome = transactionService.intake(claimApplication, lookup.kind(),
-                        candidateClaimApplicationNo, requestId, traceId);
+                Optional<ClaimApplicationIntakeOutcome> outcome = transactionService.intake(claimApplication,
+                        lookup.kind(), candidateClaimApplicationNo, requestId, traceId);
+                if (outcome.isEmpty()) {
+                    forceCreate = true;
+                    continue;
+                }
                 if (absent) {
                     markMutable(claimApplication);
                 }
-                return upgradedResult(claimApplication, outcome);
-            } catch (ClaimApplicationExistenceMismatchException exception) {
-                forceCreate = true;
+                return upgradedResult(claimApplication, outcome.get());
             } catch (DuplicateKeyException exception) {
                 Optional<ClaimApplicationIntakeOutcome> resolvedOutcome = transactionService.resolveAfterDuplicateKey(
                         claimApplication, requestId, traceId);

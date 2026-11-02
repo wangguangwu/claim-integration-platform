@@ -1,10 +1,13 @@
 package com.wangguangwu.claim.application;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 理赔申请服务的分层依赖架构测试。
@@ -73,6 +76,22 @@ class ClaimApplicationArchitectureTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..infrastructure..")
+                .check(APPLICATION_CLASSES);
+    }
+
+    /**
+     * 每个 HTTP 入口控制器都必须声明请求非法码与系统错误码，否则全局异常处理器无法组装失败响应。
+     */
+    @Test
+    void controllersMustDeclareApiErrorCodes() {
+        classes()
+                .that()
+                .areAnnotatedWith(RestController.class)
+                .and()
+                .resideInAPackage("..interfaces..")
+                .should()
+                .implement(ApiErrorCodeProvider.class)
+                .because("HTTP 入口必须声明请求非法码与系统错误码")
                 .check(APPLICATION_CLASSES);
     }
 }

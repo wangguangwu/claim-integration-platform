@@ -11,8 +11,8 @@ import static org.mockito.Mockito.when;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditSignedOutcome;
 import java.util.List;
@@ -69,7 +69,7 @@ class AuditSignedUseCaseTest {
         when(claimApplicationRepository.findByClaimApplicationNo(CLAIM_APPLICATION_NO)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.record(command()))
-                .isInstanceOf(ClaimApplicationAsyncException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND)
                 .hasMessageContaining(CLAIM_APPLICATION_NO)
                 .hasMessageContaining(EVENT_ID);

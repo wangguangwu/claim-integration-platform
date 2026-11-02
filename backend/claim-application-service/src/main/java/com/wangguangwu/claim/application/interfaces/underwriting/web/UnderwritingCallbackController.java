@@ -1,7 +1,10 @@
 package com.wangguangwu.claim.application.interfaces.underwriting.web;
 
 import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingCallbackUseCase;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
@@ -22,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/claim/v1/callbacks")
-public class UnderwritingCallbackController {
+public class UnderwritingCallbackController implements ApiErrorCodeProvider {
 
     private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
 
@@ -42,5 +45,15 @@ public class UnderwritingCallbackController {
         UnderwritingCallbackResult result = underwritingCallbackUseCase.complete(
                 new UnderwritingCompletedCommand(request.claimApplicationNo(), requestId, traceId));
         return ApiResponse.success(traceId, result);
+    }
+
+    @Override
+    public BusinessErrorCode requestInvalidCode() {
+        return ClaimApplicationAsyncErrorCode.CALLBACK_INVALID;
+    }
+
+    @Override
+    public BusinessErrorCode systemErrorCode() {
+        return ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR;
     }
 }

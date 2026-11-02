@@ -1,6 +1,7 @@
 package com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.stage;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.util.Comparator;
@@ -31,7 +32,8 @@ public class BeanValidationTenantProtocolValidator<R> implements TenantProtocolV
         validator.validate(request).stream()
                 .min(Comparator.comparing(violation -> violation.getPropertyPath().toString()))
                 .ifPresent(violation -> {
-                    throw ClaimApplicationIntakeException.invalid(describe(violation));
+                    throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
+                            describe(violation));
                 });
     }
 

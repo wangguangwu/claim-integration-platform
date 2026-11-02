@@ -1,6 +1,9 @@
 package com.wangguangwu.claim.application.interfaces.issue.web;
 
+import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.interfaces.intake.web.render.ClaimApplicationIssueResponseRenderer;
+import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
 import com.wangguangwu.claim.application.usecase.issue.ClaimApplicationIssueCloseUseCase;
 import com.wangguangwu.claim.application.usecase.issue.ClaimApplicationIssueIntakeUseCase;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueCloseCommand;
@@ -27,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/claim/v1/callbacks")
-public class ClaimApplicationIssueIntakeController {
+public class ClaimApplicationIssueIntakeController implements ApiErrorCodeProvider {
 
     private final ClaimApplicationIssueIntakeUseCase intakeUseCase;
     private final ClaimApplicationIssueCloseUseCase closeUseCase;
@@ -71,5 +74,15 @@ public class ClaimApplicationIssueIntakeController {
         ClaimApplicationIssueCloseCommand command = new ClaimApplicationIssueCloseCommand(issueNo, request.auditor());
         ClaimApplicationIssueCloseResult result = closeUseCase.close(command);
         return responseRenderer.renderCloseSuccess(traceId, result);
+    }
+
+    @Override
+    public BusinessErrorCode requestInvalidCode() {
+        return ClaimApplicationIssueErrorCode.ISSUE_INTAKE_INVALID;
+    }
+
+    @Override
+    public BusinessErrorCode systemErrorCode() {
+        return ClaimApplicationIssueErrorCode.ISSUE_SYSTEM_ERROR;
     }
 }

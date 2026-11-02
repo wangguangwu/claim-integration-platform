@@ -1,12 +1,16 @@
 package com.wangguangwu.claim.application.domain.issue.exception;
 
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+
 /**
  * 问题件链路可对外返回的业务错误码。
+ *
+ * <p>枚举常量名即对外错误码字符串，HTTP 状态由入站层统一映射。</p>
  *
  * @author wangguangwu
  * @since 2026-10-31
  */
-public enum ClaimApplicationIssueErrorCode {
+public enum ClaimApplicationIssueErrorCode implements BusinessErrorCode {
 
     /** 申请不存在，下发问题件时申请编号未找到。 */
     ISSUE_APPLICATION_NOT_FOUND,
@@ -27,5 +31,15 @@ public enum ClaimApplicationIssueErrorCode {
     ISSUE_SYSTEM_ERROR,
 
     /** 案件关系不存在，按案件号反查不到平台申请编号。 */
-    CASE_RELATION_NOT_FOUND
+    CASE_RELATION_NOT_FOUND;
+
+    /**
+     * 返回对外错误码字符串，与枚举常量名保持一致。
+     *
+     * @return 对外错误码
+     */
+    @Override
+    public String code() {
+        return name();
+    }
 }

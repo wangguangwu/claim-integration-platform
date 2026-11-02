@@ -41,24 +41,28 @@ public class ClaimApplicationIntakeTransactionService {
      * <p>存在但状态可变时读到的聚合状态即是回源观察结论：安全状态随结果返回可复用快照，
      * 供用例在事务提交后升级判定缓存，避免同一申请号反复回源。</p>
      *
+     * <p>判定为存在但按外部申请号读不到时返回空结果，由用例重新判定并重试；
+     * 该不一致属于局部控制流，不用异常表达。</p>
+     *
      * @param submitted                   协议转换后的理赔申请
      * @param lookupKind                  签收判定结论：不存在时创建，存在时读取聚合判定
      * @param candidateClaimApplicationNo 判定为不存在时必须提供的候选平台申请编号
      * @param requestId                   请求标识
      * @param traceId                     链路标识
-     * @return 签收结果与回源观察到的可复用快照
+     * @return 签收结果与回源观察到的可复用快照；存在性不一致时返回空
      */
     @Transactional
-    public ClaimApplicationIntakeOutcome intake(ClaimApplication submitted, ClaimApplicationIntakeLookupKind lookupKind,
-                                                String candidateClaimApplicationNo, String requestId, String traceId) {
+    public Optional<ClaimApplicationIntakeOutcome> intake(ClaimApplication submitted,
+                                                          ClaimApplicationIntakeLookupKind lookupKind,
+                                                          String candidateClaimApplicationNo, String requestId,
+                                                          String traceId) {
         if (lookupKind == ClaimApplicationIntakeLookupKind.ABSENT) {
-            return ClaimApplicationIntakeOutcome.withoutSnapshot(
-                    create(submitted, candidateClaimApplicationNo, requestId, traceId));
+            return Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                    create(submitted, candidateClaimApplicationNo, requestId, traceId)));
         }
         return claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(submitted.getTenantCode(),
                         submitted.getExternalClaimApplicationNo())
-                .map(claimApplication -> processExisting(claimApplication, submitted, requestId, traceId))
-                .orElseThrow(ClaimApplicationExistenceMismatchException::new);
+                .map(claimApplication -> processExisting(claimApplication, submitted, requestId, traceId));
     }
 
     /**

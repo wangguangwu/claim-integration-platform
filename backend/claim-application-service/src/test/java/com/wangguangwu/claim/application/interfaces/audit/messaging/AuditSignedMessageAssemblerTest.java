@@ -3,8 +3,8 @@ package com.wangguangwu.claim.application.interfaces.audit.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import java.util.List;
@@ -98,7 +98,7 @@ class AuditSignedMessageAssemblerTest {
 
     private void assertInvalid(ClaimApplicationEventEnvelope envelope) {
         assertThatThrownBy(() -> assembler.toCommand(envelope))
-                .isInstanceOf(ClaimApplicationAsyncException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID);
     }
 }

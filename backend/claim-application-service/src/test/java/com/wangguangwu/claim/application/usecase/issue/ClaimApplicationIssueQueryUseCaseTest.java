@@ -14,7 +14,7 @@ import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueStatus;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueException;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -90,7 +90,7 @@ class ClaimApplicationIssueQueryUseCaseTest {
         when(claimCaseRelationRepository.findClaimApplicationNo(TENANT_CODE, CASE_NO)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.queryByCaseNo(TENANT_CODE, CASE_NO))
-                .isInstanceOf(ClaimApplicationIssueException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.CASE_RELATION_NOT_FOUND)
                 .hasMessageContaining(CASE_NO);
 

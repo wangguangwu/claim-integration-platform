@@ -76,8 +76,8 @@ class ClaimApplicationIntakeUseCaseTest {
         when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
         when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
                 eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(ClaimApplicationIntakeOutcome.withoutSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.CREATED)));
+                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.CREATED))));
 
         ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
 
@@ -113,14 +113,38 @@ class ClaimApplicationIntakeUseCaseTest {
                 ClaimApplicationStatus.WAIT_AUDIT);
         when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.EXISTING), eq(null),
                 eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(ClaimApplicationIntakeOutcome.withSnapshot(
+                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withSnapshot(
                         new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED),
-                        snapshot));
+                        snapshot)));
 
         ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
 
         assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
         verify(snapshotQuery).markReusable(TENANT_CODE, EXTERNAL_NO, snapshot);
+    }
+
+    @Test
+    @DisplayName("存在性不一致：事务返回空结果 → 重建编号重试并返回 CREATED")
+    void intake_existenceMismatch_retriesWithNewClaimApplicationNo() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
+        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO))
+                .thenReturn(ClaimApplicationIntakeLookup.existing())
+                .thenReturn(ClaimApplicationIntakeLookup.absent());
+        when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
+        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.EXISTING), eq(null),
+                eq(REQUEST_ID), eq(TRACE_ID)))
+                .thenReturn(Optional.empty());
+        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
+                eq(REQUEST_ID), eq(TRACE_ID)))
+                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                                ClaimApplicationIntakeDisposition.CREATED))));
+
+        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
+
+        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.CREATED);
+        assertThat(result.claimApplicationNo()).isEqualTo(CLAIM_APPLICATION_NO);
+        verify(snapshotQuery).markMutable(TENANT_CODE, EXTERNAL_NO);
     }
 
     @Test
@@ -132,8 +156,8 @@ class ClaimApplicationIntakeUseCaseTest {
         when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
                 eq(REQUEST_ID), eq(TRACE_ID)))
                 .thenThrow(new DuplicateKeyException("duplicate"))
-                .thenReturn(ClaimApplicationIntakeOutcome.withoutSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED)));
+                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED))));
         when(transactionService.resolveAfterDuplicateKey(any(), eq(REQUEST_ID), eq(TRACE_ID)))
                 .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
                         new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED))));

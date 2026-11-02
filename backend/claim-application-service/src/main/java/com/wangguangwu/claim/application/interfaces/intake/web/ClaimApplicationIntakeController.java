@@ -1,7 +1,10 @@
 package com.wangguangwu.claim.application.interfaces.intake.web;
 
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.interfaces.intake.tenantprotocol.core.pipeline.TenantProtocolPipelineFactory;
 import com.wangguangwu.claim.application.interfaces.intake.web.render.ClaimApplicationResponseRenderer;
+import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
+import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
 import com.wangguangwu.claim.application.usecase.intake.ClaimApplicationIntakeUseCase;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
@@ -25,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/claim/v1/application")
-public class ClaimApplicationIntakeController {
+public class ClaimApplicationIntakeController implements ApiErrorCodeProvider {
 
     private final TenantProtocolPipelineFactory pipelineFactory;
     private final ClaimApplicationIntakeUseCase claimApplicationIntakeUseCase;
@@ -46,5 +49,15 @@ public class ClaimApplicationIntakeController {
         ClaimApplicationIntakeResult result = claimApplicationIntakeUseCase.intake(command,
                 request.getHeader(TraceHeaders.REQUEST_ID), traceId);
         return responseRenderer.renderSuccess(traceId, result);
+    }
+
+    @Override
+    public BusinessErrorCode requestInvalidCode() {
+        return ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID;
+    }
+
+    @Override
+    public BusinessErrorCode systemErrorCode() {
+        return ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR;
     }
 }

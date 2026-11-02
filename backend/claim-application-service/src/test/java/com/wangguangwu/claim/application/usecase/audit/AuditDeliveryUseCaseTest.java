@@ -12,9 +12,9 @@ import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeException;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditDeliveryCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditDeliveryOutcome;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
@@ -96,7 +96,7 @@ class AuditDeliveryUseCaseTest {
         when(claimApplicationRepository.findByClaimApplicationNo(CLAIM_APPLICATION_NO)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.deliver(command))
-                .isInstanceOf(ClaimApplicationIntakeException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIntakeErrorCode.AUDIT_DELIVERY_APPLICATION_NOT_FOUND)
                 .hasMessageContaining(CLAIM_APPLICATION_NO)
                 .hasMessageContaining(EVENT_ID);
