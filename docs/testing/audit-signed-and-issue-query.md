@@ -66,6 +66,8 @@ echo "$APP_NO"
 }
 ```
 
+消息中的 `eventVersion`、`occurredAt` 是历史信封字段，当前平台按未知字段忽略，保留它们用于验证兼容性。
+
 发送命令：
 
 ```bash

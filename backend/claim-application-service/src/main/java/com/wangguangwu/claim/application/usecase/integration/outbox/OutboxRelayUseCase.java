@@ -1,26 +1,27 @@
 package com.wangguangwu.claim.application.usecase.integration.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wangguangwu.claim.application.shared.contract.message.AuditDeliveryRequestedMessage;
+import com.wangguangwu.claim.application.shared.contract.message.MaterialProcessMessage;
+import com.wangguangwu.claim.application.shared.contract.message.MaterialProcessPayload;
+import com.wangguangwu.claim.application.shared.contract.message.OutboundClaimApplicationEventMessage;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.AuditDeliveryRequestedOutboxPayload;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.ClaimApplicationEventType;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.MaterialProcessOutboxPayload;
 import com.wangguangwu.claim.application.usecase.integration.outbox.model.OutboxEvent;
 import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventPublisher;
 import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxRelayPolicy;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Outbox 投递用例：抢占事件、组装信封、按结果推进投递状态。
+ * Outbox 投递用例：抢占事件、组装具体消息、按结果推进投递状态。
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -31,9 +32,6 @@ import org.springframework.stereotype.Service;
 public class OutboxRelayUseCase {
 
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
-    private static final DateTimeFormatter OCCURRED_AT_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX");
-    private static final String TRACE_ID_FIELD = "traceId";
 
     private final OutboxEventRepository outboxEventRepository;
     private final OutboxEventPublisher outboxEventPublisher;
@@ -63,7 +61,7 @@ public class OutboxRelayUseCase {
             return false;
         }
         try {
-            outboxEventPublisher.publish(toEnvelope(outboxEvent));
+            outboxEventPublisher.publish(toMessage(outboxEvent));
             outboxEventRepository.markPublished(outboxEvent.eventId(), LocalDateTime.now(BUSINESS_ZONE_ID));
             return true;
         } catch (RuntimeException exception) {
@@ -98,45 +96,40 @@ public class OutboxRelayUseCase {
         return outboxEvent.retryCount() == null ? 0 : outboxEvent.retryCount();
     }
 
-    private ClaimApplicationEventEnvelope toEnvelope(OutboxEvent outboxEvent) {
-        JsonNode payload = readPayload(outboxEvent);
-        return new ClaimApplicationEventEnvelope(outboxEvent.eventId(), outboxEvent.eventType(),
-                outboxEvent.eventVersion(), outboxEvent.claimApplicationNo(), outboxEvent.tenantCode(),
-                formatOccurredAt(outboxEvent), traceId(outboxEvent, payload), toPayloadMap(payload));
-    }
-
-    private Map<String, Object> toPayloadMap(JsonNode payload) {
-        try {
-            return objectMapper.convertValue(payload, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("Outbox 事件载荷不是 JSON 对象", exception);
-        }
-    }
-
-    private JsonNode readPayload(OutboxEvent outboxEvent) {
-        try {
-            return objectMapper.readTree(outboxEvent.payload());
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Outbox 事件载荷不是合法 JSON，eventId=" + outboxEvent.eventId(), exception);
-        }
-    }
-
     /**
-     * 事件发生时间取自落库时间；内存构造的事件没有该字段时使用当前时间。
-     *
-     * @param outboxEvent 待投递事件
-     * @return 带时区偏移的时间文本
+     * 按事件类型把存储载荷转换为具体消息。
      */
-    private String formatOccurredAt(OutboxEvent outboxEvent) {
-        ZonedDateTime occurredAt = outboxEvent.createdAt() == null
-                ? ZonedDateTime.now(BUSINESS_ZONE_ID)
-                : outboxEvent.createdAt().atZone(BUSINESS_ZONE_ID);
-        return occurredAt.format(OCCURRED_AT_FORMATTER);
+    private OutboundClaimApplicationEventMessage toMessage(OutboxEvent outboxEvent) {
+        ClaimApplicationEventType eventType = ClaimApplicationEventType.from(outboxEvent.eventType());
+        return switch (eventType) {
+            case CLAIM_APPLICATION_CREATED, CLAIM_APPLICATION_REAPPLIED -> toMaterialProcessMessage(outboxEvent);
+            case AUDIT_DELIVERY_REQUESTED -> toAuditDeliveryRequestedMessage(outboxEvent);
+        };
     }
 
-    private String traceId(OutboxEvent outboxEvent, JsonNode payload) {
-        JsonNode traceIdNode = payload.get(TRACE_ID_FIELD);
-        return traceIdNode == null || traceIdNode.isNull() ? outboxEvent.eventId() : traceIdNode.asText();
+    private MaterialProcessMessage toMaterialProcessMessage(OutboxEvent outboxEvent) {
+        MaterialProcessOutboxPayload storedPayload = readPayload(outboxEvent, MaterialProcessOutboxPayload.class);
+        return new MaterialProcessMessage(outboxEvent.eventId(), outboxEvent.claimApplicationNo(),
+                outboxEvent.tenantCode(), traceId(outboxEvent, storedPayload.traceId()),
+                new MaterialProcessPayload(storedPayload.claimApplicationAttempt()));
+    }
+
+    private AuditDeliveryRequestedMessage toAuditDeliveryRequestedMessage(OutboxEvent outboxEvent) {
+        AuditDeliveryRequestedOutboxPayload storedPayload = readPayload(outboxEvent,
+                AuditDeliveryRequestedOutboxPayload.class);
+        return new AuditDeliveryRequestedMessage(outboxEvent.eventId(), outboxEvent.claimApplicationNo(),
+                outboxEvent.tenantCode(), traceId(outboxEvent, storedPayload.traceId()));
+    }
+
+    private <T> T readPayload(OutboxEvent outboxEvent, Class<T> payloadType) {
+        try {
+            return objectMapper.readValue(outboxEvent.payload(), payloadType);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Outbox 事件载荷不合法，eventId=" + outboxEvent.eventId(), exception);
+        }
+    }
+
+    private String traceId(OutboxEvent outboxEvent, String traceId) {
+        return traceId == null ? outboxEvent.eventId() : traceId;
     }
 }

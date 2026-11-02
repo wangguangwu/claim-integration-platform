@@ -5,10 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.message.AuditSignedMessage;
+import com.wangguangwu.claim.application.shared.contract.message.AuditSignedPayload;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -31,8 +32,8 @@ class AuditSignedMessageAssemblerTest {
     @Test
     @DisplayName("合法载荷：案件号去空白并去重后装配为命令")
     void toCommand_validPayload_trimsAndDeduplicatesCaseNos() {
-        AuditSignedCommand command = assembler.toCommand(
-                envelope("AUDIT_SIGNED", Map.of("caseNos", List.of(" CASE-001 ", "CASE-002", "CASE-001"))));
+        AuditSignedCommand command = assembler.toCommand(message("AUDIT_SIGNED",
+                new AuditSignedPayload(List.of(" CASE-001 ", "CASE-002", "CASE-001"))));
 
         assertThat(command.claimApplicationNo()).isEqualTo(CLAIM_APPLICATION_NO);
         assertThat(command.tenantCode()).isEqualTo(TENANT_CODE);
@@ -44,60 +45,68 @@ class AuditSignedMessageAssemblerTest {
     @Test
     @DisplayName("事件类型不匹配：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_wrongEventType_throwsInvalid() {
-        assertInvalid(envelope("CLAIM_APPLICATION_CREATED", Map.of("caseNos", List.of("CASE-001"))));
+        assertInvalid(message("CLAIM_APPLICATION_CREATED", new AuditSignedPayload(List.of("CASE-001"))));
     }
 
     @Test
     @DisplayName("缺少案件号列表：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_missingCaseNos_throwsInvalid() {
-        assertInvalid(envelope("AUDIT_SIGNED", Map.of()));
-        assertInvalid(envelope("AUDIT_SIGNED", Map.of("caseNos", List.of())));
+        assertInvalid(message("AUDIT_SIGNED", null));
+        assertInvalid(message("AUDIT_SIGNED", new AuditSignedPayload(null)));
+        assertInvalid(message("AUDIT_SIGNED", new AuditSignedPayload(List.of())));
     }
 
     @Test
-    @DisplayName("案件号非字符串：抛出 AUDIT_SIGNED_INVALID")
-    void toCommand_caseNoNotString_throwsInvalid() {
-        assertInvalid(envelope("AUDIT_SIGNED", Map.of("caseNos", List.of(1001))));
+    @DisplayName("案件号为空：抛出 AUDIT_SIGNED_INVALID")
+    void toCommand_nullCaseNo_throwsInvalid() {
+        assertInvalid(message("AUDIT_SIGNED", new AuditSignedPayload(Arrays.asList("CASE-001", null))));
     }
 
     @Test
     @DisplayName("案件号为空白：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_blankCaseNo_throwsInvalid() {
-        assertInvalid(envelope("AUDIT_SIGNED", Map.of("caseNos", List.of("   "))));
+        assertInvalid(message("AUDIT_SIGNED", new AuditSignedPayload(List.of("   "))));
     }
 
     @Test
     @DisplayName("案件号超过 64 字符：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_overlongCaseNo_throwsInvalid() {
-        assertInvalid(envelope("AUDIT_SIGNED", Map.of("caseNos", List.of("C".repeat(65)))));
+        assertInvalid(message("AUDIT_SIGNED", new AuditSignedPayload(List.of("C".repeat(65)))));
     }
 
     @Test
     @DisplayName("缺少平台申请编号：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_missingClaimApplicationNo_throwsInvalid() {
-        ClaimApplicationEventEnvelope envelope = new ClaimApplicationEventEnvelope(EVENT_ID, "AUDIT_SIGNED", 1,
-                " ", TENANT_CODE, "2026-11-02T10:00:00+08:00", TRACE_ID, Map.of("caseNos", List.of("CASE-001")));
+        AuditSignedMessage message = new AuditSignedMessage(EVENT_ID, "AUDIT_SIGNED", " ", TENANT_CODE, TRACE_ID,
+                new AuditSignedPayload(List.of("CASE-001")));
 
-        assertInvalid(envelope);
+        assertInvalid(message);
+    }
+
+    @Test
+    @DisplayName("缺少租户编码：抛出 AUDIT_SIGNED_INVALID")
+    void toCommand_missingTenantCode_throwsInvalid() {
+        AuditSignedMessage message = new AuditSignedMessage(EVENT_ID, "AUDIT_SIGNED", CLAIM_APPLICATION_NO, " ",
+                TRACE_ID, new AuditSignedPayload(List.of("CASE-001")));
+
+        assertInvalid(message);
     }
 
     @Test
     @DisplayName("缺少事件标识：抛出 AUDIT_SIGNED_INVALID")
     void toCommand_missingEventId_throwsInvalid() {
-        ClaimApplicationEventEnvelope envelope = new ClaimApplicationEventEnvelope(" ", "AUDIT_SIGNED", 1,
-                CLAIM_APPLICATION_NO, TENANT_CODE, "2026-11-02T10:00:00+08:00", TRACE_ID,
-                Map.of("caseNos", List.of("CASE-001")));
+        AuditSignedMessage message = new AuditSignedMessage(" ", "AUDIT_SIGNED", CLAIM_APPLICATION_NO, TENANT_CODE,
+                TRACE_ID, new AuditSignedPayload(List.of("CASE-001")));
 
-        assertInvalid(envelope);
+        assertInvalid(message);
     }
 
-    private ClaimApplicationEventEnvelope envelope(String eventType, Map<String, Object> payload) {
-        return new ClaimApplicationEventEnvelope(EVENT_ID, eventType, 1, CLAIM_APPLICATION_NO, TENANT_CODE,
-                "2026-11-02T10:00:00+08:00", TRACE_ID, payload);
+    private AuditSignedMessage message(String eventType, AuditSignedPayload payload) {
+        return new AuditSignedMessage(EVENT_ID, eventType, CLAIM_APPLICATION_NO, TENANT_CODE, TRACE_ID, payload);
     }
 
-    private void assertInvalid(ClaimApplicationEventEnvelope envelope) {
-        assertThatThrownBy(() -> assembler.toCommand(envelope))
+    private void assertInvalid(AuditSignedMessage message) {
+        assertThatThrownBy(() -> assembler.toCommand(message))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID);
     }

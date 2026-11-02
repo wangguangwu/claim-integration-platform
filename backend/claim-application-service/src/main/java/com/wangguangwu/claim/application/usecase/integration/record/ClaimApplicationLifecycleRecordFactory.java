@@ -6,11 +6,12 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionLog;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.AuditDeliveryRequestedOutboxPayload;
 import com.wangguangwu.claim.application.usecase.integration.outbox.model.ClaimApplicationEventType;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.MaterialProcessOutboxPayload;
 import com.wangguangwu.claim.application.usecase.integration.outbox.model.OutboxEvent;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class ClaimApplicationLifecycleRecordFactory {
 
-    private static final String TRACE_ID_FIELD = "traceId";
     private static final int EVENT_VERSION = 1;
     private static final ZoneId BUSINESS_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
@@ -43,54 +43,52 @@ public class ClaimApplicationLifecycleRecordFactory {
     }
 
     /**
-     * 构建审核交付事件，载荷不包含人员敏感信息。
+     * 构建审核交付事件，存储载荷只保留链路标识。
      *
      * @param claimApplication 已进入等待审核签收的申请
-     * @param traceId     链路标识
+     * @param traceId          链路标识
      * @return 待投递事件
      */
     public OutboxEvent auditDeliveryRequestedEvent(ClaimApplication claimApplication, String traceId) {
-        Map<String, Object> payload = Map.of(
-                "claimApplicationNo", claimApplication.getClaimApplicationNo(),
-                "tenantCode", claimApplication.getTenantCode(),
-                "claimApplicationAttempt", claimApplication.getClaimApplicationAttempt(),
-                TRACE_ID_FIELD, traceId);
-        return newOutboxEvent(claimApplication, ClaimApplicationEventType.AUDIT_DELIVERY_REQUESTED, payload);
+        return newOutboxEvent(claimApplication, ClaimApplicationEventType.AUDIT_DELIVERY_REQUESTED,
+                new AuditDeliveryRequestedOutboxPayload(traceId));
     }
 
     /**
-     * 构建首次签收事件，触发材料处理，载荷不包含人员敏感信息。
+     * 构建首次签收事件，触发材料处理。
      *
      * @param claimApplication 已完成签收的申请
-     * @param traceId     链路标识
+     * @param traceId          链路标识
      * @return 待投递事件
      */
     public OutboxEvent claimApplicationCreatedEvent(ClaimApplication claimApplication, String traceId) {
-        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_CREATED, traceId);
+        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_CREATED,
+                traceId);
     }
 
     /**
-     * 构建重新申请事件，触发材料重新处理，载荷不包含人员敏感信息。
+     * 构建重新申请事件，触发材料重新处理。
      *
      * @param claimApplication 已重新申请的申请
-     * @param traceId     链路标识
+     * @param traceId          链路标识
      * @return 待投递事件
      */
     public OutboxEvent claimApplicationReappliedEvent(ClaimApplication claimApplication, String traceId) {
-        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_REAPPLIED, traceId);
+        return claimApplicationProcessEvent(claimApplication, ClaimApplicationEventType.CLAIM_APPLICATION_REAPPLIED,
+                traceId);
     }
 
     /**
      * 构建一条交互事件。
      *
-     * @param interactionType 交互类型
-     * @param claimApplicationNo   平台申请编号
-     * @param interactionNo   行为组编号
-     * @param action          阶段动作
-     * @param requestId       请求标识
-     * @param traceId         链路标识
-     * @param errorCode       失败错误码，非失败场景为 null
-     * @param errorMessage    失败说明，非失败场景为 null
+     * @param interactionType    交互类型
+     * @param claimApplicationNo 平台申请编号
+     * @param interactionNo      行为组编号
+     * @param action             阶段动作
+     * @param requestId          请求标识
+     * @param traceId            链路标识
+     * @param errorCode          失败错误码，非失败场景为 null
+     * @param errorMessage       失败说明，非失败场景为 null
      * @return 交互事件
      */
     public InteractionLog interaction(InteractionType interactionType, String claimApplicationNo, String interactionNo,
@@ -101,21 +99,16 @@ public class ClaimApplicationLifecycleRecordFactory {
     }
 
     /**
-     * 签收与重新申请事件需要把事件类型也写进载荷，供消费侧自校验。
+     * 材料处理事件在存储载荷中保留申请尝试次数与链路标识。
      */
-    private OutboxEvent claimApplicationProcessEvent(ClaimApplication claimApplication, ClaimApplicationEventType eventType,
-                                                String traceId) {
-        Map<String, Object> payload = Map.of(
-                "claimApplicationNo", claimApplication.getClaimApplicationNo(),
-                "tenantCode", claimApplication.getTenantCode(),
-                "eventType", eventType.name(),
-                "claimApplicationAttempt", claimApplication.getClaimApplicationAttempt(),
-                TRACE_ID_FIELD, traceId);
-        return newOutboxEvent(claimApplication, eventType, payload);
+    private OutboxEvent claimApplicationProcessEvent(ClaimApplication claimApplication,
+                                                     ClaimApplicationEventType eventType, String traceId) {
+        return newOutboxEvent(claimApplication, eventType,
+                new MaterialProcessOutboxPayload(claimApplication.getClaimApplicationAttempt(), traceId));
     }
 
     private OutboxEvent newOutboxEvent(ClaimApplication claimApplication, ClaimApplicationEventType eventType,
-                                       Map<String, Object> payload) {
+                                       Object payload) {
         return OutboxEvent.pending(UUID.randomUUID().toString(), eventType.name(), EVENT_VERSION,
                 claimApplication.getClaimApplicationNo(), claimApplication.getTenantCode(), serialize(payload));
     }

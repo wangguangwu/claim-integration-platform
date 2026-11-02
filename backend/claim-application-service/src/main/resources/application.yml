@@ -56,6 +56,9 @@ spring:
           destination: claim_application_audit_signed_v1
           group: claim-application-audit-signed-v1
           content-type: application/json
+          consumer:
+            # 原生字节交给严格解析器，避免 binder 复合转换器以 fastjson 宽松反序列化。
+            use-native-decoding: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     # 默认连接 deploy/docker-compose.yml 创建的理赔申请私有库和最小权限账号。

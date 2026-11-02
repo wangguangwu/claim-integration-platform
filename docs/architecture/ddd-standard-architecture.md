@@ -63,22 +63,22 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
 | 报文防腐组件 | `TenantProtocolSignatureVerifier`、`TenantProtocolDecryptor`、`*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/<域>/tenantprotocol/core/stage`（五个阶段端口与默认实现）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `DefaultTenantProtocolSignatureVerifier`、`DefaultTenantProtocolDecryptor`、`TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
 | 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ClaimApplicationResponseRenderer` |
-| 跨域契约 | 信封、错误码接口、异常基类、异步错误码 | `shared/contract` | `ClaimApplicationEventEnvelope`、`BusinessErrorCode`、`BusinessException`、`ClaimApplicationAsyncErrorCode` |
+| 跨域契约 | 消息密封接口与具体消息 record、错误码接口、异常基类、异步错误码 | `shared/contract`（消息类在 `shared/contract/message`） | `ClaimApplicationEventMessage`、`MaterialProcessMessage`、`AuditDeliveryRequestedMessage`、`AuditSignedMessage`、`BusinessErrorCode`、`BusinessException`、`ClaimApplicationAsyncErrorCode` |
 
 ## 4. 本项目的落位
 
-根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 192（不含 `package-info`），目录 108 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
+根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 201（不含 `package-info`），目录 109 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
 
 | 域键 | `interfaces` | `usecase` | `domain` | `infrastructure` |
 |---|---|---|---|---|
-| 申请签收（`intake` / 聚合 `claim`） | 23 | 14 | 13 | 11 |
+| 申请签收（`intake` / 聚合 `claim`） | 23 | 14 | 13 | 15 |
 | 材料处理（`material`） | 1 | 8 | 3 | 6 |
 | 承保确认（`underwriting`） | 2 | 11 | 0 | 3 |
 | 审核交付（`audit`） | 3 | 10 | 0 | 1 |
 | 问题件（`issue`） | 8 | 8 | 9 | 6 |
-| 异步集成（`integration`） | 2 | 18 | 0 | 14 |
+| 异步集成（`integration`） | 2 | 20 | 0 | 14 |
 | 分层异常（`exception`） | — | 1 | 1 | — |
-| `shared` | — | — | — | 1（另有 `contract` 4） |
+| `shared` | — | — | — | 1（另有 `contract` 11） |
 | `support` | — | — | — | 2（`support/config`） |
 | 根包 | 4（`interfaces/web`） | — | — | 1（`ClaimApplicationServiceApplication`） |
 

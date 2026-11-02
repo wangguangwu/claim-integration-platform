@@ -139,22 +139,36 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 平台不区分可重试与不可重试异常：事件结构非法、申请不存在这类错误同样重投后进入死信，由人工排查重放。消息幂等由 `t_claim_consumed_event` 的 `(consumer_group, event_id)` 唯一键兜底。
 
-消息信封：
+### 出站消息
+
+平台是 `claim_application_material_process_v1` 与 `claim_application_audit_delivery_v1` 的唯一生产者，消息只携带消费方实际读取的字段。
+
+材料处理消息（`CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED`）：
 
 ```json
 {
   "eventId": "019a9c8c-4d02-7d19-9f16-32d447d4ee66",
-  "eventType": "CLAIM_APPLICATION_CREATED",
-  "eventVersion": 1,
   "claimApplicationNo": "AP202610270001",
   "tenantCode": "tenant-a",
-  "occurredAt": "2026-10-27T10:00:00+08:00",
   "traceId": "5bba2a7f468c4efe",
-  "payload": {}
+  "payload": {
+    "claimApplicationAttempt": 1
+  }
 }
 ```
 
-`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥。消费者需要业务明细时，以 `claimApplicationNo` 读取理赔申请私有数据。
+审核交付消息（`AUDIT_DELIVERY_REQUESTED`）不含 `payload`：
+
+```json
+{
+  "eventId": "019a9c8c-4d02-7d19-9f16-32d447d4ee67",
+  "claimApplicationNo": "AP202610270001",
+  "tenantCode": "tenant-a",
+  "traceId": "5bba2a7f468c4efe"
+}
+```
+
+出站消息不携带 `eventType`、`eventVersion`、`occurredAt`：`eventType` 只用于生产端路由到 Topic，事件时间以 Outbox `created_at` 与交互轨迹 `occurred_at` 为准。`payload` 不得包含完整人员 JSON、证件号、银行卡号、Token 或密钥；消费者需要业务明细时，以 `claimApplicationNo` 读取理赔申请私有数据。
 
 ### 审核签收入站消息
 
@@ -182,6 +196,8 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `SKIPPED` | 同一 `eventId` 已被本消费组登记 |
 
 审核签收只登记 `t_claim_case_relation`，不改变申请状态；申请签收前后均保持 `WAIT_AUDIT`，案件生命周期由案件服务承载。
+
+样例中的 `eventVersion`、`occurredAt` 属于历史信封字段，平台不再读取；审核系统继续携带这两个字段或其他契约外字段时按未知字段忽略，不影响处理。
 
 ## InteractionLog 行为分组
 

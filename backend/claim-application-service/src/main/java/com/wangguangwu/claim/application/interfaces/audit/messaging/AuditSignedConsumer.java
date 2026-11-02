@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.audit.messaging;
 
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
+import com.wangguangwu.claim.application.shared.contract.message.AuditSignedMessage;
 import com.wangguangwu.claim.application.usecase.audit.AuditSignedTransactionService;
 import com.wangguangwu.claim.application.usecase.audit.AuditSignedUseCase;
 import java.util.function.Consumer;
@@ -24,22 +24,26 @@ import org.springframework.messaging.Message;
 @Configuration(proxyBeanMethods = false)
 public class AuditSignedConsumer {
 
+    private final AuditSignedMessageParser messageParser;
     private final AuditSignedMessageAssembler messageAssembler;
     private final AuditSignedUseCase auditSignedUseCase;
 
     /**
      * 声明审核签收消费函数，绑定名与配置一致。
      *
+     * <p>报文按原生字节接收，由解析器完成严格反序列化，避免 binder 复合转换器降级到宽松的 fastjson。</p>
+     *
      * @return 消息消费函数
      */
     @Bean
-    public Consumer<Message<ClaimApplicationEventEnvelope>> auditSigned() {
+    public Consumer<Message<byte[]>> auditSigned() {
         return message -> {
-            ClaimApplicationEventEnvelope envelope = message.getPayload();
+            AuditSignedMessage event = null;
             try {
-                auditSignedUseCase.record(messageAssembler.toCommand(envelope));
+                event = messageParser.parse(message.getPayload());
+                auditSignedUseCase.record(messageAssembler.toCommand(event));
             } catch (RuntimeException exception) {
-                logConsumeFailure(envelope, exception);
+                logConsumeFailure(event, exception);
                 throw exception;
             }
         };
@@ -48,14 +52,14 @@ public class AuditSignedConsumer {
     /**
      * 记录消费失败的定位信息，只打印异常摘要，堆栈由 binder 输出，避免同一异常重复打印。
      *
-     * @param envelope  事件信封，信封本身异常时可能为 null
+     * @param event     审核签收消息，消息本身异常时可能为 null
      * @param exception 消费异常
      */
-    private void logConsumeFailure(ClaimApplicationEventEnvelope envelope, RuntimeException exception) {
+    private void logConsumeFailure(AuditSignedMessage event, RuntimeException exception) {
         log.error("审核签收消费失败，交由 MQ 重投，consumerGroup={}，claimApplicationNo={}，eventId={}，reason={}",
                 AuditSignedTransactionService.CONSUMER_GROUP,
-                envelope == null ? null : envelope.claimApplicationNo(),
-                envelope == null ? null : envelope.eventId(),
+                event == null ? null : event.claimApplicationNo(),
+                event == null ? null : event.eventId(),
                 exception.toString());
     }
 }
