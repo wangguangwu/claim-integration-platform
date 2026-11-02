@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.integration.messaging;
 
-import com.wangguangwu.claim.application.domain.integration.outbox.ClaimApplicationEventType;
-import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventPublisher;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.ClaimApplicationEventType;
+import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventPublisher;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationEventEnvelope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.stream.function.StreamBridge;

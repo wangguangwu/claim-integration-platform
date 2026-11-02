@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.integration.config;
 
-import com.wangguangwu.claim.application.domain.integration.compensation.ClaimApplicationCompensationPolicy;
+import com.wangguangwu.claim.application.usecase.integration.compensation.port.ClaimApplicationCompensationPolicy;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

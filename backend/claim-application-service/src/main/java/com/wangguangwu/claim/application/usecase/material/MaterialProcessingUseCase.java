@@ -2,13 +2,13 @@ package com.wangguangwu.claim.application.usecase.material;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
-import com.wangguangwu.claim.application.domain.material.FileUploadResult;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
+import com.wangguangwu.claim.application.usecase.material.model.FileUploadResult;
 import com.wangguangwu.claim.application.domain.material.Material;
-import com.wangguangwu.claim.application.domain.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
 import com.wangguangwu.claim.application.domain.material.MaterialStatus;
-import com.wangguangwu.claim.application.domain.material.MaterialUploadRequest;
+import com.wangguangwu.claim.application.usecase.material.model.MaterialUploadRequest;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
 import com.wangguangwu.claim.application.usecase.material.result.MaterialProcessOutcome;

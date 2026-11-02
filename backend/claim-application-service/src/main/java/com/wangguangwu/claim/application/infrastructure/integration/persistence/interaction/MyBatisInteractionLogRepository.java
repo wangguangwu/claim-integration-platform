@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.integration.persistence.interaction;
 
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLog;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionLog;
+import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

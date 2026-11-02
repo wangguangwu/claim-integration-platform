@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
 import com.wangguangwu.claim.application.domain.material.Material;
-import com.wangguangwu.claim.application.domain.material.port.MaterialBatchNoGenerator;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialBatchNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

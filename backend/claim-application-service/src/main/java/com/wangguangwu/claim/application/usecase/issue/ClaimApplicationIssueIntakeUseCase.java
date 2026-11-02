@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.usecase.issue;
 
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
+import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.service.IssueDomainService;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueIntakeCommand;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueIntakeResult;

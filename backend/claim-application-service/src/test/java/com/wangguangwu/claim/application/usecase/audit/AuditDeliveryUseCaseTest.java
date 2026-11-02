@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.usecase.audit;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -8,15 +7,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditDeliveryCommand;
+import com.wangguangwu.claim.application.usecase.audit.port.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditDeliveryOutcome;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

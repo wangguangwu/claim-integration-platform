@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.integration.config;
 
-import com.wangguangwu.claim.application.domain.underwriting.UnderwritingResult;
+import com.wangguangwu.claim.application.usecase.underwriting.model.UnderwritingResult;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;

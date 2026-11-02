@@ -1,12 +1,12 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookup;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookupKind;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakePolicy;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeSnapshotQuery;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookup;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookupKind;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakePolicy;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeSnapshotQuery;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import java.util.Optional;

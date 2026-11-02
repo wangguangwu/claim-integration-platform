@@ -1,10 +1,10 @@
 package com.wangguangwu.claim.application.infrastructure.intake.cache;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookup;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeSnapshot;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookup;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeSnapshot;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeSnapshotQuery;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeSnapshotQuery;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.infrastructure.intake.config.ClaimApplicationIntakeProperties;
 import com.wangguangwu.claim.application.infrastructure.intake.resilience.RedisAvailabilityCircuit;

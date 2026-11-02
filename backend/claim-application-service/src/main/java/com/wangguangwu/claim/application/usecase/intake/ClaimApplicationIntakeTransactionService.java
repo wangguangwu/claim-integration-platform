@@ -1,14 +1,14 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeLookupKind;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeSnapshot;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookupKind;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeSnapshot;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
-import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
+import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
+import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeDisposition;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;

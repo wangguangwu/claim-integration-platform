@@ -2,7 +2,7 @@ package com.wangguangwu.claim.application.usecase.issue;
 
 import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
+import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;

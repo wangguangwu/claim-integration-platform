@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.intake.number;
 
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationNoGenerator;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.infrastructure.intake.resilience.RedisAvailabilityCircuit;
 import java.time.LocalDate;

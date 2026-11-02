@@ -4,7 +4,7 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
+import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.event.IssueClosedEvent;
 import com.wangguangwu.claim.application.domain.issue.event.IssueDomainEventPublisher;
 import com.wangguangwu.claim.application.domain.issue.event.IssueRaisedEvent;
@@ -13,7 +13,6 @@ import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 /**
  * 问题件领域服务，协调问题件聚合与申请聚合的跨聚合规则与状态变更。
@@ -32,7 +31,6 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @RequiredArgsConstructor
-@Service
 public class IssueDomainService {
 
     private final ClaimApplicationRepository claimApplicationRepository;

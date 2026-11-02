@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.integration.local;
 
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
 import com.wangguangwu.claim.application.infrastructure.integration.config.LocalIntegrationProperties;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;

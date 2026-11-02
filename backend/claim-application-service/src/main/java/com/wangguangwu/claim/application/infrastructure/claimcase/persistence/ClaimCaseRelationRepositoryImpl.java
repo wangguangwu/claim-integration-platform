@@ -21,7 +21,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ClaimCaseRelationRepositoryImpl implements ClaimCaseRelationRepository {
 
-    private final ClaimCaseRelationMapper relationMapper;
+    private final ClaimCaseRelationDOMapper relationMapper;
     private final ClaimCaseRelationConverter relationConverter;
 
     /**

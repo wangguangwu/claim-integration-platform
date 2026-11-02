@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.integration.persistence.consumption;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;

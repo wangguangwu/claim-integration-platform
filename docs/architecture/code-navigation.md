@@ -22,9 +22,9 @@ interfaces → usecase → domain ← infrastructure
 该方向由 `ClaimApplicationArchitectureTest` 在 Maven 测试阶段持续校验；新增代码不得通过跨层 import 绕过领域端口或用例编排。
 
 - `interfaces`：入站适配器，只处理 HTTP、消息、调度、协议和响应映射。
-- `usecase`：应用编排，负责事务、幂等结果和端口调用顺序。
-- `domain`：业务状态机、聚合、值对象、领域事件和端口契约，不依赖具体技术实现。
-- `infrastructure`：MyBatis-Plus、Redis、Redisson、MQ 存储和第三方系统适配，实现领域端口。
+- `usecase`：应用编排，负责事务、幂等结果和端口调用顺序，同时拥有出站能力端口、配置策略端口与端口模型。
+- `domain`：业务状态机、聚合、值对象、领域事件、聚合 Repository 和业务异常，不依赖具体技术实现。
+- `infrastructure`：MyBatis-Plus、Redis、Redisson、MQ 存储和第三方系统适配，实现 `usecase` 端口与 `domain` 聚合 Repository。
 
 # 核心链路设计
 
@@ -32,8 +32,8 @@ interfaces → usecase → domain ← infrastructure
 
 | 目录 | 进入条件 | 主要内容 | 不应放置的内容 |
 | --- | --- | --- | --- |
-| `domain` | 要定义业务事实、状态规则或外部能力契约 | 聚合、端口、领域事件、状态/错误码枚举 | Spring Controller、MyBatis Mapper、Redis 客户端调用 |
-| `usecase` | 要编排一次完整业务操作 | 用例、事务服务、命令与结果 | HTTP 注解、数据库对象、第三方 SDK 调用 |
+| `domain` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合、值对象、领域事件、聚合 Repository、状态/错误码枚举 | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
+| `usecase` | 要编排一次完整业务操作 | 用例、事务服务、命令与结果、出站端口、配置策略、端口模型 | HTTP 注解、数据库对象、第三方 SDK 调用、业务不变式 |
 | `infrastructure` | 要接入具体技术或外部系统 | MyBatis-Plus 仓储、DO/Mapper、Redis、第三方适配 | 业务状态机和接口响应映射 |
 | `interfaces` | 要承接外部输入或对外调度 | Controller、Consumer、Scheduler、租户协议流水线 | 领域规则和持久化实现 |
 | `shared` | 确属跨业务能力复用 | 事件契约、无业务归属组件 | 单一业务域模型、HTTP 请求或响应模型 |
@@ -41,14 +41,14 @@ interfaces → usecase → domain ← infrastructure
 
 ## 按业务能力定位
 
-| 业务能力 | 领域模型与端口 | 应用编排 | 基础设施实现 | 入站入口 |
+| 业务能力 | 领域模型 | 应用端口与编排 | 基础设施实现 | 入站入口 |
 | --- | --- | --- | --- | --- |
-| 申请签收 | `domain/claim` | `usecase/intake` | `infrastructure/intake` | `interfaces/intake/web`、`interfaces/intake/tenantprotocol` |
-| 材料处理 | `domain/material` | `usecase/material` | `infrastructure/material` | `interfaces/material/messaging` |
-| 自动承保 | `domain/underwriting` | `usecase/underwriting` | `infrastructure/underwriting` | `interfaces/underwriting/web` |
-| 审核交付 | `domain/audit` | `usecase/audit` | `infrastructure/audit` | `interfaces/audit/messaging` |
+| 申请签收 | `domain/claim` | `usecase/intake`、`usecase/intake/{port,model}` | `infrastructure/intake` | `interfaces/intake/web`、`interfaces/intake/tenantprotocol` |
+| 材料处理 | `domain/material` | `usecase/material`、`usecase/material/{port,model}` | `infrastructure/material` | `interfaces/material/messaging` |
+| 自动承保 | `domain/claim` 的状态推进 | `usecase/underwriting`、`usecase/underwriting/{port,model}` | `infrastructure/underwriting` | `interfaces/underwriting/web` |
+| 审核交付 | — | `usecase/audit`、`usecase/audit/{port,model}` | `infrastructure/audit` | `interfaces/audit/messaging` |
 | 问题件 | `domain/issue` | `usecase/issue` | `infrastructure/issue` | `interfaces/issue/web` |
-| 异步集成 | `domain/integration` | `usecase/integration` | `infrastructure/integration` | `interfaces/integration/scheduling` |
+| 异步集成 | — | `usecase/integration/{outbox,consumption,compensation,interaction}` | `infrastructure/integration` | `interfaces/integration/scheduling` |
 
 ## 常用排查路径
 
@@ -56,22 +56,23 @@ interfaces → usecase → domain ← infrastructure
 | --- | --- | --- |
 | 签收请求为什么被拒绝 | `interfaces/intake/web` 的异常映射 | `usecase/intake` → `domain/claim` → `infrastructure/intake` |
 | 材料为何导致受理失败 | `interfaces/material/messaging` | `usecase/material` → `domain/material` → `infrastructure/material` |
-| 承保回调为什么未推进状态 | `interfaces/underwriting/web` | `usecase/underwriting` → `domain/claim` → `domain/underwriting` |
-| 消息没有发出或重复发送 | `interfaces/integration/scheduling` | `usecase/integration/outbox` → `domain/integration/outbox` → `infrastructure/integration/persistence/outbox` |
+| 承保回调为什么未推进状态 | `interfaces/underwriting/web` | `usecase/underwriting` → `domain/claim` → `usecase/underwriting/port` |
+| 消息没有发出或重复发送 | `interfaces/integration/scheduling` | `usecase/integration/outbox` → `usecase/integration/outbox/{model,port}` → `infrastructure/integration/persistence/outbox` |
 | 问题件无法下发或关闭 | `interfaces/issue/web` | `usecase/issue` → `domain/issue` → `infrastructure/issue` |
 
 # 并发控制
 
-签收幂等、Redis 降级并发控制与唯一约束位于 `infrastructure/intake`；状态是否允许复用或重新申请位于 `domain/claim`；两者的组合流程位于 `usecase/intake`。排查并发问题必须沿此顺序阅读，避免将基础设施降级策略误解为领域规则。
+签收幂等、Redis 降级并发控制与唯一约束位于 `infrastructure/intake`；加锁、快照查询与发号端口在 `usecase/intake/port`；状态是否允许复用或重新申请位于 `domain/claim`；两者的组合流程位于 `usecase/intake`。排查并发问题必须沿此顺序阅读，避免将基础设施降级策略误解为领域规则。
 
 # 异步一致性
 
-Outbox 事件定义和状态机位于 `domain/integration/outbox`，投递编排位于 `usecase/integration/outbox`，MyBatis-Plus 持久化实现位于 `infrastructure/integration/persistence/outbox`，调度入口位于 `interfaces/integration/scheduling`。消息消费幂等登记遵循同样的分层路径。
+Outbox 事件模型、状态机与端口位于 `usecase/integration/outbox/{model,port}`，投递编排位于 `usecase/integration/outbox`，MyBatis-Plus 持久化实现位于 `infrastructure/integration/persistence/outbox`，调度入口位于 `interfaces/integration/scheduling`。消息消费幂等登记遵循同样的分层路径。
 
 # 演进原则
 
 - 当前保持分层优先，避免一次性移动大量包和 import。
 - 单个业务域出现持续增长、跨层跳转严重影响开发时，再单独评估纵向切片迁移。
 - 新增代码先按本导航判断归属；只有跨多个业务能力复用时才进入 `shared`。
+- `domain` 只放业务模型与聚合 Repository；锁、发号、外部系统、Outbox 等技术能力端口放 `usecase/<域>/port`。
 - 新增顶层或关键业务包时，必须同时增加 `package-info.java`，说明职责和依赖边界。
 - 修改申请服务包依赖后，必须运行 `ClaimApplicationArchitectureTest`，确保不违反既有分层方向。

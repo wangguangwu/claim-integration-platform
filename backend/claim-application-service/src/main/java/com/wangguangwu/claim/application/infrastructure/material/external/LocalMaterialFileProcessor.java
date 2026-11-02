@@ -1,9 +1,9 @@
 package com.wangguangwu.claim.application.infrastructure.material.external;
 
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
-import com.wangguangwu.claim.application.domain.material.FileUploadResult;
-import com.wangguangwu.claim.application.domain.material.MaterialUploadRequest;
-import com.wangguangwu.claim.application.domain.material.port.MaterialFileProcessor;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
+import com.wangguangwu.claim.application.usecase.material.model.FileUploadResult;
+import com.wangguangwu.claim.application.usecase.material.model.MaterialUploadRequest;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.infrastructure.integration.config.LocalIntegrationProperties;
 import com.wangguangwu.claim.application.infrastructure.integration.local.AbstractLocalIntegration;
 import lombok.extern.slf4j.Slf4j;

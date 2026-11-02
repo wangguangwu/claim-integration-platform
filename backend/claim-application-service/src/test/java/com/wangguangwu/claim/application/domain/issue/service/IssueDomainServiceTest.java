@@ -13,7 +13,7 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
+import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.event.IssueClosedEvent;
 import com.wangguangwu.claim.application.domain.issue.event.IssueDomainEventPublisher;
 import com.wangguangwu.claim.application.domain.issue.event.IssueRaisedEvent;

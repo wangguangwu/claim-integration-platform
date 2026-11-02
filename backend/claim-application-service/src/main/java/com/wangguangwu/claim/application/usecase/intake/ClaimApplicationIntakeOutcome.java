@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakeSnapshot;
+import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeSnapshot;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
 import java.util.Optional;
 

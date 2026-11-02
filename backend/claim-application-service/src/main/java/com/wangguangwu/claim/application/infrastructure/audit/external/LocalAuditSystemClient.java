@@ -1,8 +1,8 @@
 package com.wangguangwu.claim.application.infrastructure.audit.external;
 
-import com.wangguangwu.claim.application.domain.audit.AuditDeliveryRequest;
-import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionType;
+import com.wangguangwu.claim.application.usecase.audit.model.AuditDeliveryRequest;
+import com.wangguangwu.claim.application.usecase.audit.port.ServiceAuditSystemPort;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
 import com.wangguangwu.claim.application.infrastructure.integration.config.LocalIntegrationProperties;
 import com.wangguangwu.claim.application.infrastructure.integration.local.AbstractLocalIntegration;
 import lombok.extern.slf4j.Slf4j;

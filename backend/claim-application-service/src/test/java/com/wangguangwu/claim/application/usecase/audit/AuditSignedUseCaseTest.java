@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;

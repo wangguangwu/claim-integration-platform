@@ -2,9 +2,9 @@ package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionAction;
-import com.wangguangwu.claim.application.domain.underwriting.port.AutoUnderwritingRequester;
-import com.wangguangwu.claim.application.domain.underwriting.port.ValidPolicyQuery;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
+import com.wangguangwu.claim.application.usecase.underwriting.port.AutoUnderwritingRequester;
+import com.wangguangwu.claim.application.usecase.underwriting.port.ValidPolicyQuery;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

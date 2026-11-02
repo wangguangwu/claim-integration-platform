@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.intake.lock;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeLock;
 import com.wangguangwu.claim.application.infrastructure.intake.config.ClaimApplicationIntakeProperties;
 import com.wangguangwu.claim.application.infrastructure.intake.resilience.RedisAvailabilityCircuit;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;

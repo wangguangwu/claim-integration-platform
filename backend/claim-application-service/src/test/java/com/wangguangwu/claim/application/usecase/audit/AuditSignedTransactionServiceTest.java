@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
 import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLog;
-import com.wangguangwu.claim.application.domain.integration.interaction.InteractionLogRepository;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionLog;
+import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditSignedOutcome;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;

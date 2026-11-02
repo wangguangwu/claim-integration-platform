@@ -2,8 +2,7 @@ package com.wangguangwu.claim.application.infrastructure.issue.persistence;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueRepository;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -18,7 +17,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ClaimApplicationIssueRepositoryImpl implements ClaimApplicationIssueRepository {
 
-    private final ClaimApplicationIssueMapper issueMapper;
+    private final ClaimApplicationIssueDOMapper issueMapper;
     private final ClaimApplicationIssueConverter issueConverter;
 
     /**

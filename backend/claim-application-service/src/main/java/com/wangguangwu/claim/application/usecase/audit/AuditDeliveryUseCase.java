@@ -1,11 +1,11 @@
 package com.wangguangwu.claim.application.usecase.audit;
 
-import com.wangguangwu.claim.application.domain.audit.AuditDeliveryRequest;
-import com.wangguangwu.claim.application.domain.audit.ServiceAuditSystemPort;
+import com.wangguangwu.claim.application.usecase.audit.model.AuditDeliveryRequest;
+import com.wangguangwu.claim.application.usecase.audit.port.ServiceAuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.integration.consumption.ConsumedEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditDeliveryCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditDeliveryOutcome;

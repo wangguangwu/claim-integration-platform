@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.infrastructure.intake.config;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIntakePolicy;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakePolicy;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

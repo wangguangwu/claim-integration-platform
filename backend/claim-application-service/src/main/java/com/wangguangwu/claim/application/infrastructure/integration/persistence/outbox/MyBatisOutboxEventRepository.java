@@ -2,9 +2,9 @@ package com.wangguangwu.claim.application.infrastructure.integration.persistence
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEvent;
-import com.wangguangwu.claim.application.domain.integration.outbox.port.OutboxEventRepository;
-import com.wangguangwu.claim.application.domain.integration.outbox.OutboxEventStatus;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.OutboxEvent;
+import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.outbox.model.OutboxEventStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
