@@ -8,6 +8,9 @@ package com.wangguangwu.claim.application.domain.integration.interaction;
  */
 public enum InteractionDirection {
 
+    /** 外部系统或上游组件向本服务发起的交互。 */
     INBOUND,
+
+    /** 本服务向外部系统或下游组件发起的交互。 */
     OUTBOUND
 }

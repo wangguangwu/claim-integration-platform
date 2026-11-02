@@ -10,9 +10,16 @@ package com.wangguangwu.claim.application.domain.integration.interaction;
  */
 public enum InteractionAction {
 
+    /** 开始发起一次交互，结果状态为进行中。 */
     STARTED(InteractionResultStatus.STARTED),
+
+    /** 交互已成功完成。 */
     COMPLETED(InteractionResultStatus.SUCCESS),
+
+    /** 重复请求复用既有处理结果，视为成功完成。 */
     REUSED(InteractionResultStatus.SUCCESS),
+
+    /** 交互执行失败。 */
     FAILED(InteractionResultStatus.FAILED);
 
     private final InteractionResultStatus resultStatus;

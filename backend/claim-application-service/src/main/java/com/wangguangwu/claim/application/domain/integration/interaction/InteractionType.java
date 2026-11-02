@@ -11,10 +11,19 @@ package com.wangguangwu.claim.application.domain.integration.interaction;
  */
 public enum InteractionType {
 
+    /** 租户或上游系统向理赔申请服务提交签收请求。 */
     CLAIM_APPLICATION_INTAKE(InteractionDirection.INBOUND, "CLAIM_APPLICATION_SERVICE"),
+
+    /** 材料处理器向理赔申请服务反馈材料处理结果。 */
     MATERIAL_PROCESS(InteractionDirection.INBOUND, "MATERIAL_PROCESSOR"),
+
+    /** 理赔申请服务向自动承保系统发起承保请求或查询。 */
     UNDERWRITING(InteractionDirection.OUTBOUND, "UNDERWRITING_SYSTEM"),
+
+    /** 自动承保系统向理赔申请服务回调承保完成结果。 */
     UNDERWRITING_CALLBACK(InteractionDirection.INBOUND, "UNDERWRITING_SYSTEM"),
+
+    /** 理赔申请服务向审核系统交付已满足审核条件的申请。 */
     AUDIT_DELIVERY(InteractionDirection.OUTBOUND, "AUDIT_SYSTEM");
 
     private final InteractionDirection direction;

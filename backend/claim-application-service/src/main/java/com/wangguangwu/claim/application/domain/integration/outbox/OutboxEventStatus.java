@@ -11,8 +11,15 @@ package com.wangguangwu.claim.application.domain.integration.outbox;
  */
 public enum OutboxEventStatus {
 
+    /** 事件待投递，可被投递任务抢占。 */
     PENDING,
+
+    /** 事件已被某个投递任务抢占，等待发送结果回写。 */
     SENDING,
+
+    /** 事件已成功发布到消息中间件，不再重复投递。 */
     PUBLISHED,
+
+    /** 事件发送达到失败终态，需要人工排查或补偿。 */
     FAILED
 }
