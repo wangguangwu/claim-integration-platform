@@ -1,8 +1,8 @@
-package com.wangguangwu.claim.application.infrastructure.claimcase.persistence;
+package com.wangguangwu.claim.application.infrastructure.claim.persistence;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
-import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

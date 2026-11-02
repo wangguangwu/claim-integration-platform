@@ -115,8 +115,8 @@ flowchart TB
 
 - 根包是 DDD 四层 `interfaces`、`usecase`、`domain`、`infrastructure`，业务域 `intake`、`material`、`underwriting`、`audit`、`issue`、`integration` 作为每层的第二级子包；`shared`、`support` 保留为额外根包。
 - 依赖方向为 `interfaces → usecase → domain ← infrastructure`；`domain` 不依赖任何上层，`infrastructure` 只依赖 `usecase/<域>/{port,model}` 与 `domain`，不依赖用例编排或 `interfaces`，`usecase` 不依赖 `interfaces`/`infrastructure`。
-- 目录命名遵循标准 DDD 词典：`interfaces/<域>` 按入站通道分为 `web`、`messaging`、`scheduling`、`tenantprotocol`，不设 `inbound` 中转层（出站适配器属于 `infrastructure`）；`tenantprotocol/core/{pipeline,stage}` 分放流水线装配与三个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 按租户各一套 request/流水线/解析/校验/转换，租户响应渲染在 `interfaces/intake/web/render`，问题件响应渲染在 `interfaces/issue/web/render`；`domain` 只含聚合、值对象、状态枚举、领域事件、领域服务、聚合 Repository、业务异常与错误码，零框架依赖，聚合 Repository 在 `domain/<聚合>/port`（理赔申请的人员基类与四个角色在 `domain/claim/person`），锁、发号、快照查询、外部系统调用、Outbox 等技术能力端口与端口模型在 `usecase/<域>/{port,model}`，聚合根不暴露 setter 且构造器私有；DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter` 和仓储实现一律在 `infrastructure/<域>/persistence`，单聚合平铺、多聚合按与 `domain` 同名的子包分组。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
-- `shared` 放被多域复用的构件：`shared/contract` 承载消息信封、跨域命令与跨域异步异常及错误码，另有统一响应模型（`interfaces/web`）与加密工具（`shared/infrastructure`）；`support` 只放配置；文件系统、承保系统与审核系统由 `infrastructure/<域>/external` 的进程内本地实现提供，接真实系统时替换为对应适配器。
+- 目录命名遵循标准 DDD 词典：`interfaces/<域>` 按入站通道分为 `web`、`messaging`、`scheduling`、`tenantprotocol`，不设 `inbound` 中转层（出站适配器属于 `infrastructure`）；`tenantprotocol/core/{pipeline,stage}` 分放流水线装配与五个阶段端口（验签、解密、解析、校验、转换，默认验签/解密实现直通），`tenantprotocol/tenants/{tenant_a,tenant_b}` 按租户各一套 request/流水线/解析/校验/转换，租户响应渲染在 `interfaces/intake/web/render`，问题件响应渲染在 `interfaces/issue/web/render`；`domain` 只含聚合、值对象、状态枚举、领域事件、领域服务、聚合 Repository、业务异常与错误码，零框架依赖，聚合 Repository 在 `domain/<聚合>/port`（理赔申请的人员基类与四个角色在 `domain/claim/person`），锁、发号、快照查询、外部系统调用、Outbox 等技术能力端口与端口模型在 `usecase/<域>/{port,model}`，聚合根不暴露 setter 且构造器私有；DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter` 和仓储实现一律在 `infrastructure/<域>/persistence`，单聚合平铺、多聚合按与 `domain` 同名的子包分组。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
+- `shared` 放被多域复用的构件：`shared/contract` 只承载消息信封、错误码接口、业务异常基类与异步错误码，另有统一响应模型（`interfaces/web`）与加密工具（`shared/infrastructure`）；承保完成命令等应用输入随用例归位到 `usecase/<域>/command`；`support` 只放配置；文件系统、承保系统与审核系统由 `infrastructure/<域>/external` 的进程内本地实现提供，接真实系统时替换为对应适配器。
 - `integration` 定位平台异步内核，承载 Outbox 投递、消费去重、交互日志记录装配与滞留补偿；其模型与端口位于 `usecase/integration/{outbox,consumption,compensation,interaction}/{model,port}`。补偿允许重放业务域用例，业务域允许复用内核的记录装配入口 `usecase/integration/record`。
 - 跨域引用只允许落在对方 `domain`、`shared`、对方 `usecase` 的 `port`/`model`，或 `integration` 对外提供的记录装配与补偿用例；禁止引用其他业务域的 `interfaces`、`infrastructure` 与用例编排类，DO 不得跨域传递，`domain` 包不得依赖 Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ 与 Jackson；规则由包名前缀即可判定，详见 [005 Spec 依赖方向规则](../../specs/005-application-service-package-refactoring/design.md)。
 - JMeter 压测位于 `scripts/jmeter`，必须经 `claim-gateway` 的对外接口进入服务，不能绕过网关直调应用服务。
@@ -141,7 +141,7 @@ flowchart TB
 | `ClaimApplication` | 申请聚合根，持有生命周期状态、外部申请号和人员信息。 | `(tenantCode, externalClaimApplicationNo)` 唯一。 |
 | `Material` | 首次材料和补材记录。 | 使用 `batchNo` 区分材料批次；重新申请时旧材料软删除。 |
 | `Issue` | 审核系统下发的问题件。 | 同一理赔申请同时只允许一条未关闭记录。 |
-| `CaseRelation` | 理赔申请与审核签收返回案件的关联。 | `(tenantCode, claimApplicationNo, caseNo)` 唯一。 |
+| `CaseRelation` | 理赔申请与审核签收返回案件的关联，归属 `domain/claim`，不构成独立聚合。 | `(tenantCode, claimApplicationNo, caseNo)` 唯一。 |
 | `InteractionLog` | 外部系统调用、通知和回调的处理轨迹。 | 记录必要业务标识与结果，不记录完整敏感信息。 |
 | `OutboxEvent` | 与本地业务数据同事务持久化的待投递事件。 | `eventId` 唯一，按事件和理赔申请幂等消费。 |
 
@@ -503,6 +503,7 @@ flowchart LR
 ### 异常处理
 
 - 业务校验失败、状态不允许迁移、唯一约束冲突和外部系统拒绝必须返回统一业务异常，并携带必要的 `claimApplicationNo`、租户或外部申请号上下文。
+- 异常按层分型：领域不变式抛 `DomainException`，用例编排抛 `ApplicationException`，两者继承 `BusinessException`；入站适配与基础设施在自身边界内直接使用基类，全局处理器仍只捕获基类，HTTP 状态与响应结构不变。
 - 不捕获异常后继续执行，不吞掉外部系统、MQ 或数据库异常。
 - 自动承保的完成通知缺失不产生业务失败状态，由补偿查询恢复；查询结果未得到前保持 `UNDERWRITING`。
 - 审核撤销失败时保持 `COMPLETED`，不修改 CaseRelation，也不将理赔申请标记为已撤销。

@@ -1,6 +1,6 @@
 # 标准 DDD 架构说明
 
-本文回答一个问题：什么叫"符合标准 DDD"，判定依据是什么，以及 `claim-application-service` 的 185 个类各自落在哪一层。
+本文回答一个问题：什么叫"符合标准 DDD"，判定依据是什么，以及 `claim-application-service` 的 192 个类各自落在哪一层。
 文档面向本项目开发者，术语以 Eric Evans / Vaughn Vernon《实现域驱动设计》、业界广泛引用的四层结构、Alibaba COLA 4.0 与 Fowler《企业应用架构模式》为基准。
 
 ## 1. 标准只规定三件事
@@ -10,7 +10,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 1. **层的职责**：每一层放什么类型、不放什么类型，有明确定义。展开成三条最容易被漏掉的硬规则：
    - **聚合自己守不变式**：聚合根不得对层外暴露公开 setter，构造器私有，状态只能经命名领域方法迁移；从数据库重建聚合走 owning 域的反水化工厂，不能"先构造再逐字段 set"。写了状态机又开着 `setStatus`，等于没有状态机。
    - **创建知识只留在 owning 域**：其他层不得 `new` 本域聚合或逐字段拼装其状态，只能调用该域 `domain` 暴露的工厂方法；入站适配器也不得组装聚合——租户协议流水线的产物是 `ClaimApplicationIntakeCommand` 命令，聚合由签收用例调用 `ClaimApplication.submit(...)` 创建，否则聚合的组装知识在 `interfaces` 又有第二份；同一类记录（如异步 Outbox 事件与交互日志）只允许一个装配入口，且装配入口不得自行推断领域词汇——方向、目标系统、结果状态这类固定映射挂在说出它们的枚举上（`InteractionType.direction()`、`InteractionAction.resultStatus()`），否则用例层就成了第二套业务定义。
-   - **业务性拒绝说业务的语言**：不变式违反应抛 `BusinessException` 并携带本域 `BusinessErrorCode`，领域、用例与入站适配共用同一种异常；`IllegalStateException` 这类 JDK 异常留给真正的编程错误。异常不携带 HTTP 类型：状态码由入站层 `BusinessErrorStatusRegistry` 集中映射，字段校验失败与报文不可解析使用的“请求非法”码、未预期异常使用的系统错误码由当前控制器实现 `ApiErrorCodeProvider` 声明，未声明时 ArchUnit 直接失败。局部重试信号（如同步判定与库中记录不一致）用返回值表达，不复用业务异常。
+   - **业务性拒绝说业务的语言**：不变式违反应抛 `DomainException`，用例编排拒绝抛 `ApplicationException`，两者都继承传输无关的 `BusinessException` 并携带本域 `BusinessErrorCode`；入站适配与基础设施在自身边界内直接使用基类。`IllegalStateException` 这类 JDK 异常留给真正的编程错误。异常不携带 HTTP 类型：状态码由入站层 `BusinessErrorStatusRegistry` 集中映射，字段校验失败与报文不可解析使用的“请求非法”码、未预期异常使用的系统错误码由当前控制器实现 `ApiErrorCodeProvider` 声明，未声明时 ArchUnit 直接失败。局部重试信号（如同步判定与库中记录不一致）用返回值表达，不复用业务异常。
 2. **依赖方向**：`interfaces → usecase → domain ← infrastructure`，且 `domain` 不依赖任何框架。这是"依赖倒置"，是标准，不是风格。配置阈值同样是实现细节：用例需要批量、退避与滞留阈值时，在 `usecase/<域>/port` 声明 `*Policy` 端口，由 `infrastructure/<域>/config` 的 `*Properties` 绑定配置实现；把 `@ConfigurationProperties` 挨着用例放，用例层就带上了 Spring，换配置中心要改用例。
 3. **对象角色命名**：一个类的后缀要能说明它在模式里的角色——`DO`、ORM 映射、转换器、仓储实现、端口、值对象各不相同。Fowler 的 Data Mapper 定义决定了 `*Mapper` 只能是 ORM，这就是为什么 DO↔领域对象的转换器不能叫 `Mapper`。同一后缀在整棵树上只能有一种含义：`*UseCase` 一律是用例入口具体类（不为它保留单实现接口），`*TransactionService` 一律是事务边界；两个名字只差一个词（`*Validation` 与 `*Validator`）视为职责未说清，必须改名拆分。
 
@@ -56,33 +56,33 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
 | 外部系统实现 | 进程内本地实现用 `Local*`；接入真实系统时另加适配器 | `infrastructure/<域>/external` | `LocalMaterialFileProcessor`、`LocalValidPolicyQuery`、`LocalAutoUnderwritingRequester`、`LocalUnderwritingResultQuery`、`LocalAuditSystemClient` |
 | 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging,resilience}` | `RedisClaimApplicationIntakeSnapshotQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher`、`RedisAvailabilityCircuit` |
-| 业务异常与错误码 | `BusinessException`（唯一业务异常）+ `*ErrorCode implements BusinessErrorCode` | `shared/contract`（异常基类与跨域错误码）、`domain/<聚合>/exception`（域内错误码） | `BusinessException`、`ClaimApplicationIntakeErrorCode`、`ClaimApplicationIssueErrorCode`、`ClaimApplicationAsyncErrorCode` |
+| 业务异常与错误码 | `BusinessException`（传输无关基类）、`DomainException`（领域拒绝）、`ApplicationException`（用例拒绝）+ `*ErrorCode implements BusinessErrorCode` | `shared/contract`（异常基类与跨域错误码）、`domain/exception`、`usecase/exception`、`domain/<聚合>/exception`（域内错误码） | `BusinessException`、`DomainException`、`ApplicationException`、`ClaimApplicationIntakeErrorCode`、`ClaimApplicationIssueErrorCode`、`ClaimApplicationAsyncErrorCode` |
 | 入站错误码声明与异常渲染 | `ApiErrorCodeProvider`、`BusinessErrorStatusRegistry`、`WebExceptionHandler` | `interfaces/web` | 控制器声明请求非法码与系统错误码；注册表是错误码到 HTTP 状态的唯一映射；全局处理器是唯一 `@RestControllerAdvice` |
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
-| 报文防腐组件 | `*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/<域>/tenantprotocol/core/stage`（端口与适配器）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
+| 报文防腐组件 | `TenantProtocolSignatureVerifier`、`TenantProtocolDecryptor`、`*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/<域>/tenantprotocol/core/stage`（五个阶段端口与默认实现）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `DefaultTenantProtocolSignatureVerifier`、`DefaultTenantProtocolDecryptor`、`TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
 | 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/<域>/web/render` | `ClaimApplicationResponseRenderer` |
-| 跨域契约 | 信封、命令 DTO | `shared/contract` | `ClaimApplicationEventEnvelope`、`UnderwritingCompletedCommand` |
+| 跨域契约 | 信封、错误码接口、异常基类、异步错误码 | `shared/contract` | `ClaimApplicationEventEnvelope`、`BusinessErrorCode`、`BusinessException`、`ClaimApplicationAsyncErrorCode` |
 
 ## 4. 本项目的落位
 
-根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 186（不含 `package-info`），目录 108 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
+根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 192（不含 `package-info`），目录 108 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
 
 | 域键 | `interfaces` | `usecase` | `domain` | `infrastructure` |
 |---|---|---|---|---|
-| 申请签收（`intake` / 聚合 `claim`） | 20 | 14 | 11 | 11 |
+| 申请签收（`intake` / 聚合 `claim`） | 23 | 14 | 13 | 11 |
 | 材料处理（`material`） | 1 | 8 | 3 | 6 |
-| 承保确认（`underwriting`） | 2 | 10 | 0 | 3 |
+| 承保确认（`underwriting`） | 2 | 11 | 0 | 3 |
 | 审核交付（`audit`） | 3 | 10 | 0 | 1 |
-| 问题件（`issue`） | 7 | 8 | 9 | 6 |
+| 问题件（`issue`） | 8 | 8 | 9 | 6 |
 | 异步集成（`integration`） | 2 | 18 | 0 | 14 |
-| 案件关系（`claimcase`） | — | — | 2 | 4 |
-| `shared` | — | — | — | 1（另有 `contract` 5） |
+| 分层异常（`exception`） | — | 1 | 1 | — |
+| `shared` | — | — | — | 1（另有 `contract` 4） |
 | `support` | — | — | — | 2（`support/config`） |
 | 根包 | 4（`interfaces/web`） | — | — | 1（`ClaimApplicationServiceApplication`） |
 
-- `interfaces/intake` 的 20 个类里有 18 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
+- `interfaces/intake` 的 23 个类里有 20 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务异常，共 12 个文件。
 - 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `domain/<聚合>/port`（只放聚合 Repository）、`usecase/<域>/{port,model}`（能力端口与端口模型）、`interfaces/intake/tenantprotocol/core/{pipeline,stage}`、`tenants/{tenant_a,tenant_b}`、`interfaces/intake/web/render`、`interfaces/issue/web/render`。`usecase` 的端口与模型即使只有一个类也保留 `port`/`model` 子包，避免后续新增时再次搬包。
 - `integration` 是平台异步内核：Outbox 投递、消费去重、交互轨迹装配、滞留补偿。它的模型与端口位于 `usecase/integration/{outbox,consumption,compensation,interaction}/{model,port}`，业务域允许调用它的记录装配工厂（`usecase/integration/record`），允许它的补偿重放业务用例，这两条是显式写进 005 的例外，不是默认规则。记录装配工厂只做载荷序列化与标识生成，交互事件本身由 `usecase/integration/interaction/model/InteractionLog.of(...)` 装配。
@@ -99,7 +99,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 2. 它承载业务不变式或业务词汇吗？是 → `domain`（哪怕它是接口或异常）。
 3. 它只是把外部请求翻译成用例调用吗？是 → `interfaces`。三者都不是 → `usecase`。
 
-可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 6、第 8b 项应为 2、第 15 项应为 15 外，其余必须为 0）：
+可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 6、第 8b 项应为 2、第 15 项应为 19 外，其余必须为 0）：
 
 ```bash
 P=com.wangguangwu.claim.application
@@ -144,9 +144,14 @@ grep -rn '^\s*public [A-Z][A-Za-z0-9]*(' --include='*.java' . | wc -l
 # 16 人员角色：聚合、受理命令与租户转换器的装配入口不得声明基类 PersonInfo（注释与 Javadoc 不计）
 grep -rn 'PersonInfo' --include='*.java' domain/claim/ClaimApplication.java usecase/intake/command \
   interfaces/intake/tenantprotocol | grep -vE ':[0-9]+:\s*\*' | wc -l
+# 17 shared 反向依赖业务分层
+grep -rh "^import ${P}\.\(domain\|usecase\|interfaces\|infrastructure\)\." --include='*.java' shared | wc -l
+# 18 domain/usecase 生产代码直接依赖异常基类（分层异常类自身除外）
+grep -rn '^import .*shared\.contract\.BusinessException' --include='*.java' domain usecase \
+  | grep -v '/exception/' | wc -l
 ```
 
-当前结果：第 1～7、9～14、16 项均为 0；第 8 项 6 个接口（4 个聚合 Repository 在 `port` 子包，另有 `IssueDomainEvent` 与 `IssueDomainEventPublisher`），第 8b 项 2；第 15 项 15，全部是有装配逻辑的构造器，按类别列入白名单：两个异常类需要 `super(...)`、四个人员角色值对象需要 `super(...)`、两个租户流水线需要 `super(...)` 装配组件、`RedissonClaimApplicationIntakeLock` 需要按配置初始化信号量、`RedisAvailabilityCircuit` 需要把配置换算成纳秒并初始化日志节流、五个 `Local*` 外部实现需要按配置决定休眠与失败。生产类 186、目录 108。
+当前结果：第 1～7、9～14、16～18 项均为 0；第 8 项 6 个接口（4 个聚合 Repository 在 `port` 子包，另有 `IssueDomainEvent` 与 `IssueDomainEventPublisher`），第 8b 项 2；第 15 项 19，全部是有装配逻辑的构造器，按类别列入白名单：三个异常类需要 `super(...)`、四个人员角色值对象需要 `super(...)`、两个租户流水线需要 `super(...)` 装配组件、`RedissonClaimApplicationIntakeLock` 需要按配置初始化信号量、`RedisAvailabilityCircuit` 需要把配置换算成纳秒并初始化日志节流、五个 `Local*` 外部实现需要按配置决定休眠与失败。生产类 192、目录 108。
 
 单元测试代码在功能定稿前只保留分层与问题件相关用例，`mvn -B -pl backend/claim-application-service -am package` 编译通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、改造前落库的人员 JSON 由新代码按角色还原、tenant-b 协议、未支持租户错误映射、同号并发单行、异步链路至 `WAIT_AUDIT`、材料失败与重新申请覆盖四个角色字段并进入第 2 次尝试）逐项一致。
 

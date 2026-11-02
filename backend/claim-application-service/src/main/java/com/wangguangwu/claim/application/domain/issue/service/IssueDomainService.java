@@ -3,13 +3,13 @@ package com.wangguangwu.claim.application.domain.issue.service;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.domain.exception.DomainException;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.event.IssueClosedEvent;
 import com.wangguangwu.claim.application.domain.issue.event.IssueDomainEventPublisher;
 import com.wangguangwu.claim.application.domain.issue.event.IssueRaisedEvent;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,25 +53,25 @@ public class IssueDomainService {
      * @param auditor            审核人员
      * @param issueContent       问题详情 JSON
      * @return 创建的问题件
-     * @throws BusinessException 当业务规则校验失败时
+     * @throws DomainException 当业务规则校验失败时
      */
     public ClaimApplicationIssue raiseIssue(String claimApplicationNo, String issueNo, String reason,
                                             String auditor, String issueContent) {
         ClaimApplication application = claimApplicationRepository
                 .findByClaimApplicationNo(claimApplicationNo)
-                .orElseThrow(() -> new BusinessException(
+                .orElseThrow(() -> new DomainException(
                         ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND,
                         "申请不存在，claimApplicationNo=" + claimApplicationNo));
 
         if (!application.isAwaitingAudit()) {
-            throw new BusinessException(
+            throw new DomainException(
                     ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
                     "申请状态不合法，无法下发问题件，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + application.getStatus());
         }
 
         if (claimApplicationIssueRepository.hasOpenIssue(claimApplicationNo)) {
-            throw new BusinessException(
+            throw new DomainException(
                     ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN,
                     "同一申请已有未关闭问题件，claimApplicationNo=" + claimApplicationNo);
         }
@@ -99,7 +99,7 @@ public class IssueDomainService {
      * @param issue   已加载的问题件
      * @param auditor 处理人
      * @return 关闭后的问题件
-     * @throws BusinessException 当关联申请不存在或状态已被并发改变时
+     * @throws DomainException 当关联申请不存在或状态已被并发改变时
      */
     public ClaimApplicationIssue closeIssue(ClaimApplicationIssue issue, String auditor) {
         issue.close(auditor);
@@ -107,7 +107,7 @@ public class IssueDomainService {
 
         ClaimApplication application = claimApplicationRepository
                 .findByClaimApplicationNo(issue.getClaimApplicationNo())
-                .orElseThrow(() -> new BusinessException(
+                .orElseThrow(() -> new DomainException(
                         ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND,
                         "问题件关联的申请不存在，issueNo=" + issue.getIssueNo()
                                 + "，claimApplicationNo=" + issue.getClaimApplicationNo()));
@@ -135,7 +135,7 @@ public class IssueDomainService {
     private void persistTransition(ClaimApplication application, ClaimApplicationStatus statusBefore,
                                    String claimApplicationNo) {
         if (!claimApplicationRepository.updateStatus(application, statusBefore)) {
-            throw new BusinessException(
+            throw new DomainException(
                     ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
                     "申请状态已被并发改变，无法完成问题件状态同步，claimApplicationNo=" + claimApplicationNo
                             + "，迁移前状态=" + statusBefore);

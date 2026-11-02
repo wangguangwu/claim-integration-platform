@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.infrastructure.claimcase.persistence;
+package com.wangguangwu.claim.application.infrastructure.claim.persistence;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

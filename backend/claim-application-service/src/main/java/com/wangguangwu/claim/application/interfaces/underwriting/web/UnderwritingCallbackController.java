@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.underwriting.web;
 
-import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.application.usecase.underwriting.command.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import com.wangguangwu.claim.application.interfaces.web.ApiResponse;
 import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;

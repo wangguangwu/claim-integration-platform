@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.shared.contract;
+package com.wangguangwu.claim.application.usecase.underwriting.command;
 
 /**
  * 承保完成通知命令，来源可以是承保系统回调或进程内模拟承保。

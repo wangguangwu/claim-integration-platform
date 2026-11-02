@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueStatus;

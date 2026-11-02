@@ -1,10 +1,10 @@
 package com.wangguangwu.claim.application.usecase.issue;
 
-import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.shared.contract.BusinessException;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,7 @@ public class ClaimApplicationIssueQueryUseCase {
      */
     public ClaimApplicationIssueQueryResult queryByCaseNo(String tenantCode, String caseNo) {
         String claimApplicationNo = claimCaseRelationRepository.findClaimApplicationNo(tenantCode, caseNo)
-                .orElseThrow(() -> new BusinessException(
+                .orElseThrow(() -> new ApplicationException(
                         ClaimApplicationIssueErrorCode.CASE_RELATION_NOT_FOUND,
                         "案件关联不存在，tenantCode=" + tenantCode + "，caseNo=" + caseNo));
         return claimApplicationIssueRepository.findOpenByClaimApplicationNo(claimApplicationNo)

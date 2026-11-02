@@ -7,7 +7,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.wangguangwu.claim.application.domain.exception.DomainException;
 import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
+import com.wangguangwu.claim.application.shared.contract.BusinessException;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,6 +42,59 @@ class ClaimApplicationArchitectureTest {
             "..usecase.integration.compensation.port..", "..usecase.integration.compensation.model..",
             "..usecase.integration.interaction.port..", "..usecase.integration.interaction.model.."
     };
+
+    /**
+     * 共享契约位于依赖图底部，只能被其他层引用，不得反向依赖任何业务分层。
+     */
+    @Test
+    void sharedMustNotDependOnOuterLayers() {
+        noClasses()
+                .that()
+                .resideInAPackage("..shared..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..domain..", "..usecase..", "..interfaces..", "..infrastructure..")
+                .because("共享契约不得反向依赖业务分层")
+                .check(APPLICATION_CLASSES);
+    }
+
+    /**
+     * 领域层统一抛出领域异常，生产代码不得绕过子类直接依赖异常基类。
+     */
+    @Test
+    void domainMustUseDomainExceptionInsteadOfBusinessException() {
+        noClasses()
+                .that()
+                .resideInAPackage("..domain..")
+                .and()
+                .doNotHaveFullyQualifiedName(DomainException.class.getName())
+                .and()
+                .haveSimpleNameNotEndingWith("Test")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(BusinessException.class.getName())
+                .because("领域层统一抛 DomainException，不得直接依赖 BusinessException")
+                .check(APPLICATION_CLASSES);
+    }
+
+    /**
+     * 用例层统一抛出应用异常，生产代码不得绕过子类直接依赖异常基类。
+     */
+    @Test
+    void useCaseMustUseApplicationExceptionInsteadOfBusinessException() {
+        noClasses()
+                .that()
+                .resideInAPackage("..usecase..")
+                .and()
+                .doNotHaveFullyQualifiedName(ApplicationException.class.getName())
+                .and()
+                .haveSimpleNameNotEndingWith("Test")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(BusinessException.class.getName())
+                .because("用例层统一抛 ApplicationException，不得直接依赖 BusinessException")
+                .check(APPLICATION_CLASSES);
+    }
 
     /**
      * 领域层只能依赖领域自身和受控共享能力，不能依赖任何外层实现。

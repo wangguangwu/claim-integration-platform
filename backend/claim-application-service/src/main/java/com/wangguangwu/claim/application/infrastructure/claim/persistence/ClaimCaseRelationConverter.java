@@ -1,6 +1,6 @@
-package com.wangguangwu.claim.application.infrastructure.claimcase.persistence;
+package com.wangguangwu.claim.application.infrastructure.claim.persistence;
 
-import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
 import org.springframework.stereotype.Component;
 
 /**

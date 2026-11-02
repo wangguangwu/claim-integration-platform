@@ -7,7 +7,7 @@ import com.wangguangwu.claim.application.usecase.integration.interaction.model.I
 import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
 import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
-import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.application.usecase.underwriting.command.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackDisposition;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;

@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.usecase.audit;
 
-import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
-import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
 import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;

@@ -10,7 +10,7 @@
 | `interfaces/issue/web/render` | 接收 `ClaimApplicationIssueResponseRenderer`，包名改为问题件域 |
 | `interfaces/issue/web` | 两个控制器更新渲染器 import |
 | `infrastructure/issue/persistence` | `ClaimApplicationIssueMapper` 重命名为 `ClaimApplicationIssueDOMapper`，仓储实现改字段类型 |
-| `infrastructure/claimcase/persistence` | `ClaimCaseRelationMapper` 重命名为 `ClaimCaseRelationDOMapper`，仓储实现改字段类型 |
+| `infrastructure/claim/persistence`（原 `infrastructure/claimcase/persistence`，023 迁移） | `ClaimCaseRelationMapper` 重命名为 `ClaimCaseRelationDOMapper`，仓储实现改字段类型 |
 | `docs/architecture` | 自检第 15、16 项口径，统计数字，渲染器路径，已知偏差段落 |
 
 ## 二、领域服务去框架化

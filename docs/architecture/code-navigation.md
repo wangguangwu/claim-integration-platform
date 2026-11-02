@@ -22,8 +22,8 @@ interfaces → usecase → domain ← infrastructure
 该方向由 `ClaimApplicationArchitectureTest` 在 Maven 测试阶段持续校验；新增代码不得通过跨层 import 绕过领域端口或用例编排。
 
 - `interfaces`：入站适配器，只处理 HTTP、消息、调度、协议和响应映射。
-- `usecase`：应用编排，负责事务、幂等结果和端口调用顺序，同时拥有出站能力端口、配置策略端口与端口模型。
-- `domain`：业务状态机、聚合、值对象、领域事件、聚合 Repository 和业务异常，不依赖具体技术实现。
+- `usecase`：应用编排，负责事务、幂等结果和端口调用顺序，同时拥有出站能力端口、配置策略端口、端口模型与应用异常（`ApplicationException`）。
+- `domain`：业务状态机、聚合、值对象、领域事件、聚合 Repository 和领域异常（`DomainException`），不依赖具体技术实现。
 - `infrastructure`：MyBatis-Plus、Redis、Redisson、MQ 存储和第三方系统适配，实现 `usecase` 端口与 `domain` 聚合 Repository。
 
 # 核心链路设计
@@ -32,8 +32,8 @@ interfaces → usecase → domain ← infrastructure
 
 | 目录 | 进入条件 | 主要内容 | 不应放置的内容 |
 | --- | --- | --- | --- |
-| `domain` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合、值对象、领域事件、聚合 Repository、状态/错误码枚举 | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
-| `usecase` | 要编排一次完整业务操作 | 用例、事务服务、命令与结果、出站端口、配置策略、端口模型 | HTTP 注解、数据库对象、第三方 SDK 调用、业务不变式 |
+| `domain` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合、值对象、领域事件、聚合 Repository、状态/错误码枚举、`DomainException` | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
+| `usecase` | 要编排一次完整业务操作 | 用例、事务服务、命令与结果、出站端口、配置策略、端口模型、`ApplicationException` | HTTP 注解、数据库对象、第三方 SDK 调用、业务不变式 |
 | `infrastructure` | 要接入具体技术或外部系统 | MyBatis-Plus 仓储、DO/Mapper、Redis、第三方适配 | 业务状态机和接口响应映射 |
 | `interfaces` | 要承接外部输入或对外调度 | Controller、Consumer、Scheduler、租户协议流水线 | 领域规则和持久化实现 |
 | `shared` | 确属跨业务能力复用 | 事件契约、无业务归属组件 | 单一业务域模型、HTTP 请求或响应模型 |
@@ -46,7 +46,7 @@ interfaces → usecase → domain ← infrastructure
 | 申请签收 | `domain/claim` | `usecase/intake`、`usecase/intake/{port,model}` | `infrastructure/intake` | `interfaces/intake/web`、`interfaces/intake/tenantprotocol` |
 | 材料处理 | `domain/material` | `usecase/material`、`usecase/material/{port,model}` | `infrastructure/material` | `interfaces/material/messaging` |
 | 自动承保 | `domain/claim` 的状态推进 | `usecase/underwriting`、`usecase/underwriting/{port,model}` | `infrastructure/underwriting` | `interfaces/underwriting/web` |
-| 审核交付 | — | `usecase/audit`、`usecase/audit/{port,model}` | `infrastructure/audit` | `interfaces/audit/messaging` |
+| 审核交付 | `domain/claim`（`ClaimCaseRelation` 案件关联） | `usecase/audit`、`usecase/audit/{port,model}` | `infrastructure/claim/persistence`、`infrastructure/audit` | `interfaces/audit/messaging` |
 | 问题件 | `domain/issue` | `usecase/issue` | `infrastructure/issue` | `interfaces/issue/web` |
 | 异步集成 | — | `usecase/integration/{outbox,consumption,compensation,interaction}` | `infrastructure/integration` | `interfaces/integration/scheduling` |
 

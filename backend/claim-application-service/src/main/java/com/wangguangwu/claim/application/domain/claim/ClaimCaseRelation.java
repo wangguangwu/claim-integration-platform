@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claimcase;
+package com.wangguangwu.claim.application.domain.claim;
 
 import lombok.Getter;
 
@@ -6,7 +6,7 @@ import lombok.Getter;
  * 理赔申请与审核案件的关联关系。
  *
  * <p>一条记录表示审核系统为某次申请签收后返回的案件号。一个申请可对应多个案件号，
- * 案件生命周期由案件服务承载，本服务只记录关联事实。</p>
+ * 案件生命周期由案件服务承载，本服务只在申请聚合下记录关联事实。</p>
  *
  * @author wangguangwu
  * @since 2026-11-02

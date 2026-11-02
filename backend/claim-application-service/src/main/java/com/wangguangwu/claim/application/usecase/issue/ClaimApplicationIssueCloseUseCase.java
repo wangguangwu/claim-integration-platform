@@ -4,7 +4,7 @@ import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
 import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.issue.service.IssueDomainService;
-import com.wangguangwu.claim.application.shared.contract.BusinessException;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueCloseCommand;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,7 @@ public class ClaimApplicationIssueCloseUseCase {
     public ClaimApplicationIssueCloseResult close(ClaimApplicationIssueCloseCommand command) {
         ClaimApplicationIssue issue = claimApplicationIssueRepository
                 .findByIssueNo(command.issueNo())
-                .orElseThrow(() -> new BusinessException(
+                .orElseThrow(() -> new ApplicationException(
                         ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
                         "问题件不存在，issueNo=" + command.issueNo()));
 

@@ -9,8 +9,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
-import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionLog;
 import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;

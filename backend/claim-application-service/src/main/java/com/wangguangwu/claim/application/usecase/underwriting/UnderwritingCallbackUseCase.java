@@ -2,9 +2,9 @@ package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.shared.contract.BusinessException;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
-import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.application.usecase.underwriting.command.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.underwriting.result.UnderwritingCallbackResult;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +37,7 @@ public class UnderwritingCallbackUseCase {
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command) {
         validate(command);
         ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new BusinessException(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
+                .orElseThrow(() -> new ApplicationException(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
                         "承保完成通知对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
         UnderwritingCallbackResult result = transactionService.complete(command, claimApplication,
                 recordFactory.newInteractionNo());
@@ -48,10 +48,10 @@ public class UnderwritingCallbackUseCase {
 
     private void validate(UnderwritingCompletedCommand command) {
         if (isBlank(command.claimApplicationNo())) {
-            throw new BusinessException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 claimApplicationNo");
+            throw new ApplicationException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 claimApplicationNo");
         }
         if (isBlank(command.requestId())) {
-            throw new BusinessException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 X-Request-Id");
+            throw new ApplicationException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 X-Request-Id");
         }
     }
 

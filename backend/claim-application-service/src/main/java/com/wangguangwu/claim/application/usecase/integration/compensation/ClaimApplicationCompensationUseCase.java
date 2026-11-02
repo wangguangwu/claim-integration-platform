@@ -9,7 +9,7 @@ import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxE
 import com.wangguangwu.claim.application.usecase.underwriting.port.AutoUnderwritingRequester;
 import com.wangguangwu.claim.application.usecase.underwriting.model.UnderwritingResult;
 import com.wangguangwu.claim.application.usecase.underwriting.port.UnderwritingResultQuery;
-import com.wangguangwu.claim.application.shared.contract.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.application.usecase.underwriting.command.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.material.MaterialProcessingUseCase;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;

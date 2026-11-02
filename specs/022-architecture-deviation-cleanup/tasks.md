@@ -27,7 +27,7 @@
 
 #### T3：Mapper 命名统一
 - 产物：重命名两个 Mapper；修改两个仓储实现的字段类型
-- 路径：`infrastructure/issue/persistence/`、`infrastructure/claimcase/persistence/`
+- 路径：`infrastructure/issue/persistence/`、`infrastructure/claim/persistence/`（023 后由 `infrastructure/claimcase/persistence/` 迁入）
 - 完成条件：
   - `ClaimApplicationIssueMapper` → `ClaimApplicationIssueDOMapper`
   - `ClaimCaseRelationMapper` → `ClaimCaseRelationDOMapper`
