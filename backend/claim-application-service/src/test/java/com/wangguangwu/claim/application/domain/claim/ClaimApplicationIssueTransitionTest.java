@@ -4,17 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
-import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.claim.material.Material;
-import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
-import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
-import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
-import com.wangguangwu.claim.application.domain.claim.person.Applicant;
-import com.wangguangwu.claim.application.domain.claim.person.Gender;
-import com.wangguangwu.claim.application.domain.claim.person.Payee;
-import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
-import com.wangguangwu.claim.application.domain.exception.DomainException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.shared.exception.DomainException;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +25,7 @@ class ClaimApplicationIssueTransitionTest {
     private static final String CLAIM_APPLICATION_NO = "A2026103100000001";
     private static final String BATCH_NO = "B2026110300000001";
     private static final long MATERIAL_ID = 10L;
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 11, 3, 12, 0);
 
     @Test
     @DisplayName("下发问题件：等待审核迁移到问题件并追加未关闭问题件")
@@ -79,7 +72,7 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication application = persisted(ClaimApplicationStatus.ISSUE, List.of(pendingMaterial()),
                 List.of(openIssue()));
 
-        boolean closed = application.closeIssue("ISSUE-001", "auditor-2");
+        boolean closed = application.closeIssue("ISSUE-001", "auditor-2", FIXED_NOW);
 
         assertThat(closed).isTrue();
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.WAIT_AUDIT);
@@ -90,11 +83,11 @@ class ClaimApplicationIssueTransitionTest {
     @DisplayName("关闭问题件：已关闭问题件幂等返回 false 且不校验申请状态")
     void closeIssue_closedIssue_returnsFalse() {
         ClaimApplicationIssue closedIssue = openIssue();
-        closedIssue.close("auditor-1");
+        closedIssue.close("auditor-1", FIXED_NOW);
         ClaimApplication application = persisted(ClaimApplicationStatus.WAIT_AUDIT, List.of(pendingMaterial()),
                 List.of(closedIssue));
 
-        boolean closed = application.closeIssue("ISSUE-001", "auditor-2");
+        boolean closed = application.closeIssue("ISSUE-001", "auditor-2", FIXED_NOW);
 
         assertThat(closed).isFalse();
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.WAIT_AUDIT);
@@ -106,7 +99,7 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication application = persisted(ClaimApplicationStatus.WAIT_AUDIT, List.of(pendingMaterial()),
                 List.of());
 
-        application.completeAudit();
+        application.completeAudit(FIXED_NOW);
 
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.COMPLETED);
         assertThat(application.getCompletedAt()).isNotNull();
@@ -120,7 +113,7 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication application = persisted(ClaimApplicationStatus.WAIT_AUDIT, List.of(pendingMaterial()),
                 List.of(openIssue()));
 
-        assertThatThrownBy(application::completeAudit)
+        assertThatThrownBy(() -> application.completeAudit(FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("存在未关闭问题件")
                 .extracting("errorCode")
@@ -137,12 +130,12 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication issue = persisted(ClaimApplicationStatus.ISSUE, List.of(pendingMaterial()),
                 List.of(openIssue()));
 
-        assertThatThrownBy(accepted::completeAudit)
+        assertThatThrownBy(() -> accepted.completeAudit(FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("期望状态=WAIT_AUDIT")
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID);
-        assertThatThrownBy(issue::completeAudit)
+        assertThatThrownBy(() -> issue.completeAudit(FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID);
@@ -153,14 +146,14 @@ class ClaimApplicationIssueTransitionTest {
     void completedApplication_rejectsFurtherTransitions() {
         ClaimApplication application = persisted(ClaimApplicationStatus.WAIT_AUDIT, List.of(pendingMaterial()),
                 List.of());
-        application.completeAudit();
+        application.completeAudit(FIXED_NOW);
         ClaimApplication submitted = submitted("B2026110300000002", "孙七");
 
-        assertThatThrownBy(() -> application.reapply(submitted, "B2026110300000002"))
+        assertThatThrownBy(() -> application.reapply(submitted, "B2026110300000002", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID);
-        assertThatThrownBy(() -> application.supplement(submitted, "B2026110300000002"))
+        assertThatThrownBy(() -> application.supplement(submitted, "B2026110300000002", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID);
@@ -177,7 +170,7 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication application = persisted(ClaimApplicationStatus.ISSUE, List.of(pendingMaterial()),
                 List.of(openIssue()));
 
-        assertThatThrownBy(() -> application.closeIssue("ISSUE-404", "auditor-2"))
+        assertThatThrownBy(() -> application.closeIssue("ISSUE-404", "auditor-2", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND);
@@ -189,7 +182,7 @@ class ClaimApplicationIssueTransitionTest {
         ClaimApplication application = persisted(ClaimApplicationStatus.WAIT_AUDIT, List.of(pendingMaterial()),
                 List.of(openIssue()));
 
-        assertThatThrownBy(() -> application.closeIssue("ISSUE-001", "auditor-2"))
+        assertThatThrownBy(() -> application.closeIssue("ISSUE-001", "auditor-2", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("期望状态=ISSUE")
                 .extracting("errorCode")
@@ -289,7 +282,7 @@ class ClaimApplicationIssueTransitionTest {
                 List.of(openIssue()));
         ClaimApplication submitted = submitted("B2026110300000002", "孙七");
 
-        application.supplement(submitted, "B2026110300000002");
+        application.supplement(submitted, "B2026110300000002", FIXED_NOW);
 
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.PENDING_ACCEPT);
         assertThat(application.getClaimApplicationAttempt()).isEqualTo(2);
@@ -309,7 +302,7 @@ class ClaimApplicationIssueTransitionTest {
                 List.of(openIssue()));
         ClaimApplication submitted = submitted("B2026110300000002", "孙七");
 
-        assertThatThrownBy(() -> application.supplement(submitted, "B2026110300000002"))
+        assertThatThrownBy(() -> application.supplement(submitted, "B2026110300000002", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .extracting("errorCode")
                 .isEqualTo(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID);
@@ -322,7 +315,7 @@ class ClaimApplicationIssueTransitionTest {
                 List.of());
         ClaimApplication submitted = submitted("B2026110300000002", "孙七");
 
-        application.reapply(submitted, "B2026110300000002");
+        application.reapply(submitted, "B2026110300000002", FIXED_NOW);
 
         assertThat(application.getStatus()).isEqualTo(ClaimApplicationStatus.PENDING_ACCEPT);
         assertThat(application.getClaimApplicationAttempt()).isEqualTo(2);
@@ -339,7 +332,7 @@ class ClaimApplicationIssueTransitionTest {
                 List.of());
         ClaimApplication submitted = submitted("B2026110300000002", "孙七");
 
-        assertThatThrownBy(() -> application.reapply(submitted, "B2026110300000002"))
+        assertThatThrownBy(() -> application.reapply(submitted, "B2026110300000002", FIXED_NOW))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("仅受理失败的申请允许重新申请")
                 .extracting("errorCode")
@@ -383,16 +376,28 @@ class ClaimApplicationIssueTransitionTest {
     }
 
     @Test
-    @DisplayName("乐观锁版本：只接受插入版本或保存后的下一版本")
-    void bindVersion_acceptsOnlyInitialOrNextVersion() {
+    @DisplayName("乐观锁版本：直接回填持久化层给出的最新版本")
+    void bindVersion_setsPersistedVersion() {
         ClaimApplication application = persisted(ClaimApplicationStatus.PENDING_ACCEPT, List.of(pendingMaterial()),
                 List.of());
         application.bindVersion(1L);
 
         assertThat(application.getVersion()).isEqualTo(1L);
-        assertThatThrownBy(() -> application.bindVersion(3L))
+    }
+
+    @Test
+    @DisplayName("还原：终态缺少完成时间时拒绝")
+    void restore_completedWithoutCompletedAt_throwsException() {
+        assertThatThrownBy(() -> ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO,
+                ClaimApplicationStatus.COMPLETED, 1, null,
+                new Applicant("张三", Gender.MALE, "身份证", "110101199001011234"),
+                new PrimaryInsured("李四", Gender.MALE, "身份证", "110101199002022345"),
+                new AccidentPerson("王五", Gender.MALE, "身份证", "110101199003033456"),
+                new Payee("赵六", Gender.FEMALE, "身份证", "110101199004044567"),
+                0L, List.of(), List.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("只能回填插入版本或保存后的下一版本");
+                .hasMessageContaining("状态与完成时间不一致")
+                .hasMessageContaining(CLAIM_APPLICATION_NO);
     }
 
     @Test
@@ -424,7 +429,8 @@ class ClaimApplicationIssueTransitionTest {
 
     private ClaimApplication persisted(ClaimApplicationStatus status, List<Material> materials,
                                        List<ClaimApplicationIssue> issues) {
-        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, 1, null,
+        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, 1,
+                status == ClaimApplicationStatus.COMPLETED ? FIXED_NOW : null,
                 new Applicant("张三", Gender.MALE, "身份证", "110101199001011234"),
                 new PrimaryInsured("李四", Gender.MALE, "身份证", "110101199002022345"),
                 new AccidentPerson("王五", Gender.MALE, "身份证", "110101199003033456"),

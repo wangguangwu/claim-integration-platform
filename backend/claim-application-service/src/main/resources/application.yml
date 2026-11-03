@@ -126,24 +126,6 @@ claim:
       failure-threshold: ${CLAIM_APPLICATION_REDIS_CIRCUIT_FAILURE_THRESHOLD:3}
       open-duration: ${CLAIM_APPLICATION_REDIS_CIRCUIT_OPEN_DURATION:10s}
       log-interval: ${CLAIM_APPLICATION_REDIS_CIRCUIT_LOG_INTERVAL:10s}
-  integration:
-    local:
-      # 每次外部调用的模拟耗时，用于观察异步链路与消费耗时。
-      delay: ${CLAIM_APPLICATION_LOCAL_INTEGRATION_DELAY:200ms}
-      # 保单查询结果，用于覆盖有保单直接等待审核与无保单进入自动承保两条分支。
-      valid-policy: ${CLAIM_APPLICATION_LOCAL_VALID_POLICY:false}
-      # 承保结果查询返回值，取值 COMPLETED / PROCESSING / NOT_FOUND。
-      underwriting-result: ${CLAIM_APPLICATION_LOCAL_UNDERWRITING_RESULT:COMPLETED}
-      # 命中这些材料类型时上传返回失败，用于验证受理失败链路。
-      fail-material-types: []
-      # 开启后审核交付固定失败，用于验证重投与死信。
-      fail-audit-delivery: ${CLAIM_APPLICATION_LOCAL_FAIL_AUDIT_DELIVERY:false}
-      # 审核签收查询返回值，取值 PROCESSING / SIGNED / NOT_FOUND。
-      audit-signed-result: ${CLAIM_APPLICATION_LOCAL_AUDIT_SIGNED_RESULT:PROCESSING}
-      # 审核签收查询返回 SIGNED 时携带的案件号。
-      audit-signed-case-nos: []
-      # 开启后审核签收查询固定失败，用于验证等待审核滞留补偿重试。
-      fail-audit-signed-query: ${CLAIM_APPLICATION_LOCAL_FAIL_AUDIT_SIGNED_QUERY:false}
 
 ---
 spring:

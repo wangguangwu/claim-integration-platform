@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.web;
 
-import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+import com.wangguangwu.claim.application.shared.exception.BusinessErrorCode;
 
 /**
  * HTTP 入口控制器的错误码声明契约。

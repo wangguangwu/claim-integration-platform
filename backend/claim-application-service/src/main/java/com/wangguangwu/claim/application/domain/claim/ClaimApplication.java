@@ -1,16 +1,8 @@
 package com.wangguangwu.claim.application.domain.claim;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
-import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.claim.material.Material;
-import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
-import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
-import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
-import com.wangguangwu.claim.application.domain.claim.person.Applicant;
-import com.wangguangwu.claim.application.domain.claim.person.Payee;
-import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
-import com.wangguangwu.claim.application.domain.exception.DomainException;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.foundation.common.util.AssertUtil;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -159,6 +151,12 @@ public class ClaimApplication {
                                            Applicant applicant, PrimaryInsured primaryInsured,
                                            AccidentPerson accidentPerson, Payee payee, Long version,
                                            List<Material> materials, List<ClaimApplicationIssue> issues) {
+        boolean completed = status == ClaimApplicationStatus.COMPLETED;
+        boolean hasCompletedAt = completedAt != null;
+        if (completed != hasCompletedAt) {
+            throw new IllegalStateException("理赔申请状态与完成时间不一致，claimApplicationNo=" + claimApplicationNo
+                    + "，状态=" + status + "，完成时间=" + completedAt);
+        }
         return ClaimApplication.builder().id(id).tenantCode(tenantCode).claimApplicationNo(claimApplicationNo)
                 .externalClaimApplicationNo(externalClaimApplicationNo).status(status)
                 .claimApplicationAttempt(claimApplicationAttempt).completedAt(completedAt).applicant(applicant)
@@ -196,18 +194,12 @@ public class ClaimApplication {
     }
 
     /**
-     * 同步聚合的乐观锁版本，仅供持久化层在插入或保存成功后回填。
+     * 同步聚合的乐观锁版本，仅供持久化层在插入或保存成功后回填最新版本。
      *
      * @param version 数据库当前版本号
      */
     public void bindVersion(Long version) {
         AssertUtil.notNull(version, "乐观锁版本不能为空");
-        boolean initialVersion = this.version == null && version == 0L;
-        boolean nextVersion = this.version != null && version == this.version + 1;
-        if (!initialVersion && !nextVersion) {
-            throw new IllegalStateException("乐观锁版本只能回填插入版本或保存后的下一版本，claimApplicationNo="
-                    + claimApplicationNo + "，当前版本=" + this.version + "，待绑定版本=" + version);
-        }
         this.version = version;
     }
 
@@ -215,19 +207,21 @@ public class ClaimApplication {
      * 使用新一次协议提交的人员信息与材料重新发起受理失败的申请。
      *
      * <p>重新申请允许修改人员：四类人员整体替换；旧材料逻辑删除，新批次材料追加到聚合。
-     * 与租户补材的区别只在人员处理规则。</p>
+     * 与租户补材的区别只在人员处理规则。业务动作时间由应用层按业务时区提供。</p>
      *
-     * @param submitted 新一次提交的理赔申请
-     * @param batchNo   本次提交的材料批次编号
+     * @param submitted  新一次提交的理赔申请
+     * @param batchNo    本次提交的材料批次编号
+     * @param operatedAt 本次业务动作时间
      */
-    public void reapply(ClaimApplication submitted, String batchNo) {
+    public void reapply(ClaimApplication submitted, String batchNo, LocalDateTime operatedAt) {
+        AssertUtil.notNull(operatedAt, "重新申请时间不能为空");
         if (!isReapplicable()) {
             throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
                     "仅受理失败的申请允许重新申请，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + status);
         }
         List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
-        softDeleteCurrentMaterials();
+        softDeleteCurrentMaterials(operatedAt);
         materials.addAll(adoptedMaterials);
         this.applicant = submitted.applicant;
         this.primaryInsured = submitted.primaryInsured;
@@ -241,12 +235,15 @@ public class ClaimApplication {
      * 租户补材：关闭当前未关闭问题件、逻辑删除旧材料并追加全新影像件。
      *
      * <p>补材不接收人员变更：四类人员保持聚合原值，提交中的人员字段一律忽略且不做一致性校验。
-     * 受理尝试次数加 1，状态由 {@code ISSUE} 迁移到 {@code PENDING_ACCEPT}，随后按首次签收链路异步处理材料。</p>
+     * 受理尝试次数加 1，状态由 {@code ISSUE} 迁移到 {@code PENDING_ACCEPT}，随后按首次签收链路异步处理材料。
+     * 关闭时间与软删除时间使用同一个业务动作时间。</p>
      *
-     * @param submitted 新一次提交的理赔申请
-     * @param batchNo   本次提交的材料批次编号
+     * @param submitted  新一次提交的理赔申请
+     * @param batchNo    本次提交的材料批次编号
+     * @param operatedAt 本次业务动作时间
      */
-    public void supplement(ClaimApplication submitted, String batchNo) {
+    public void supplement(ClaimApplication submitted, String batchNo, LocalDateTime operatedAt) {
+        AssertUtil.notNull(operatedAt, "租户补材时间不能为空");
         List<ClaimApplicationIssue> openIssues = openIssues();
         if (status != ClaimApplicationStatus.ISSUE || openIssues.isEmpty()) {
             throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
@@ -254,8 +251,8 @@ public class ClaimApplication {
                             + "，当前状态=" + status + "，未关闭问题件数=" + openIssues.size());
         }
         List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
-        openIssues.forEach(issue -> issue.close(SUPPLEMENT_AUDITOR));
-        softDeleteCurrentMaterials();
+        openIssues.forEach(issue -> issue.close(SUPPLEMENT_AUDITOR, operatedAt));
+        softDeleteCurrentMaterials(operatedAt);
         materials.addAll(adoptedMaterials);
         this.claimApplicationAttempt = claimApplicationAttempt + 1;
         status = ClaimApplicationStatus.PENDING_ACCEPT;
@@ -310,16 +307,19 @@ public class ClaimApplication {
      * 审核系统完成签收，申请进入终态并记录完成时间。
      *
      * <p>只有等待审核的申请可以完成；存在未关闭问题件说明状态已漂移，拒绝完成，
-     * 避免带着问题件进入终态。</p>
+     * 避免带着问题件进入终态。完成时间由应用层按业务时区提供。</p>
+     *
+     * @param completedAt 审核完成时间
      */
-    public void completeAudit() {
+    public void completeAudit(LocalDateTime completedAt) {
+        AssertUtil.notNull(completedAt, "审核完成时间不能为空");
         ensureStatus(ClaimApplicationStatus.WAIT_AUDIT, "完成审核签收");
         if (hasOpenIssue()) {
             throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
                     "存在未关闭问题件，不允许完成审核签收，claimApplicationNo=" + claimApplicationNo);
         }
         status = ClaimApplicationStatus.COMPLETED;
-        completedAt = LocalDateTime.now();
+        this.completedAt = completedAt;
     }
 
     /**
@@ -349,9 +349,11 @@ public class ClaimApplication {
      *
      * @param issueNo  问题件编号
      * @param closedBy 问题件关闭人
+     * @param closedAt 问题件关闭时间
      * @return 本次是否真正关闭了问题件
      */
-    public boolean closeIssue(String issueNo, String closedBy) {
+    public boolean closeIssue(String issueNo, String closedBy, LocalDateTime closedAt) {
+        AssertUtil.notNull(closedAt, "问题件关闭时间不能为空");
         ClaimApplicationIssue issue = issues.stream()
                 .filter(candidate -> candidate.getIssueNo().equals(issueNo))
                 .findFirst()
@@ -361,7 +363,7 @@ public class ClaimApplication {
             return false;
         }
         ensureStatus(ClaimApplicationStatus.ISSUE, "关闭未关闭问题件");
-        issue.close(closedBy);
+        issue.close(closedBy, closedAt);
         status = ClaimApplicationStatus.WAIT_AUDIT;
         return true;
     }
@@ -466,8 +468,8 @@ public class ClaimApplication {
         return submitted.getMaterials();
     }
 
-    private void softDeleteCurrentMaterials() {
-        materials.forEach(Material::softDelete);
+    private void softDeleteCurrentMaterials(LocalDateTime deletedAt) {
+        materials.forEach(material -> material.softDelete(deletedAt));
     }
 
     private List<Material> pendingMaterials() {

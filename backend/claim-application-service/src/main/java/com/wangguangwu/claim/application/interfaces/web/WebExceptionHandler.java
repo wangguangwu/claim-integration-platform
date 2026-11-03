@@ -1,7 +1,9 @@
 package com.wangguangwu.claim.application.interfaces.web;
 
-import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
-import com.wangguangwu.claim.application.shared.contract.BusinessException;
+import com.wangguangwu.claim.application.interfaces.dto.ApiResponse;
+
+import com.wangguangwu.claim.application.shared.exception.BusinessErrorCode;
+import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

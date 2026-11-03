@@ -385,17 +385,36 @@ Gateway 只处理入口层能力，不处理租户协议转换及业务规则。
 claim-application-service
 └─ com.wangguangwu.claim.application
    ├─ interfaces
-   ├─ usecase
+   │  ├─ web
+   │  ├─ consumer
+   │  ├─ dto
+   │  └─ scheduler
+   ├─ application
+   │  ├─ command
+   │  ├─ query
+   │  ├─ port
+   │  ├─ process
+   │  └─ exception
    ├─ domain
+   │  └─ claim
+   │     ├─ port
+   │     └─ exception
    ├─ infrastructure
-   ├─ shared
-   └─ support
+   │  ├─ persistence
+   │  ├─ adapter
+   │  ├─ acl
+   │  ├─ mq
+   │  └─ config
+   └─ shared
+      ├─ exception
+      ├─ message
+      └─ util
 ```
 
 租户接入适配：
 
 ```
-interfaces/intake/tenantprotocol
+interfaces/web/tenantprotocol
 ├─ core
 │  ├─ pipeline
 │  └─ stage
@@ -406,7 +425,7 @@ interfaces/intake/tenantprotocol
 
 协议路由：
 
-**tenantCode + protocolVersion → TenantProtocolPipelineFactory → TenantProtocolPipelineRegistry → TenantProtocolPipeline**
+**tenantCode + protocolVersion → TenantProtocolPipelineRegistry → TenantProtocolPipeline**
 
 TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → 转换”执行，负责处理租户接入协议差异；验签与解密提供默认直通实现，真实租户按需覆写：
 
@@ -419,7 +438,7 @@ TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → �
 
 请求链路：
 
-**外部请求 → Tenant 识别 → TenantProtocolPipelineFactory → TenantProtocolPipelineRegistry → TenantProtocolPipeline（验签 → 解密 → Parser → Validator → Converter） → 理赔申请用例 → ClaimApplication**
+**外部请求 → Tenant 识别 → TenantProtocolPipelineRegistry → TenantProtocolPipeline（验签 → 解密 → Parser → Validator → Converter） → 理赔申请用例 → ClaimApplication**
 
 理赔申请内部的聚合根、聚合内实体、值对象、Repository、状态机及表结构由理赔申请业务域设计文档定义。
 

@@ -1,0 +1,12 @@
+package com.wangguangwu.claim.application.application.process;
+
+/**
+ * 理赔申请签收结果。
+ *
+ * @param claimApplicationNo 平台申请编号
+ * @param disposition 签收结果类型
+ * @author wangguangwu
+ * @since 2026-10-27
+ */
+public record ClaimApplicationIntakeResult(String claimApplicationNo, ClaimApplicationIntakeDisposition disposition) {
+}

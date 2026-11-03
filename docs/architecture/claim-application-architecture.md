@@ -118,14 +118,17 @@ flowchart TB
     INTEGRATION --> MQ["MQ"]
 ```
 
-代码目录采用“层级优先、层内分域”的组织方式：
+代码目录采用“层级优先、层内按对象角色分包”的组织方式：
 
-- 根包是 DDD 四层 `interfaces`、`usecase`、`domain`、`infrastructure`，业务域 `intake`、`material`、`underwriting`、`audit`、`issue`、`query`、`integration` 作为每层的第二级子包；`shared`、`support` 保留为额外根包。
-- 依赖方向为 `interfaces → usecase → domain ← infrastructure`；`domain` 不依赖任何上层，`infrastructure` 只依赖 `usecase/<域>/{port,model}` 与 `domain`，不依赖用例编排或 `interfaces`，`usecase` 不依赖 `interfaces`/`infrastructure`。
-- 目录命名遵循标准 DDD 词典：`interfaces/<域>` 按入站通道分为 `web`、`messaging`、`scheduling`、`tenantprotocol`，不设 `inbound` 中转层（出站适配器属于 `infrastructure`）；`tenantprotocol/core/{pipeline,stage}` 分放流水线装配与五个阶段端口（验签、解密、解析、校验、转换，默认验签/解密实现直通），`tenantprotocol/tenants/{tenant_a,tenant_b}` 按租户各一套 request/流水线/解析/校验/转换，租户响应渲染在 `interfaces/intake/web/render`，问题件响应渲染在 `interfaces/issue/web/render`；`domain` 只含聚合根（`ClaimApplication`）、聚合内实体（`claim/material`、`claim/issue`）、聚合外追加事实（`ClaimCaseRelation`）、值对象、状态枚举、聚合 Repository、业务异常与错误码，零框架依赖，聚合 Repository 在 `domain/claim/port`（理赔申请的人员基类与四个角色在 `domain/claim/person`），锁、发号、快照查询、读模型查询、外部系统调用、Outbox 等技术能力端口与端口模型在 `usecase/<域>/{port,model}`，聚合根不暴露 setter 且构造器私有；DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter` 和仓储实现一律在 `infrastructure/claim/persistence`，读模型实现在 `infrastructure/query/persistence`。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
-- `shared` 放被多域复用的构件：`shared/contract` 只承载消息信封、错误码接口、业务异常基类与异步错误码，另有统一响应模型（`interfaces/web`）与加密工具（`shared/infrastructure`）；承保完成命令等应用输入随用例归位到 `usecase/<域>/command`；`support` 只放配置；文件系统、承保系统与审核系统由 `infrastructure/<域>/external` 的进程内本地实现提供，接真实系统时替换为对应适配器。
-- `integration` 定位平台异步内核，承载 Outbox 投递、消费去重、交互日志记录装配与滞留补偿；其模型与端口位于 `usecase/integration/{outbox,consumption,compensation,interaction}/{model,port}`。补偿允许重放业务域用例，业务域允许复用内核的记录装配入口 `usecase/integration/record`。
-- 跨域引用只允许落在对方 `domain`、`shared`、对方 `usecase` 的 `port`/`model`，或 `integration` 对外提供的记录装配与补偿用例；禁止引用其他业务域的 `interfaces`、`infrastructure` 与用例编排类，DO 不得跨域传递，`domain` 包不得依赖 Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ 与 Jackson；规则由包名前缀即可判定，详见 [005 Spec 依赖方向规则](../../specs/005-application-service-package-refactoring/design.md)。
+- 根包是 DDD 四层 `interfaces`、`application`、`domain`、`infrastructure`，另有 `shared` 位于依赖图底部。层内按角色分包：`interfaces/{web,consumer,dto,scheduler}`、`application/{command,query,port,process,exception}`、`domain/claim`（聚合根、聚合内实体、值对象、状态枚举）与 `domain/claim/{port,exception}`、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`。
+- 依赖方向为 `interfaces → application → domain ← infrastructure`；`domain` 不依赖任何上层与框架，`infrastructure` 只依赖 `application/port`、`application/port/model`、`application/query/model`、`domain` 与 `shared`，不依赖用例编排或 `interfaces`，`application` 不依赖 `interfaces`/`infrastructure`。
+- `interfaces/web` 放控制器、统一响应与异常处理、响应渲染与租户协议流水线（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换）；`interfaces/consumer` 放 MQ 消费者与报文解析装配；`interfaces/dto` 放对外请求响应；`interfaces/scheduler` 放 Outbox 投递与补偿调度。
+- `application/command` 放用例入参；`application/query` 与 `application/query/model` 放详情查询用例与读模型；`application/port` 与 `application/port/model` 放锁、发号、快照查询、外部系统调用、Outbox、消费去重、补偿策略与读模型端口；`application/process` 放用例编排、事务服务、结果模型、冲突解析与记录装配；`application/exception` 放应用异常与异步错误码。
+- `domain/claim` 只含聚合根（`ClaimApplication`）、聚合内实体（`Material`、`ClaimApplicationIssue`）、聚合外追加事实（`ClaimCaseRelation`）、人员值对象与状态枚举，零框架依赖；聚合 Repository 在 `domain/claim/port`，领域错误码在 `domain/claim/exception`；聚合根不暴露 setter 且构造器私有。
+- `infrastructure/persistence` 放 DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter`、仓储实现与读模型实现；`infrastructure/adapter` 放 Redis、Redisson、发号、分布式锁与熔断降级；`infrastructure/acl` 放审核、承保与文件服务的日志实现；`infrastructure/mq` 放 Outbox 发布；`infrastructure/config` 放配置属性与框架装配。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md) 与 [026 Spec 角色分包](../../specs/026-package-standard-alignment/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
+- `shared/exception` 承载消息无关的 `BusinessException`、`DomainException` 与 `BusinessErrorCode`；`shared/message` 承载消息密封接口与具体消息 record；`shared/util` 承载摘要工具。文件系统、承保系统与审核系统由 `infrastructure/acl` 的日志实现提供：只打印调用日志并返回可继续流程的默认结果，接真实系统时替换本包实现。
+- `application/process` 同时承载异步内核编排：Outbox 投递、消费去重、交互记录装配与滞留补偿；补偿允许重放业务用例，业务域允许复用内核的记录装配入口 `ClaimApplicationLifecycleRecordFactory`。
+- 跨层引用规则由包名前缀即可判定：`interfaces` 不依赖 `infrastructure`，`application` 不依赖 `interfaces`/`infrastructure`，`domain` 不依赖任何上层，`shared` 不依赖业务分层；DO 不得跨出 `infrastructure/persistence`。规则由 `ClaimApplicationArchitectureTest` 校验，详见 [026 Spec 依赖规则](../../specs/026-package-standard-alignment/design.md)。
 - JMeter 压测位于 `scripts/jmeter`，必须经 `claim-gateway` 的对外接口进入服务，不能绕过网关直调应用服务。
 
 ### 接口与异步边界
@@ -503,7 +506,7 @@ sequenceDiagram
 - 租户来自 `TenantContext`；摘要查询同时按 `claimApplicationNo` 与 `tenantCode` 定位，跨租户与不存在使用同一错误码返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`，不暴露存在性。
 - 缺少租户上下文返回 400 `CLAIM_APPLICATION_QUERY_INVALID`；未预期异常映射 500 `CLAIM_APPLICATION_QUERY_SYSTEM_ERROR`。
 - 子集合为空返回 200 与空数组；材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。
-- 查询只经过 `usecase/query` 与 `infrastructure/query/persistence`，不加载领域聚合、不写交互轨迹；ArchUnit 规则禁止查询包依赖聚合仓储与轨迹仓储。
+- 查询只经过 `application/query` 与 `infrastructure/persistence`，不加载领域聚合、不写交互轨迹；ArchUnit 规则禁止查询包依赖聚合仓储与轨迹仓储。
 - 问题件按案件号查询的既有接口 `/api/claim/v1/cases/{caseNo}/issue` 响应结构不变，内部改为读模型实现。
 
 ## 并发控制与幂等

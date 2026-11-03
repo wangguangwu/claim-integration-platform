@@ -26,12 +26,7 @@
 3. 确认服务健康：`curl -fsS http://127.0.0.1:8081/actuator/health` 返回 `UP`。
 4. 启动网关 `claim-gateway`（8080 端口），问题件 HTTP 接口经网关验证。
 
-准备一笔处于 `WAIT_AUDIT` 的申请（`valid-policy=true` 时直达待审核）：
-
-```bash
-java -jar backend/claim-application-service/target/claim-application-service-*.jar \
-  --claim.integration.local.valid-policy=true
-```
+准备一笔处于 `WAIT_AUDIT` 的申请：先提交申请，等待进入 `UNDERWRITING` 后调用承保完成回调推进（日志实现固定按无有效保单返回且承保结果按处理中返回，需要显式回调）。
 
 ```bash
 APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
@@ -51,6 +46,16 @@ APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake 
     ]
   }' | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["claimApplicationNo"])')
 echo "$APP_NO"
+```
+
+等待申请进入 `UNDERWRITING` 后调用承保完成回调：
+
+```bash
+curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: verify-018-callback-001' \
+  -H 'X-Trace-Id: trace-018-callback-001' \
+  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
 ```
 
 ## 场景一：审核签收多案件号
@@ -230,9 +235,14 @@ curl -sS "http://127.0.0.1:8080/api/claim/v1/cases/CASE-2026-0001/issue" \
 
 ### 重新申请
 
-1. 以材料失败配置启动服务：`--claim.integration.local.fail-material-types=MATERIAL_TYPE_DIAGNOSIS`。
-2. 提交一笔新申请并等待材料处理完成，确认状态为 `ACCEPT_FAILED`。
-3. 去掉失败配置重启服务，使用同一 `requestNo` 并携带 `claimApplicationNo` 再次提交：
+1. 提交一笔新申请，等待材料处理完成后，将状态直接改为 `ACCEPT_FAILED`（日志实现固定上传成功，本地无法构造真实拒绝）：
+
+```bash
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
+  -e "UPDATE t_claim_application SET status='ACCEPT_FAILED' WHERE claim_application_no='$APP_NO';"
+```
+
+2. 使用同一 `requestNo` 并携带 `claimApplicationNo` 再次提交：
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
@@ -258,11 +268,11 @@ curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
 
 ### 租户补材
 
-1. 以 `--claim.integration.local.valid-policy=true` 启动服务，创建 `VERIFY-024-SUPPLEMENT` 并等待进入 `WAIT_AUDIT`。
+1. 创建 `VERIFY-024-SUPPLEMENT`，等待进入 `UNDERWRITING` 后调用承保完成回调推进到 `WAIT_AUDIT`。
 2. 按场景五下发问题件，确认状态为 `ISSUE`。
 3. 携带 `claimApplicationNo` 提交补材，人员字段故意改为不同姓名，`attachments` 使用新文件地址。
 4. 预期 200；状态回到 `PENDING_ACCEPT`，未关闭问题件 `closed_at` 非空且 `closed_by='TENANT_SUPPLEMENT'`，人员 JSON 仍为原值，旧材料 `deleted=1`，新批次材料写入，`claim_application_attempt` 与 `version` 均加 1。
-5. 等待异步材料处理与承保分流完成，状态回到 `WAIT_AUDIT`；再次调用问题件关闭接口返回 `data.closed=false`。
+5. 等待异步材料处理与承保分流完成，申请进入 `UNDERWRITING`；再次调用承保完成回调推进到 `WAIT_AUDIT`，然后调用问题件关闭接口返回 `data.closed=false`。
 
 ## 场景九：理赔申请详情查询
 
@@ -287,16 +297,15 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 
 ## 场景十：等待审核滞留补偿
 
-通过本地审核签收查询配置分别验证三种结果，服务重启后等待 `wait-audit-timeout`（默认 5m）到期或临时调小阈值以触发补偿：
+`LoggingAuditSystem` 固定按 `PROCESSING` 返回，因此本地可验证的补偿行为只有一种：等待 `wait-audit-timeout`（默认 5m）到期或临时调小阈值后，补偿任务查询到“处理中”，只记录 INFO，申请保持 `WAIT_AUDIT`，无新增轨迹与状态变化：
 
-| 配置 | 补偿行为 | 预期 |
-|---|---|---|
-| `claim.integration.local.audit-signed-result=SIGNED`，`audit-signed-case-nos` 非空 | 复用审核签收用例推进完成 | 申请 `COMPLETED`，案件关联与签收轨迹写入，`completedAt` 非空 |
-| `claim.integration.local.audit-signed-result=PROCESSING` | 只记录 INFO | 申请保持 `WAIT_AUDIT`，无新增轨迹与状态变化 |
-| `claim.integration.local.audit-signed-result=NOT_FOUND` | 重新调用审核交付端口 | 申请保持 `WAIT_AUDIT`，新增一组 `AUDIT_DELIVERY` 的 `STARTED`/`COMPLETED` 轨迹 |
-| `claim.integration.local.fail-audit-signed-query=true` | 查询失败 | 申请保持 `WAIT_AUDIT`，新增 `AUDIT_SIGNED` 的 `FAILED` 轨迹，错误码 `AUDIT_SIGNED_QUERY_FAILED` |
+```bash
+java -jar backend/claim-application-service/target/claim-application-service-*.jar \
+  --claim.compensation.fixed-delay-ms=5000 \
+  --claim.compensation.wait-audit-timeout=10s
+```
 
-`SIGNED` 但 `audit-signed-case-nos` 为空时按空案件号处理，写 `AUDIT_SIGNED_CASE_NO_MISSING` 失败轨迹并保持 `WAIT_AUDIT`。同批多笔申请中单笔失败不阻断其他申请，可在日志与轨迹中分别核对。
+`SIGNED`（推进 `COMPLETED`）、`NOT_FOUND`（重新交付审核系统）与查询失败（写 `AUDIT_SIGNED_QUERY_FAILED` 轨迹）三个分支需要真实审核系统返回对应结果，本地日志实现无法构造；接入真实系统后再按原规则验证。补偿分支的单测覆盖见 `WaitAuditCompensationHandlerTest`。
 
 ## 状态核对清单
 
@@ -307,7 +316,7 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 | 消费去重 | `t_claim_consumed_event` | 同一 `(consumer_group, event_id)` 只有一行 |
 | 审核完成 | `t_claim_application` | `WAIT_AUDIT` 签收后为 `COMPLETED`，`completed_at` 非空；重复签收只补关系，状态与时间不变 |
 | 问题件人员字段 | `t_claim_application_issue` | 下发写 `raised_by`；关闭只写 `closed_by`，不覆盖 `raised_by` |
-| 等待审核补偿 | `t_claim_application`、`t_claim_interaction_log` | 已签收推进 `COMPLETED`；处理中保持；未找到重发交付；查询失败写失败轨迹 |
+| 等待审核补偿 | `t_claim_application`、`t_claim_interaction_log` | 日志实现固定处理中：保持 `WAIT_AUDIT`，无新增轨迹；其他分支由真实审核系统驱动 |
 | 问题件状态流转 | `t_claim_application` | 下发后 `ISSUE`，关闭后 `WAIT_AUDIT` |
 | 补材闭环 | `t_claim_application`、`t_claim_material`、`t_claim_application_issue` | 状态回到 `PENDING_ACCEPT` 后重新到达 `WAIT_AUDIT`；问题件由 `TENANT_SUPPLEMENT` 关闭；旧材料逻辑删除 |
 | 乐观锁 | `t_claim_application` | 重新申请与补材后 `claim_application_attempt` 与 `version` 均递增 |

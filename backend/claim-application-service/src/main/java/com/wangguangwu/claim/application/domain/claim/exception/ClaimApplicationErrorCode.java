@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.domain.claim.exception;
 
-import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
+import com.wangguangwu.claim.application.shared.exception.BusinessErrorCode;
 
 /**
  * 理赔申请聚合自身不变式拒绝时使用的业务错误码。

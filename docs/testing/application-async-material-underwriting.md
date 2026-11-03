@@ -2,7 +2,7 @@
 
 ## 文档位置
 
-本文件记录 004 规格（材料处理与承保分流）与 009 规格（签收后异步链路）在本地 MQ 与 MySQL 上的端到端验证步骤。验证对象是 `claim-application-service` 自身的实现，文件系统、承保系统与审核系统由服务内的本地实现提供，不依赖真实外部系统。
+本文件记录 004 规格（材料处理与承保分流）与 009 规格（签收后异步链路）在本地 MQ 与 MySQL 上的端到端验证步骤。验证对象是 `claim-application-service` 自身的实现，文件系统、承保系统与审核系统由服务内的日志实现提供：只打印调用日志并返回可继续流程的默认结果，不依赖真实外部系统。
 
 脚本目录不放置验证说明，后续仅在本文件维护。
 
@@ -11,21 +11,18 @@
 | 场景 | 触发方式 | 预期业务结果 |
 |---|---|---|
 | 签收后自动投递 | 提交申请报文 | 签收成功写入 Outbox，投递器把事件发到材料处理 Topic |
-| 材料处理成功 | 材料类型不在失败名单中 | 材料变为 `PROCESSED`，申请进入承保分流 |
-| 无有效保单 | `claim.integration.local.valid-policy=false`（默认） | 申请进入 `UNDERWRITING`，承保结果查询返回 `COMPLETED` 后经补偿推进到 `WAIT_AUDIT` |
-| 有有效保单 | `claim.integration.local.valid-policy=true` | 申请直接进入 `WAIT_AUDIT`，不发起自动承保 |
+| 材料处理成功 | 提交合法材料 | 材料变为 `PROCESSED`，申请进入承保分流 |
+| 无有效保单 | 默认行为（日志实现固定返回无有效保单） | 申请进入 `UNDERWRITING` |
+| 承保完成回调 | 调用承保完成回调接口 | 申请推进到 `WAIT_AUDIT`，生成审核交付事件 |
 | 审核交付 | 申请进入 `WAIT_AUDIT` | 消费审核交付 Topic，写入 `AUDIT_DELIVERY` 行为组 |
 | 重复消息与重复回调 | 重投同一条消息或重复调用回调 | 不产生重复材料处理与重复审核交付 |
-| 材料处理失败 | 材料类型命中 `claim.integration.local.fail-material-types` | 申请进入 `ACCEPT_FAILED`，记录失败交互 |
 | MQ 停机与待受理滞留补偿 | 停止 Broker 后提交申请，等待超过 `pending-accept-timeout` | 签收仍成功；补偿直接重放材料处理并推进状态 |
-| 审核交付失败进死信 | `fail-audit-delivery=true` 且重投次数为 1 | 重投耗尽后消息转入死信主题 |
 
 ## 前置准备
 
 1. 启动本地依赖：`./scripts/docker-start.sh`，并按 [本地基础服务检查说明](../environment/local-infrastructure-health-check.md) 确认 MySQL、Redis、RocketMQ 健康。
 2. 使用 JDK 21 启动 `claim-application-service`，默认 profile 为 `local`。
-3. 本地实现默认参数：`delay=200ms`、`valid-policy=false`、`underwriting-result=COMPLETED`、`fail-material-types=[]`、`fail-audit-delivery=false`。
-4. 确认服务健康：`curl -fsS http://127.0.0.1:8081/actuator/health` 返回 `UP`。
+3. 确认服务健康：`curl -fsS http://127.0.0.1:8081/actuator/health` 返回 `UP`。
 
 数据库仅为本地 Docker 开发库，命令统一使用最小权限账号：
 
@@ -33,13 +30,7 @@
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SHOW TABLES;"
 ```
 
-启动时覆盖本地实现参数，配置生效即重启即可，不需要另外启动模拟服务：
-
-```bash
-java -jar backend/claim-application-service/target/claim-application-service-*.jar \
-  --claim.integration.local.valid-policy=true \
-  --claim.integration.local.delay=0ms
-```
+日志实现没有延迟、失败或结果开关，验证不同分支时通过承保回调与审核签收消息驱动，不需要额外启动模拟服务。
 
 ## 提交申请
 
@@ -76,26 +67,28 @@ echo "$APP_NO"
 
 同一租户外部申请号重复提交会返回同一个 `claimApplicationNo`，不重复创建数据。
 
-## 场景一：无有效保单的黄金路径
+## 场景一：无有效保单进入承保中
 
-`valid-policy` 为 `false` 时，链路为：签收 → 投递 → 材料处理 → `UNDERWRITING` → 承保结果查询补偿 → `WAIT_AUDIT` → 审核交付。
+日志实现固定按无有效保单返回，链路为：签收 → 投递 → 材料处理 → `UNDERWRITING` → 承保完成回调 → `WAIT_AUDIT` → 审核交付。
 
-本地实现不发送承保完成通知，`UNDERWRITING` 由补偿任务查询承保结果推进。默认阈值 1 分钟，验证时缩短：
+日志实现不发送承保完成通知，承保结果查询固定返回 `PROCESSING`，因此 `UNDERWRITING` 不会由补偿推进，需要显式调用承保完成回调：
 
 ```bash
-java -jar backend/claim-application-service/target/claim-application-service-*.jar \
-  --claim.compensation.fixed-delay-ms=5000 \
-  --claim.compensation.underwriting-timeout=10s
+curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: verify-009-callback-001' \
+  -H 'X-Trace-Id: trace-009-callback-001' \
+  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
 ```
 
-1. 提交申请后确认申请短暂处于承保中与已受理之间的状态：
+1. 提交申请后确认申请处于承保中状态：
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
   -e "SELECT claim_application_no, status, claim_application_attempt FROM t_claim_application WHERE claim_application_no='$APP_NO';"
 ```
 
-2. 等待超过一轮补偿后核对最终状态、材料、轨迹、事件与消费登记：
+2. 调用承保完成回调后核对最终状态、材料、轨迹、事件与消费登记：
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "
@@ -111,24 +104,15 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 预期：
 
 - `t_claim_application.status = WAIT_AUDIT`。
-- `t_claim_application_material.status = PROCESSED`，`uploaded_file_url` 形如 `https://local.invalid/material/<claimApplicationNo>/<materialType>`。
-- `t_claim_interaction_log` 依次出现 `MATERIAL_PROCESS`、`UNDERWRITING`（含补偿查询）、`UNDERWRITING_CALLBACK` 与 `AUDIT_DELIVERY` 的 `STARTED`/`COMPLETED`，同一行为的 `interaction_no` 相同。
-- 补偿推进的承保回调记录 `request_id = compensation-<claimApplicationNo>`。
+- `t_claim_application_material.status = PROCESSED`，`uploaded_file_url` 为租户提交的原始地址。
+- `t_claim_interaction_log` 依次出现 `MATERIAL_PROCESS`、`UNDERWRITING`（含自动承保请求）、`UNDERWRITING_CALLBACK` 与 `AUDIT_DELIVERY` 的 `STARTED`/`COMPLETED`，同一行为的 `interaction_no` 相同。
+- 回调推进的承保回调记录 `request_id = verify-009-callback-001`。
 - `t_claim_outbox_event` 中 `CLAIM_APPLICATION_CREATED` 与 `AUDIT_DELIVERY_REQUESTED` 均为 `PUBLISHED`。
 - `t_claim_consumed_event` 含 `claim-application-material-processor-v1` 与 `claim-application-audit-delivery-v1` 两条记录。
 
 ## 场景二：存在有效保单直达待审核
 
-1. 以 `--claim.integration.local.valid-policy=true` 重启服务。
-2. 用新的外部申请号提交申请（报文同上，`requestNo` 改为 `VERIFY-009-002`），并重新赋值 `APP_NO`。
-3. 预期申请直接为 `WAIT_AUDIT`，轨迹没有 `UNDERWRITING_CALLBACK`：
-
-```bash
-docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
-  -e "SELECT interaction_type, action FROM t_claim_interaction_log WHERE claim_application_no='$APP_NO' ORDER BY id;"
-```
-
-验证结束后恢复默认参数重启：`valid-policy=false`。
+该分支依赖承保系统返回“存在有效保单”。日志实现固定返回无有效保单，本地无法构造；接入真实承保系统或在 `LoggingUnderwritingSystem.hasValidPolicy` 中返回 `true` 后再验证：申请应直接进入 `WAIT_AUDIT`，轨迹没有 `UNDERWRITING_CALLBACK`。
 
 ## 场景三：审核交付消费
 
@@ -190,7 +174,7 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
    WHERE claim_application_no='$APP_NO' AND consumer_group='claim-application-material-processor-v1';"
 ```
 
-预期申请推进到 `UNDERWRITING`（或 `WAIT_AUDIT`），消费登记的 `event_id` 为 `compensation-<claimApplicationNo>-<attempt>`。
+预期申请推进到 `UNDERWRITING`，消费登记的 `event_id` 为 `compensation-<claimApplicationNo>-<attempt>`。
 
 4. 恢复 Broker：
 
@@ -202,40 +186,22 @@ docker start claim-rocketmq-broker
 
 ## 场景六：材料处理失败
 
-以失败名单启动服务后提交包含该材料类型的申请：
-
-```bash
-java -jar backend/claim-application-service/target/claim-application-service-*.jar \
-  --claim.integration.local.fail-material-types=MATERIAL_TYPE_REJECTED
-```
-
-```json
-{"type": "MATERIAL_TYPE_REJECTED", "sourceUrl": "https://files.example.com/rejected.pdf"}
-```
-
-预期申请进入 `ACCEPT_FAILED`，命中失败名单的材料置为 `FAILED` 且不写上传地址，其余材料正常 `PROCESSED`，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 及错误码 `LOCAL_UPLOAD_REJECTED`。重新申请必须携带原 `claimApplicationNo` 再次提交，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料；未携带平台编号时按重复请求复用，不会触发重新申请。
+材料处理失败依赖文件系统明确拒绝（`FileUploadResult.success=false`）。`LoggingMaterialFileProcessor` 固定返回成功，本地无法构造该分支；接入真实文件服务后再验证：申请进入 `ACCEPT_FAILED`，被拒绝的材料置为 `FAILED` 且不写上传地址，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 与对应错误码。重新申请必须携带原 `claimApplicationNo` 再次提交，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料；未携带平台编号时按重复请求复用，不会触发重新申请。
 
 租户补材复用 `CLAIM_APPLICATION_REAPPLIED` 事件：补材提交后申请回到 `PENDING_ACCEPT`，材料处理消费者按新的受理尝试次数重新处理新批次材料，再进入承保分流与审核交付。材料处理事务会校验 `PENDING_ACCEPT` 与 `claimApplicationAttempt`，过期批次只记录 `REUSED` 轨迹。
 
-注意：外部系统异常与明确拒绝不同，异常向上抛出由 binder 重投，材料与申请保持原状态；`claim.integration.local.delay` 可放大调用耗时，便于观察消费占用。
+注意：外部系统异常与明确拒绝不同，异常向上抛出由 binder 重投，材料与申请保持原状态。
 
 ## 场景七：审核交付失败与死信
 
-1. 以交付失败开关和最小重投次数重启服务：
+审核交付失败依赖审核系统抛出异常。`LoggingAuditSystem.deliver` 只记日志且不失败，本地无法构造该分支；接入真实审核系统后，以最小重投次数启动：
 
 ```bash
 java -jar backend/claim-application-service/target/claim-application-service-*.jar \
-  --claim.integration.local.valid-policy=true \
-  --claim.integration.local.fail-audit-delivery=true \
   --spring.cloud.stream.rocketmq.bindings.auditDelivery-in-0.consumer.push.max-reconsume-times=1
 ```
 
-2. 提交申请，申请进入 `WAIT_AUDIT` 后审核交付固定失败：
-
-- 应用日志出现「外部系统本地实现交付失败」ERROR，`claimApplicationNo` 可见、无证件号；次数等于初次投递加 `max-reconsume-times` 次重投（每次内部还会经 Spring Retry 重试若干次，日志条数因此多于投递次数）；
-- 每次投递失败另有一条「审核交付消费失败」ERROR，含 `consumerGroup=claim-application-audit-delivery-v1`、`claimApplicationNo`、`eventId`；
-- `t_claim_interaction_log` 没有 `AUDIT_DELIVERY` 行为组（外部调用失败，事务未开启）；
-- 重投耗尽后消息进入死信主题 `%DLQ%claim-application-audit-delivery-v1`，平台不消费死信。
+重投耗尽后消息进入死信主题 `%DLQ%claim-application-audit-delivery-v1`，平台不消费死信：
 
 ```bash
 docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topicList \
@@ -253,8 +219,8 @@ docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topi
 | 签收成功 | `t_claim_application` | `status = PENDING_ACCEPT` |
 | 事件已生成 | `t_claim_outbox_event` | `status IN (PENDING, SENDING, PUBLISHED)` |
 | 材料处理完成 | `t_claim_application_material` | `status = PROCESSED` |
-| 无保单分流 | `t_claim_application` | `status = UNDERWRITING` 后推进 `WAIT_AUDIT` |
-| 有保单分流 | `t_claim_application` | `status = WAIT_AUDIT` |
+| 无保单分流 | `t_claim_application` | `status = UNDERWRITING`，经承保完成回调推进 `WAIT_AUDIT` |
+| 有保单分流 | `t_claim_application` | 需真实承保系统返回有效保单；命中时 `status = WAIT_AUDIT` |
 | 审核交付已投递 | `t_claim_outbox_event` | `event_type = AUDIT_DELIVERY_REQUESTED` 且 `status = PUBLISHED` |
 | 审核交付已消费 | `t_claim_interaction_log` | `interaction_type = AUDIT_DELIVERY` 且含 `STARTED`/`COMPLETED` |
 | 消费去重 | `t_claim_consumed_event` | 同一 `event_id` 只有一行 |
@@ -263,5 +229,4 @@ docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topi
 ## 收尾
 
 1. 停止本地服务，确认端口释放：`lsof -ti:8081 || echo "port 8081 released"`。
-2. 恢复默认启动参数，确认 `valid-policy=false`、`fail-audit-delivery=false`、`fail-material-types` 为空。
-3. 如需复位本地数据，使用 `./scripts/docker-stop.sh` 后删除数据卷并重新执行 `./scripts/docker-start.sh`；该操作只允许在本地开发环境执行。
+2. 如需复位本地数据，使用 `./scripts/docker-stop.sh` 后删除数据卷并重新执行 `./scripts/docker-start.sh`；该操作只允许在本地开发环境执行。

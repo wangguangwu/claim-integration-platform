@@ -239,19 +239,17 @@ InteractionLog 以“一个事件一条记录”保存跨系统和材料处理�
 
 ## 外部系统接入
 
-外部系统以领域端口接入，端口只声明业务能力，不绑定传输方式。当前版本的文件系统、承保系统与审核系统均为进程内本地实现：按配置休眠、打印交互日志并按配置返回结果，不发起 HTTP 调用。接入真实系统时新增对应适配器并替换本地实现，调用方无需改动。
+外部系统以领域端口接入，端口只声明业务能力，不绑定传输方式。当前版本的文件系统、承保系统与审核系统均为日志实现：只打印调用日志并返回可继续流程的默认结果，不发起 HTTP 调用。接入真实系统时新增对应适配器并替换日志实现，调用方无需改动。
 
-| 端口 | 职责 | 本地实现 | 配置 |
+| 端口 | 职责 | 默认实现 | 默认行为 |
 |---|---|---|---|
-| `MaterialFileProcessor` | 上传材料文件 | `LocalMaterialFileProcessor` | `claim.integration.local.delay`、`fail-material-types` |
-| `ValidPolicyQuery` | 查询被保人是否存在有效保单 | `LocalValidPolicyQuery` | `claim.integration.local.valid-policy` |
-| `AutoUnderwritingRequester` | 发起自动承保 | `LocalAutoUnderwritingRequester` | `claim.integration.local.delay` |
-| `UnderwritingResultQuery` | 查询自动承保结果 | `LocalUnderwritingResultQuery` | `claim.integration.local.underwriting-result` |
-| `ServiceAuditSystemPort` | 交付申请给审核系统 | `LocalAuditSystemClient` | `claim.integration.local.fail-audit-delivery` |
-| `AuditSignedStatusQuery` | 查询审核系统签收状态 | `LocalAuditSignedStatusQuery` | `claim.integration.local.audit-signed-result`、`audit-signed-case-nos`、`fail-audit-signed-query` |
+| `MaterialFileProcessor` | 上传材料文件 | `LoggingMaterialFileProcessor` | 返回成功，文件地址保留租户提交的原始地址 |
+| `UnderwritingSystemPort` | 有效保单查询、发起自动承保、查询承保结果 | `LoggingUnderwritingSystem` | 按无有效保单返回（进入自动承保）；承保结果按 `PROCESSING` 返回 |
+| `AuditSystemPort` | 交付申请给审核系统、查询签收状态 | `LoggingAuditSystem` | 交付只记日志；签收状态按 `PROCESSING` 返回 |
 
 约定：
 
 - 外部系统明确拒绝以业务结果返回（如 `FileUploadResult.success=false`），进入业务失败分支。
 - 外部系统不可用或超时以异常抛出，调用方保持申请原状态，由消息重投或补偿任务恢复。
-- 交互日志只打印目标系统、交互类型、`claimApplicationNo` 与模拟耗时，不打印证件号、文件地址与报文。
+- 交互日志只打印 `claimApplicationNo` 等业务标识，不打印证件号、文件地址与报文。
+- 日志实现不做延迟、失败注入或结果模拟；需要验证其他分支时通过审核签收消息或承保回调消息驱动。
