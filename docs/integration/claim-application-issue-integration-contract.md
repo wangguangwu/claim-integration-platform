@@ -79,7 +79,8 @@
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "5bba2a7f468c4efe",
   "data": {
     "issueNo": "ISS202610310001",
@@ -95,7 +96,8 @@
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "5bba2a7f468c4efe",
   "data": {
     "issueNo": "ISS202610310001",
@@ -107,24 +109,19 @@
 
 **错误响应**：
 
-| HTTP 状态码 | 错误码 | 说明 | 处理建议 |
-|---|---|---|---|
-| 400 | `ISSUE_INTAKE_INVALID` | 请求参数不合法（必填字段缺失或超长） | 检查请求体字段 |
-| 404 | `ISSUE_APPLICATION_NOT_FOUND` | 申请不存在 | 确认 `claimApplicationNo` 是否正确 |
-| 400 | `ISSUE_APPLICATION_STATUS_INVALID` | 申请状态不合法（不是 `WAIT_AUDIT`） | 确认申请当前状态 |
-| 409 | `ISSUE_ALREADY_OPEN` | 同一申请已有未关闭问题件 | 等待现有问题件关闭后再下发 |
-| 500 | `ISSUE_SYSTEM_ERROR` | 系统异常 | 联系平台运维 |
+| HTTP 状态码 | 说明 | 处理建议 |
+|---|---|---|
+| 400 | 请求参数不合法（必填字段缺失或超长）、申请不存在、申请状态不是 `WAIT_AUDIT`，或同一申请已有未关闭问题件 | 检查请求体字段与申请当前状态 |
+| 500 | 系统异常 | 联系平台运维 |
 
 **错误响应示例**：
 
 ```json
 {
-  "success": false,
+  "code": "FAILURE",
+  "message": "申请不存在，claimApplicationNo=CLA202610310001",
   "traceId": "5bba2a7f468c4efe",
-  "error": {
-    "code": "ISSUE_APPLICATION_NOT_FOUND",
-    "message": "申请不存在，claimApplicationNo=CLA202610310001"
-  }
+  "data": null
 }
 ```
 
@@ -189,7 +186,8 @@
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "5bba2a7f468c4efe",
   "data": {
     "issueNo": "ISS202610310001",
@@ -204,7 +202,8 @@
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "5bba2a7f468c4efe",
   "data": {
     "issueNo": "ISS202610310001",
@@ -215,22 +214,19 @@
 
 **错误响应**：
 
-| HTTP 状态码 | 错误码 | 说明 | 处理建议 |
-|---|---|---|---|
-| 404 | `ISSUE_NOT_FOUND` | 问题件不存在 | 确认 `issueNo` 是否正确 |
-| 404 | `ISSUE_APPLICATION_NOT_FOUND` | 问题件关联的申请不存在 | 数据异常，联系平台运维 |
-| 500 | `ISSUE_SYSTEM_ERROR` | 系统异常 | 联系平台运维 |
+| HTTP 状态码 | 说明 | 处理建议 |
+|---|---|---|
+| 400 | 问题件不存在，或问题件关联的申请不存在 | 确认 `issueNo` 是否正确 |
+| 500 | 系统异常 | 联系平台运维 |
 
 **错误响应示例**：
 
 ```json
 {
-  "success": false,
+  "code": "FAILURE",
+  "message": "问题件不存在，issueNo=ISS202610310001",
   "traceId": "5bba2a7f468c4efe",
-  "error": {
-    "code": "ISSUE_NOT_FOUND",
-    "message": "问题件不存在，issueNo=ISS202610310001"
-  }
+  "data": null
 }
 ```
 
@@ -279,7 +275,7 @@ ISSUE → WAIT_AUDIT（关闭问题件）
 WAIT_AUDIT → COMPLETED（审核签收返回案件号）
 ```
 
-`COMPLETED` 是终态：不得再下发问题件，下发请求返回 `ISSUE_APPLICATION_STATUS_INVALID`；已关闭问题件重复关闭仍按幂等返回 `closed=false`。
+`COMPLETED` 是终态：不得再下发问题件，下发请求返回 400 `FAILURE`；已关闭问题件重复关闭仍按幂等返回 `closed=false`。
 
 ### 问题件状态
 
@@ -319,16 +315,14 @@ CLOSED（已关闭）
 
 ---
 
-## 错误码汇总
+## 失败响应汇总
 
-| 错误码 | HTTP 状态 | 说明 | 触发场景 |
-|---|---|---|---|
-| `ISSUE_APPLICATION_NOT_FOUND` | 404 | 申请不存在 | 下发问题件时申请编号未找到 |
-| `ISSUE_APPLICATION_STATUS_INVALID` | 400 | 申请状态不合法 | 下发问题时申请状态不是 `WAIT_AUDIT`（含已 `COMPLETED`） |
-| `ISSUE_ALREADY_OPEN` | 409 | 已有未关闭问题件 | 同一申请已有 `OPEN` 状态问题件 |
-| `ISSUE_NOT_FOUND` | 404 | 问题件不存在 | 关闭时问题件编号未找到 |
-| `ISSUE_INTAKE_INVALID` | 400 | 问题件命令不合法 | 必填字段缺失或超长 |
-| `ISSUE_SYSTEM_ERROR` | 500 | 问题件系统异常 | 未预期的系统错误 |
+失败不区分具体码值，响应体统一为 `code=FAILURE`，`message` 说明原因：
+
+| HTTP 状态 | 触发场景 |
+|---|---|
+| 400 | 申请不存在；申请状态不是 `WAIT_AUDIT`（含已 `COMPLETED`）；同一申请已有 `OPEN` 问题件；问题件不存在；必填字段缺失或超长；报文不可解析 |
+| 500 | 未预期的系统异常 |
 
 ---
 
@@ -355,7 +349,8 @@ curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "trace-001",
   "data": {
     "issueNo": "ISS202610310001",
@@ -380,7 +375,8 @@ curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues/ISS202610
 
 ```json
 {
-  "success": true,
+  "code": "SUCCESS",
+  "message": "success",
   "traceId": "trace-002",
   "data": {
     "issueNo": "ISS202610310001",
@@ -439,16 +435,14 @@ curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
 
 ```json
 {
-  "success": false,
+  "code": "FAILURE",
+  "message": "申请不存在，claimApplicationNo=CLA_NOT_EXIST",
   "traceId": "trace-003",
-  "error": {
-    "code": "ISSUE_APPLICATION_NOT_FOUND",
-    "message": "申请不存在，claimApplicationNo=CLA_NOT_EXIST"
-  }
+  "data": null
 }
 ```
 
-**HTTP 状态码**：`404 Not Found`
+**HTTP 状态码**：`400 Bad Request`
 
 ---
 
@@ -465,7 +459,7 @@ curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
 
 3. **并发控制**：
    - 同一申请同一时间最多一个 `OPEN` 问题件
-   - 并发下发时，后到的请求会返回幂等成功或 `ISSUE_ALREADY_OPEN` 错误
+   - 并发下发时，后到的请求会返回幂等成功或 400 `FAILURE`
 
 4. **事务一致性**：
    - 问题件状态与申请状态在同一事务内变更

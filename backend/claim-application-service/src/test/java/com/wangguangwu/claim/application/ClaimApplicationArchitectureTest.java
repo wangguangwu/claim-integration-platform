@@ -17,12 +17,12 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.claim.material.Material;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * 理赔申请服务的分层依赖架构测试。
@@ -257,18 +257,30 @@ class ClaimApplicationArchitectureTest {
     }
 
     /**
-     * 每个 HTTP 入口控制器都必须声明请求非法码与系统错误码，否则全局异常处理器无法组装失败响应。
+     * HTTP 异常处理器只允许集中在 advice 子包，避免异常渲染逻辑扩散到控制器。
      */
     @Test
-    void controllersMustDeclareApiErrorCodes() {
+    void exceptionHandlerMustResideInAdvicePackage() {
+        classes()
+                .that()
+                .areAnnotatedWith(RestControllerAdvice.class)
+                .should()
+                .resideInAPackage(BASE + ".interfaces.web.advice")
+                .because("HTTP 异常处理只允许集中在 interfaces.web.advice")
+                .check(APPLICATION_CLASSES);
+    }
+
+    /**
+     * HTTP 控制器只允许集中在 controller 子包，避免入口类与协议、DTO 平铺混放。
+     */
+    @Test
+    void controllersMustResideInControllerPackage() {
         classes()
                 .that()
                 .areAnnotatedWith(RestController.class)
-                .and()
-                .resideInAPackage(INTERFACES)
                 .should()
-                .implement(ApiErrorCodeProvider.class)
-                .because("HTTP 入口必须声明请求非法码与系统错误码")
+                .resideInAPackage(BASE + ".interfaces.web.controller")
+                .because("HTTP 入口只允许集中在 interfaces.web.controller")
                 .check(APPLICATION_CLASSES);
     }
 

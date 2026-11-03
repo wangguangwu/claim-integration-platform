@@ -2,7 +2,6 @@ package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.exception.ClaimApplicationIntakeConflictException;
@@ -80,13 +79,10 @@ public class ClaimApplicationIntakeTransactionService {
                                                         String batchNo, String requestId, String traceId) {
         ClaimApplication claimApplication = claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(
                         submitted.getTenantCode(), submitted.getExternalClaimApplicationNo())
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
-                        "平台申请编号无法匹配既有申请，tenantCode=" + submitted.getTenantCode()
+                .orElseThrow(() -> new ApplicationException("平台申请编号无法匹配既有申请，tenantCode=" + submitted.getTenantCode()
                                 + "，externalClaimApplicationNo=" + submitted.getExternalClaimApplicationNo()));
         if (!expectedClaimApplicationNo.equals(claimApplication.getClaimApplicationNo())) {
-            throw new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
-                    "报文平台申请编号与既有申请不一致，externalClaimApplicationNo="
+            throw new ApplicationException("报文平台申请编号与既有申请不一致，externalClaimApplicationNo="
                             + submitted.getExternalClaimApplicationNo()
                             + "，报文编号=" + expectedClaimApplicationNo
                             + "，实际编号=" + claimApplication.getClaimApplicationNo());

@@ -8,15 +8,15 @@
 | 重复签收事件 | 重发同一 `eventId` | 三张表行数不变，日志出现「审核签收事件已消费，跳过处理」 |
 | 部分案件号重叠 | 对 `COMPLETED` 申请发送新 `eventId`，携带 1 个已存在、1 个新案件号 | 只补插缺失案件号，状态与 `completedAt` 不变，轨迹结果与新增数量一致 |
 | 审核签收申请不存在 | 发送不存在的 `claimApplicationNo` | 重投耗尽后进入 `%DLQ%claim-application-audit-signed-v1` |
-| 审核签收租户不一致 | 消息 `tenantCode` 与申请归属不一致 | 重投后进入死信，返回 400 `AUDIT_SIGNED_TENANT_MISMATCH`，无业务写入 |
-| 审核签收状态不合法 | 对 `ISSUE` 或 `ACCEPTED` 申请发送签收消息 | 重投后进入死信，返回 409 `AUDIT_SIGNED_STATUS_INVALID`，无业务写入 |
+| 审核签收租户不一致 | 消息 `tenantCode` 与申请归属不一致 | 重投后进入死信，错误日志记录租户不一致，无业务写入 |
+| 审核签收状态不合法 | 对 `ISSUE` 或 `ACCEPTED` 申请发送签收消息 | 重投后进入死信，错误日志记录状态不合法，无业务写入 |
 | 问题件下发与关闭 | 经网关调用问题件接口 | 返回 2xx，申请在 `WAIT_AUDIT` 与 `ISSUE` 间流转 |
-| 问题件业务拒绝 | 状态不合法、重复关闭、问题件不存在 | 返回 4xx 与明确错误码，不进入死信 |
+| 问题件业务拒绝 | 状态不合法、重复关闭、问题件不存在 | 返回 400 `FAILURE`，不进入死信 |
 | 问题件状态查询 | 按案件号查询未关闭问题件 | 分别返回有、无、案件关系不存在三种结果 |
 | 重新申请 | 携带平台申请编号，申请处于 `ACCEPT_FAILED` | 返回 `REAPPLIED`，人员与材料整体替换，旧材料逻辑删除，尝试次数加 1 |
 | 租户补材 | 携带平台申请编号，申请处于 `ISSUE` | 返回 `SUPPLEMENTED`，问题件关闭、人员保持原值、材料换批次、状态回到 `PENDING_ACCEPT` |
-| 平台编号不匹配 | 携带与库中记录不一致的 `claimApplicationNo` | 返回 400 `CLAIM_APPLICATION_INTAKE_INVALID`，不新建申请 |
-| 详情查询 | 查询材料、问题件、案件关联 | 返回摘要与对应集合；跨租户与不存在返回 404，空集合返回 200 + 空数组 |
+| 平台编号不匹配 | 携带与库中记录不一致的 `claimApplicationNo` | 返回 400 `FAILURE`，不新建申请 |
+| 详情查询 | 查询材料、问题件、案件关联 | 返回摘要与对应集合；跨租户与不存在返回 400，空集合返回 200 + 空数组 |
 | 旧路径失效 | 调用 `/api/application/v1/callbacks/**` | 返回 404 |
 
 ## 前置准备
@@ -26,7 +26,7 @@
 3. 确认服务健康：`curl -fsS http://127.0.0.1:8081/actuator/health` 返回 `UP`。
 4. 启动网关 `claim-gateway`（8080 端口），问题件 HTTP 接口经网关验证。
 
-准备一笔处于 `WAIT_AUDIT` 的申请：先提交申请，等待进入 `UNDERWRITING` 后调用承保完成回调推进（日志实现固定按无有效保单返回且承保结果按处理中返回，需要显式回调）。
+准备一笔处于 `WAIT_AUDIT` 的申请：先提交申请，日志实现会在发起承保后立即返回承保完成，申请自动推进到 `WAIT_AUDIT`。
 
 ```bash
 APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake \
@@ -48,14 +48,13 @@ APP_NO=$(curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/application/intake 
 echo "$APP_NO"
 ```
 
-等待申请进入 `UNDERWRITING` 后调用承保完成回调：
+等待数秒，确认申请已自动进入 `WAIT_AUDIT`：
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-Id: verify-018-callback-001' \
-  -H 'X-Trace-Id: trace-018-callback-001' \
-  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
+curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/issues" \
+  -H 'X-Tenant-Code: tenant-a' \
+  -H 'X-Protocol-Version: v1' \
+  -H 'X-Trace-Id: trace-018-intake-002'
 ```
 
 ## 场景一：审核签收多案件号
@@ -191,14 +190,14 @@ curl -sS -X POST http://127.0.0.1:8080/api/claim/v1/callbacks/audit-issues/ISSUE
 
 ## 场景六：问题件业务拒绝
 
-| 请求 | 预期 HTTP 状态 | 错误码 |
+| 请求 | 预期 HTTP 状态 | 响应 code |
 |---|---|---|
-| 向非 `WAIT_AUDIT` 申请下发问题件 | 400 | `ISSUE_APPLICATION_STATUS_INVALID` |
-| 已有未关闭问题件且申请状态为 `WAIT_AUDIT`（并发窗口或状态漂移） | 409 | `ISSUE_ALREADY_OPEN` |
-| 关闭不存在的问题件 | 404 | `ISSUE_NOT_FOUND` |
-| 请求缺少必填字段 | 400 | `ISSUE_INTAKE_INVALID` |
-| 请求报文无法解析 | 400 | `ISSUE_INTAKE_INVALID` |
-| 调用旧路径 `/api/application/v1/callbacks/audit-issues` | 404 | 无业务错误码 |
+| 向非 `WAIT_AUDIT` 申请下发问题件 | 400 | `FAILURE` |
+| 已有未关闭问题件且申请状态为 `WAIT_AUDIT`（并发窗口或状态漂移） | 400 | `FAILURE` |
+| 关闭不存在的问题件 | 400 | `FAILURE` |
+| 请求缺少必填字段 | 400 | `FAILURE` |
+| 请求报文无法解析 | 400 | `FAILURE` |
+| 调用旧路径 `/api/application/v1/callbacks/audit-issues` | 404 | `FAILURE` |
 
 串行重发同一 `issueNo` 返回 200 且 `created=false`；换成新 `issueNo` 时申请已处于 `ISSUE`，先命中状态校验返回 400。`ISSUE_ALREADY_OPEN` 只在申请状态与未关闭问题件不一致时命中，验证时可临时把申请状态改回 `WAIT_AUDIT` 制造该分支：
 
@@ -229,7 +228,7 @@ curl -sS "http://127.0.0.1:8080/api/claim/v1/cases/CASE-2026-0001/issue" \
 
 关闭后再次查询：预期 200，`data.hasOpenIssue=false`，其余问题件字段为 `null`。
 
-查询不存在的案件号：预期 404，`code=CASE_RELATION_NOT_FOUND`。
+查询不存在的案件号：预期 400，`code=FAILURE`。
 
 ## 场景八：重新申请与租户补材
 
@@ -291,8 +290,8 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 - 审核完成后摘要 `status=COMPLETED` 且 `completedAt` 非空；等待审核阶段 `completedAt` 为 `null`。
 - 问题件响应包含 `raisedBy` 与 `closedBy`：未关闭问题件 `closedBy`、`closedAt` 为 `null`；审核关闭后 `closedBy` 为关闭人；租户补材关闭后 `closedBy=TENANT_SUPPLEMENT`，`raisedBy` 保持原下发人。
 - 空集合返回 200 与空数组，不返回 404。
-- 使用 `X-Tenant-Code: tenant-x` 查询同一申请返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`。
-- 缺少租户请求头时返回 400 `CLAIM_APPLICATION_QUERY_INVALID`。
+- 使用 `X-Tenant-Code: tenant-x` 查询同一申请返回 400 `FAILURE`。
+- 缺少租户请求头时返回 400 `FAILURE`。
 - 查询前后 `t_claim_interaction_log` 行数不变。
 
 ## 场景十：等待审核滞留补偿
@@ -320,5 +319,5 @@ java -jar backend/claim-application-service/target/claim-application-service-*.j
 | 问题件状态流转 | `t_claim_application` | 下发后 `ISSUE`，关闭后 `WAIT_AUDIT` |
 | 补材闭环 | `t_claim_application`、`t_claim_material`、`t_claim_application_issue` | 状态回到 `PENDING_ACCEPT` 后重新到达 `WAIT_AUDIT`；问题件由 `TENANT_SUPPLEMENT` 关闭；旧材料逻辑删除 |
 | 乐观锁 | `t_claim_application` | 重新申请与补材后 `claim_application_attempt` 与 `version` 均递增 |
-| 详情查询只读 | `t_claim_interaction_log` | 查询前后行数不变；跨租户返回 404 |
+| 详情查询只读 | `t_claim_interaction_log` | 查询前后行数不变；跨租户返回 400 |
 | 消费失败 | Broker | 重投耗尽后进入 `%DLQ%claim-application-audit-signed-v1` |

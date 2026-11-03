@@ -3,7 +3,6 @@ package com.wangguangwu.claim.application.application.process;
 import com.wangguangwu.claim.application.application.port.model.AuditDeliveryRequest;
 import com.wangguangwu.claim.application.application.port.AuditSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.application.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
@@ -44,9 +43,7 @@ public class AuditDeliveryUseCase {
         }
         ClaimApplication claimApplication = claimApplicationRepository
                 .findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationIntakeErrorCode.AUDIT_DELIVERY_APPLICATION_NOT_FOUND,
-                        "审核交付事件对应的申请不存在，可能 outbox 事件早于申请落库到达，claimApplicationNo="
+                .orElseThrow(() -> new ApplicationException("审核交付事件对应的申请不存在，可能 outbox 事件早于申请落库到达，claimApplicationNo="
                                 + command.claimApplicationNo() + "，eventId=" + command.eventId()));
         String interactionNo = recordFactory.newInteractionNo();
         if (!claimApplication.isAwaitingAudit()) {

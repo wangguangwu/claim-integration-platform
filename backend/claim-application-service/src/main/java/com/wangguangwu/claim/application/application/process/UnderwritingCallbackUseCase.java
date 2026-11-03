@@ -3,7 +3,6 @@ package com.wangguangwu.claim.application.application.process;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
-import com.wangguangwu.claim.application.application.exception.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.application.command.UnderwritingCompletedCommand;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +34,7 @@ public class UnderwritingCallbackUseCase {
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command) {
         validate(command);
         ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new ApplicationException(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
-                        "承保完成通知对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
+                .orElseThrow(() -> new ApplicationException("承保完成通知对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
         UnderwritingCallbackResult result = transactionService.complete(command, claimApplication,
                 recordFactory.newInteractionNo());
         log.info("承保完成通知处理完成，claimApplicationNo={}, disposition={}, traceId={}", command.claimApplicationNo(),
@@ -46,10 +44,10 @@ public class UnderwritingCallbackUseCase {
 
     private void validate(UnderwritingCompletedCommand command) {
         if (isBlank(command.claimApplicationNo())) {
-            throw new ApplicationException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 claimApplicationNo");
+            throw new ApplicationException("回调缺少 claimApplicationNo");
         }
         if (isBlank(command.requestId())) {
-            throw new ApplicationException(ClaimApplicationAsyncErrorCode.CALLBACK_INVALID, "回调缺少 X-Request-Id");
+            throw new ApplicationException("回调缺少 X-Request-Id");
         }
     }
 

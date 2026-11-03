@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.application.exception;
 
-import com.wangguangwu.claim.application.shared.exception.BusinessErrorCode;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
 
 /**
@@ -16,21 +15,19 @@ public class ApplicationException extends BusinessException {
     /**
      * 创建应用业务异常。
      *
-     * @param errorCode 业务错误码
-     * @param message   面向调用方的错误说明，不得包含敏感请求字段
+     * @param message 面向调用方的错误说明，不得包含敏感请求字段
      */
-    public ApplicationException(BusinessErrorCode errorCode, String message) {
-        super(errorCode, message);
+    public ApplicationException(String message) {
+        super(message);
     }
 
     /**
      * 创建保留原始失败原因的应用业务异常。
      *
-     * @param errorCode 业务错误码
-     * @param message   面向调用方的错误说明，不得包含敏感请求字段
-     * @param cause     原始异常
+     * @param message 面向调用方的错误说明，不得包含敏感请求字段
+     * @param cause   原始异常
      */
-    public ApplicationException(BusinessErrorCode errorCode, String message, Throwable cause) {
-        super(errorCode, message, cause);
+    public ApplicationException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

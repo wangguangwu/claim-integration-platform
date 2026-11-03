@@ -2,9 +2,12 @@ package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.application.command.UnderwritingCompletedCommand;
 import com.wangguangwu.claim.application.application.port.model.InteractionAction;
+import com.wangguangwu.claim.application.application.port.model.UnderwritingResult;
 import com.wangguangwu.claim.application.application.port.UnderwritingSystemPort;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,8 +16,9 @@ import org.springframework.stereotype.Service;
  * 承保分流用例：事务外查询有效保单，按结果推进到等待审核签收或自动承保。
  *
  * <p>保单查询与自动承保发起都在事务外执行，外部调用失败时保持申请原状态，
- * 由补偿任务按 `ACCEPTED` 或 `UNDERWRITING` 滞留重试。两次调用的开始与结束轨迹都由
- * 事务服务一次写入，调用中断时不会留下孤儿轨迹。</p>
+ * 由补偿任务按 `ACCEPTED` 或 `UNDERWRITING` 滞留重试。自动承保发起后立即查询一次结果，
+ * 承保系统同步完成时直接推进等待审核，仍在处理时由补偿任务继续查询。两次调用的开始与结束轨迹
+ * 都由事务服务一次写入，调用中断时不会留下孤儿轨迹。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -30,6 +34,7 @@ public class UnderwritingUseCase {
     private final ClaimApplicationRepository claimApplicationRepository;
     private final UnderwritingSystemPort underwritingSystemPort;
     private final UnderwritingTransactionService transactionService;
+    private final UnderwritingCallbackUseCase underwritingCallbackUseCase;
     private final ClaimApplicationLifecycleRecordFactory recordFactory;
 
     /**
@@ -95,10 +100,36 @@ public class UnderwritingUseCase {
                     insuredCertificateNo);
             transactionService.recordAttempt(claimApplicationNo, interactionNo, InteractionAction.COMPLETED, traceId,
                     null, null);
+            completeUnderwritingIfFinished(claimApplicationNo, traceId);
         } catch (RuntimeException exception) {
             log.warn("自动承保请求失败，申请保持承保中状态等待补偿重发，claimApplicationNo={}", claimApplicationNo, exception);
             transactionService.recordAttempt(claimApplicationNo, interactionNo, InteractionAction.FAILED, traceId,
                     AUTO_UNDERWRITING_REQUEST_FAILED_CODE, exception.getMessage());
+        }
+    }
+
+    /**
+     * 承保系统同步返回完成时立即推进等待审核，仍在处理或查询失败时保持承保中等待补偿。
+     */
+    private void completeUnderwritingIfFinished(String claimApplicationNo, String traceId) {
+        UnderwritingResult underwritingResult;
+        try {
+            underwritingResult = underwritingSystemPort.queryUnderwritingResult(claimApplicationNo);
+        } catch (RuntimeException exception) {
+            log.warn("自动承保结果查询失败，申请保持承保中状态等待补偿，claimApplicationNo={}", claimApplicationNo,
+                    exception);
+            return;
+        }
+        if (underwritingResult != UnderwritingResult.COMPLETED) {
+            log.info("自动承保仍在处理中，申请保持承保中状态，claimApplicationNo={}，result={}", claimApplicationNo,
+                    underwritingResult);
+            return;
+        }
+        try {
+            underwritingCallbackUseCase.complete(new UnderwritingCompletedCommand(claimApplicationNo,
+                    UUID.randomUUID().toString(), traceId));
+        } catch (RuntimeException exception) {
+            log.warn("承保完成推进失败，申请保持承保中状态等待补偿，claimApplicationNo={}", claimApplicationNo, exception);
         }
     }
 

@@ -3,6 +3,8 @@ package com.wangguangwu.claim.application.interfaces.consumer;
 import com.wangguangwu.claim.application.shared.message.AuditSignedMessage;
 import com.wangguangwu.claim.application.application.process.AuditSignedTransactionService;
 import com.wangguangwu.claim.application.application.process.AuditSignedUseCase;
+import com.wangguangwu.claim.application.interfaces.consumer.message.AuditSignedMessageAssembler;
+import com.wangguangwu.claim.application.interfaces.consumer.message.AuditSignedMessageParser;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

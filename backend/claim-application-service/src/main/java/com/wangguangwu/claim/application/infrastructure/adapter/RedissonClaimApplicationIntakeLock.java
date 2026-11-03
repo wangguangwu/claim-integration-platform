@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.infrastructure.adapter;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationIntakeLock;
 import com.wangguangwu.claim.application.infrastructure.config.ClaimApplicationIntakeProperties;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
@@ -72,16 +71,14 @@ public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntak
             locked = lock.tryLock(WAIT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
-                    "申请签收等待锁被中断，请稍后重试");
+            throw new BusinessException("申请签收等待锁被中断，请稍后重试");
         } catch (RedisException exception) {
             redisAvailabilityCircuit.recordFailure();
             return executeDegraded(action);
         }
         redisAvailabilityCircuit.recordSuccess();
         if (!locked) {
-            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
-                    "同一申请的签收请求正在处理中，请稍后重试");
+            throw new BusinessException("同一申请的签收请求正在处理中，请稍后重试");
         }
         try {
             return action.get();
@@ -101,9 +98,7 @@ public class RedissonClaimApplicationIntakeLock implements ClaimApplicationIntak
         redisAvailabilityCircuit.enterDegraded("签收锁");
         try {
             if (!degradedPermits.tryAcquire()) {
-                throw new BusinessException(
-                        ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR,
-                        DEGRADED_CONCURRENCY_MESSAGE);
+                throw new IllegalStateException(DEGRADED_CONCURRENCY_MESSAGE);
             }
             try {
                 return action.get();

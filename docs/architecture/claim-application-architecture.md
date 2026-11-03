@@ -120,13 +120,13 @@ flowchart TB
 
 代码目录采用“层级优先、层内按对象角色分包”的组织方式：
 
-- 根包是 DDD 四层 `interfaces`、`application`、`domain`、`infrastructure`，另有 `shared` 位于依赖图底部。层内按角色分包：`interfaces/{web,consumer,dto,scheduler}`、`application/{command,query,port,process,exception}`、`domain/claim`（聚合根、状态枚举）与 `domain/claim/{material,issue,person,port,exception}`、`domain/claimcase/{port}`（聚合外追加事实）、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`。
+- 根包是 DDD 四层 `interfaces`、`application`、`domain`、`infrastructure`，另有 `shared` 位于依赖图底部。层内按角色分包：`interfaces/{web,consumer,scheduler}`、`application/{command,query,port,process,exception}`、`domain/claim`（聚合根、状态枚举）与 `domain/claim/{material,issue,person,port}`、`domain/claimcase/{port}`（聚合外追加事实）、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`。
 - 依赖方向为 `interfaces → application → domain ← infrastructure`；`domain` 不依赖任何上层与框架，`infrastructure` 只依赖 `application/port`、`application/port/model`、`application/query/model`、`domain` 与 `shared`，不依赖用例编排或 `interfaces`，`application` 不依赖 `interfaces`/`infrastructure`。
-- `interfaces/web` 放控制器、统一响应与异常处理、响应渲染与租户协议流水线（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/tenant_a` 放租户 request/解析/校验/转换）；`interfaces/consumer` 放 MQ 消费者与报文解析装配；`interfaces/dto` 放对外请求响应；`interfaces/scheduler` 放 Outbox 投递与补偿调度。
-- `application/command` 放用例入参；`application/query` 与 `application/query/model` 放详情查询用例与读模型；`application/port` 与 `application/port/model` 放锁、发号、快照查询、外部系统调用、Outbox、消费去重、补偿策略与读模型端口；`application/process` 放用例编排、事务服务、结果模型、冲突解析与记录装配；`application/exception` 放应用异常与异步错误码。
-- `domain/claim` 只含聚合根（`ClaimApplication`）与生命周期状态枚举，零框架依赖；聚合内实体的 `Material`、`ClaimApplicationIssue` 分别在 `domain/claim/material`、`domain/claim/issue`，人员值对象在 `domain/claim/person`；聚合 Repository 在 `domain/claim/port`，领域错误码在 `domain/claim/exception`；聚合根不暴露 setter 且构造器私有。案件关联事实 `ClaimCaseRelation` 不参与聚合加载，位于 `domain/claimcase`。
-- `infrastructure/persistence` 放 DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter`、仓储实现与读模型实现；`infrastructure/adapter` 放 Redis、Redisson、发号、分布式锁与熔断降级；`infrastructure/acl` 放审核、承保与文件服务的日志实现；`infrastructure/mq` 放 Outbox 发布；`infrastructure/config` 放配置属性与框架装配。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md) 与 [026 Spec 角色分包](../../specs/026-package-standard-alignment/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
-- `shared/exception` 承载消息无关的 `BusinessException`、`DomainException` 与 `BusinessErrorCode`；`shared/message` 承载消息密封接口与具体消息 record；`shared/util` 承载摘要工具。文件系统、承保系统与审核系统由 `infrastructure/acl` 的日志实现提供：只打印调用日志并返回可继续流程的默认结果，接真实系统时替换本包实现。
+- `interfaces/web` 放 HTTP 入站适配（`controller` 放四个控制器，`advice` 放唯一异常处理器，`dto/{request,response}` 放对外请求与响应，`tenantprotocol/pipeline` 放流水线接口、注册中心与默认实现，`tenantprotocol/stage` 放五个阶段端口与默认实现，`tenantprotocol/tenants/tenant_a` 放租户 request/解析/转换与流水线注册）；`interfaces/consumer` 放 MQ 消费者，报文解析与命令装配在 `consumer/message`；`interfaces/scheduler` 放 Outbox 投递与补偿调度。
+- `application/command` 放用例入参；`application/query` 与 `application/query/model` 放详情查询用例与读模型；`application/port` 与 `application/port/model` 放锁、发号、快照查询、外部系统调用、Outbox、消费去重、补偿策略与读模型端口；`application/process` 放用例编排、事务服务、结果模型、冲突解析与记录装配；`application/exception` 放应用异常。
+- `domain/claim` 只含聚合根（`ClaimApplication`）与生命周期状态枚举，零框架依赖；聚合内实体的 `Material`、`ClaimApplicationIssue` 分别在 `domain/claim/material`、`domain/claim/issue`，人员值对象在 `domain/claim/person`；聚合 Repository 在 `domain/claim/port`；聚合根不暴露 setter 且构造器私有。案件关联事实 `ClaimCaseRelation` 不参与聚合加载，位于 `domain/claimcase`。
+- `infrastructure/persistence` 放 DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter`、仓储实现与读模型实现；`infrastructure/adapter` 放 Redis、Redisson、发号、分布式锁与熔断降级；`infrastructure/acl` 放审核、承保与文件服务的日志实现；`infrastructure/mq` 放 Outbox 发布；`infrastructure/config` 放配置属性与框架装配。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md) 与 [026 Spec 角色分包](../../specs/026-package-standard-alignment/design.md)。
+- `shared/exception` 承载消息无关的 `BusinessException`、`DomainException` 与 `ApplicationException`；`shared/message` 承载消息密封接口与具体消息 record；`shared/util` 承载摘要工具。文件系统、承保系统与审核系统由 `infrastructure/acl` 的日志实现提供：只打印调用日志并返回可继续流程的默认结果，接真实系统时替换本包实现。
 - `application/process` 同时承载异步内核编排：Outbox 投递、消费去重、交互记录装配与滞留补偿；补偿允许重放业务用例，业务域允许复用内核的记录装配入口 `ClaimApplicationLifecycleRecordFactory`。
 - 跨层引用规则由包名前缀即可判定：`interfaces` 不依赖 `infrastructure`，`application` 不依赖 `interfaces`/`infrastructure`，`domain` 不依赖任何上层，`shared` 不依赖业务分层；DO 不得跨出 `infrastructure/persistence`。规则由 `ClaimApplicationArchitectureTest` 校验，详见 [026 Spec 依赖规则](../../specs/026-package-standard-alignment/design.md)。
 - JMeter 压测位于 `scripts/jmeter`，必须经 `claim-gateway` 的对外接口进入服务，不能绕过网关直调应用服务。
@@ -140,7 +140,7 @@ flowchart TB
 | 自动承保完成通知 | 承保系统 | 异步 | 无有效保单时进入 `UNDERWRITING`，通知后推进审核交付。 |
 | 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，追加案件关联；`WAIT_AUDIT` 申请同事务迁移 `COMPLETED`，已完成申请只补齐关系。 |
 | 问题件回调 | 审核系统 | 异步 | 创建未关闭问题件并挂起申请；关闭问题件后恢复等待审核。 |
-| 详情查询 | 租户系统 | 同步 | 按申请编号返回摘要及材料、问题件或案件关联，租户不匹配返回 404。 |
+| 详情查询 | 租户系统 | 同步 | 按申请编号返回摘要及材料、问题件或案件关联，租户不匹配返回 400。 |
 | 理赔申请撤销 | 租户系统 | 同步发起 | 未完成审核签收时直接撤销；完成后协同审核系统撤销。 |
 
 ## 核心数据模型
@@ -317,7 +317,7 @@ sequenceDiagram
     else 携带平台申请编号
         U->>DB: 跳过快照，直接读库并严格比对平台编号
         alt 不存在或编号不一致
-            U-->>T: 400 CLAIM_APPLICATION_INTAKE_INVALID
+            U-->>T: 400 FAILURE
         else 状态为 ACCEPT_FAILED
             U->>DB: 人员与材料整体替换，旧材料软删除，尝试次数加 1
             U->>DB: 状态回到 PENDING_ACCEPT，写 CLAIM_APPLICATION_REAPPLIED OutboxEvent
@@ -341,7 +341,7 @@ sequenceDiagram
 ```
 
 - 未携带平台申请编号：快照命中可直接复用时只写轨迹；库中不存在则创建；已存在一律按重复请求复用，不覆盖人员、材料与状态。
-- 携带平台申请编号：跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致，否则返回 `CLAIM_APPLICATION_INTAKE_INVALID`。
+- 携带平台申请编号：跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致，否则返回 400 `FAILURE`。
 - 携带平台编号且状态为 `ACCEPT_FAILED` 时返回 `REAPPLIED`，沿用原 `claimApplicationNo`，人员与材料整体替换，旧材料软删除，尝试次数加 1，状态回到 `PENDING_ACCEPT`。
 - 携带平台编号且状态为 `ISSUE` 并存在未关闭问题件时返回 `SUPPLEMENTED`，关闭该问题件（关闭人 `TENANT_SUPPLEMENT`），保留聚合原人员，旧材料软删除并写入新批次，尝试次数加 1，状态回到 `PENDING_ACCEPT`，随后重新走异步材料处理与承保分流。
 - 其余状态按重复请求返回 `REUSED`，不覆盖数据。
@@ -425,7 +425,7 @@ sequenceDiagram
 
 - 审核系统在一次签收回调中返回该理赔申请的全部 `caseNo`，重复回调只补齐缺失关系，不重复创建 `ClaimCaseRelation`。
 - 审核签收在同一个 `@Transactional` 内完成消费登记、租户校验、状态校验、缺失案件关联追加、`WAIT_AUDIT → COMPLETED` 迁移与完成时间写入、聚合保存和交互轨迹写入；任一失败整体回滚。
-- 租户不一致返回 `AUDIT_SIGNED_TENANT_MISMATCH`（400）；申请不存在返回 `CLAIM_APPLICATION_NOT_FOUND`（404）；状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件，返回 `AUDIT_SIGNED_STATUS_INVALID`（409）。
+- 租户不一致、申请不存在、状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件时均以业务异常失败，不写入业务数据并进入死信重试。
 - `COMPLETED` 申请只补齐缺失案件关联，不改变状态与完成时间；版本冲突抛出内部冲突信号使事务回滚，交由 MQ 重投后按 `COMPLETED` 重放。
 - `WAIT_AUDIT` 滞留补偿通过审核签收状态查询端口恢复：已签收且案件号非空时复用审核签收用例推进 `COMPLETED`，处理中保持状态，未找到时重新调用审核交付端口；查询失败、空案件号或签收失败写失败轨迹并等待下一轮。
 
@@ -503,8 +503,8 @@ sequenceDiagram
 | GET | `/api/claim/v1/application/{claimApplicationNo}/issues` | 申请摘要 + 全部问题件 |
 | GET | `/api/claim/v1/application/{claimApplicationNo}/cases` | 申请摘要 + 案件关联 |
 
-- 租户来自 `TenantContext`；摘要查询同时按 `claimApplicationNo` 与 `tenantCode` 定位，跨租户与不存在使用同一错误码返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`，不暴露存在性。
-- 缺少租户上下文返回 400 `CLAIM_APPLICATION_QUERY_INVALID`；未预期异常映射 500 `CLAIM_APPLICATION_QUERY_SYSTEM_ERROR`。
+- 租户来自 `TenantContext`；摘要查询同时按 `claimApplicationNo` 与 `tenantCode` 定位，跨租户与不存在返回 400 `FAILURE`，不暴露存在性。
+- 缺少租户上下文返回 400 `FAILURE`；未预期异常映射 500 `FAILURE`。
 - 子集合为空返回 200 与空数组；材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。
 - 查询只经过 `application/query` 与 `infrastructure/persistence`，不加载领域聚合、不写交互轨迹；ArchUnit 规则禁止查询包依赖聚合仓储与轨迹仓储。
 - 问题件按案件号查询的既有接口 `/api/claim/v1/cases/{caseNo}/issue` 响应结构不变，内部改为读模型实现。
@@ -576,7 +576,7 @@ flowchart LR
 
 - 连续失败达到 3 次后熔断打开 10 秒，到期只放行一次探测；探测成功即关闭并要求发号器先抬升计数器，探测失败立即重新打开。
 - 熔断期间锁、判定快照与发号不再发起 Redis 调用：锁降级为无锁、快照只走 L1 与 MySQL、发号改为本节点串行取当天最大尾号加一。
-- 降级期间本节点签收受信号量限制（默认 10），超出直接返回 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`，不排队。
+- 降级期间本节点签收受信号量限制（默认 10），超出直接返回 500 `FAILURE`，不排队。
 - 跨节点编号冲突仍由唯一键约束与用例重试收敛，重试上限 5 次；编号格式 `A` + `yyyyMMdd` + 8 位序列不因降级改变。
 - 降级日志相邻两条间隔不小于 10 秒，只包含降级原因与当前并发数。
 

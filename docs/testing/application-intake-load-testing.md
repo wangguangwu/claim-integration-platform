@@ -75,7 +75,7 @@ rg ',false,' scripts/jmeter/results/idempotency-20261028-001.jtl
 网关对签收路由执行两层限流，阈值都是单节点 QPS：租户全局上界 = 单节点阈值 × 网关节点数。
 
 - 路由兜底：`CLAIM_APPLICATION_RATE_LIMIT_DEFAULT_QPS`（默认 50），不区分接口与租户。
-- 接口级租户配额：`CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS`（默认 20）只作用于签收接口 `claim-application-intake`，同一租户的承保回调不受该配额影响；接口路径由 `CLAIM_APPLICATION_RATE_LIMIT_INTAKE_PATH` 指定，默认 `/api/claim/v1/application/intake`。
+- 接口级租户配额：`CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS`（默认 20）只作用于签收接口 `claim-application-intake`，同一租户的查询接口不受该配额影响；接口路径由 `CLAIM_APPLICATION_RATE_LIMIT_INTAKE_PATH` 指定，默认 `/api/claim/v1/application/intake`。
 
 压测脚本固定使用 `tenant-a`，而默认配额 20 低于压测吞吐，直接跑吞吐脚本会把 429 计入 `Error %`。压测吞吐前把两层阈值都调到高于目标吞吐再启动网关：
 
@@ -87,8 +87,8 @@ export CLAIM_APPLICATION_RATE_LIMIT_DEFAULT_QPS=500
 ### 限流演练
 
 1. 用 `CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS=2` 重启网关，连续提交 50 次签收请求：`tenant-a` 应返回 HTTP 429 与 `code=CLAIM_APPLICATION_RATE_LIMITED`，响应头带 `X-Trace-Id`；预期首批 2 次返回 200，其余 429。
-2. 配额被打满时，同一 `tenant-a` 调用承保回调 `POST /api/claim/v1/callbacks/underwriting-completed` 应正常返回 200，证明接口级配额只作用于签收接口。
-3. 同时用未接入的 `X-Tenant-Code: tenant-b` 提交签收，请求返回 400 `TENANT_PROTOCOL_UNSUPPORTED` 而非 429，证明接口级配额只作用于已接入租户。
+2. 配额被打满时，同一 `tenant-a` 用上一步创建的申请编号调用 `GET /api/claim/v1/application/{claimApplicationNo}/issues`（带 `X-Tenant-Code: tenant-a`、`X-Protocol-Version: v1`）应正常返回 200，证明接口级配额只作用于签收接口。
+3. 同时用未接入的 `X-Tenant-Code: tenant-b` 提交签收，请求返回 400 `FAILURE` 而非 429，证明接口级配额只作用于已接入租户。
 4. 核对理赔申请服务日志：被限流的 `tenant-a` 请求没有签收日志，`t_claim_interaction_log` 也没有对应轨迹，说明请求没有进入业务服务。
 5. 恢复阈值并重启网关后，同样的请求重新返回 200。
 
@@ -121,7 +121,7 @@ docker exec claim-redis redis-cli --user claim_app --pass claim_redis --no-auth-
   GET "claim-applicationnumber:$(date +%Y%m%d)"
 ```
 
-降级期间本节点签收并发受信号量限制（默认 10），超出直接返回 500 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`；这类响应属于预期保护行为，不是压测失败样本。
+降级期间本节点签收并发受信号量限制（默认 10），超出直接返回 500 `FAILURE`；这类响应属于预期保护行为，不是压测失败样本。
 
 ## 清理压测数据
 

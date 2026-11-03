@@ -23,8 +23,6 @@ public record AuditSignedCommand(String claimApplicationNo, String tenantCode, S
 
     /**
      * 规范化案件号：去空白、去重并校验非空与长度。
-     *
-     * <p>MQ 装配器负责报文级错误码，补偿链路直接构造命令时依赖本构造器获得相同约束。</p>
      */
     public AuditSignedCommand {
         if (caseNos == null || caseNos.isEmpty()) {

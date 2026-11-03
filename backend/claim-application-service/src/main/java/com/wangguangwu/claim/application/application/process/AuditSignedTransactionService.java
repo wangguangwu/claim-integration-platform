@@ -5,7 +5,6 @@ import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.application.exception.AuditSignedConflictException;
-import com.wangguangwu.claim.application.application.exception.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.application.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.port.ConsumedEventRepository;
@@ -77,18 +76,15 @@ public class AuditSignedTransactionService {
     private ClaimApplication loadForCompletion(AuditSignedCommand command) {
         ClaimApplication claimApplication = claimApplicationRepository
                 .findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new ApplicationException(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
-                        "审核签收事件对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()
+                .orElseThrow(() -> new ApplicationException("审核签收事件对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()
                                 + "，eventId=" + command.eventId()));
         if (!claimApplication.getTenantCode().equals(command.tenantCode())) {
-            throw new ApplicationException(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_TENANT_MISMATCH,
-                    "审核签收消息租户与申请租户不一致，claimApplicationNo=" + command.claimApplicationNo()
+            throw new ApplicationException("审核签收消息租户与申请租户不一致，claimApplicationNo=" + command.claimApplicationNo()
                             + "，eventId=" + command.eventId());
         }
         boolean acceptable = claimApplication.isAwaitingAudit() || claimApplication.isCompleted();
         if (!acceptable || (claimApplication.isAwaitingAudit() && claimApplication.hasOpenIssue())) {
-            throw new ApplicationException(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_STATUS_INVALID,
-                    "申请状态不允许完成审核签收，claimApplicationNo=" + command.claimApplicationNo()
+            throw new ApplicationException("申请状态不允许完成审核签收，claimApplicationNo=" + command.claimApplicationNo()
                             + "，当前状态=" + claimApplication.getStatus() + "，eventId=" + command.eventId());
         }
         return claimApplication;

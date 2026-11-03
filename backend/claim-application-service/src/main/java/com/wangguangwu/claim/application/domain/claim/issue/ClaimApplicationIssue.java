@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.domain.claim.issue;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.foundation.common.util.AssertUtil;
 import java.time.LocalDateTime;
@@ -118,8 +117,7 @@ public class ClaimApplicationIssue {
     public void close(String closedBy, LocalDateTime closedAt) {
         AssertUtil.notNull(closedAt, "问题件关闭时间不能为空");
         if (status != ClaimApplicationIssueStatus.OPEN) {
-            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_STATUS_INVALID,
-                    "问题件状态不允许关闭，issueNo=" + issueNo + "，当前状态=" + status);
+            throw new DomainException("问题件状态不允许关闭，issueNo=" + issueNo + "，当前状态=" + status);
         }
         AssertUtil.notBlank(closedBy, "关闭人不能为空");
         AssertUtil.isTrue(closedBy.length() <= 128, "关闭人不能超过 128 字符");

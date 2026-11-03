@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.application.application.command.ClaimApplicationIssueCloseCommand;
@@ -39,8 +38,7 @@ public class ClaimApplicationIssueCloseUseCase {
      */
     public ClaimApplicationIssueCloseResult close(ClaimApplicationIssueCloseCommand command) {
         ClaimApplication claimApplication = claimApplicationRepository.findByIssueNo(command.issueNo())
-                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
-                        "问题件不存在，issueNo=" + command.issueNo()));
+                .orElseThrow(() -> new DomainException("问题件不存在，issueNo=" + command.issueNo()));
         if (!claimApplication.closeIssue(command.issueNo(), command.auditor(),
                 LocalDateTime.now(BUSINESS_ZONE_ID))) {
             log.info("问题件已关闭，按幂等处理，issueNo={}，claimApplicationNo={}", command.issueNo(),
@@ -57,8 +55,7 @@ public class ClaimApplicationIssueCloseUseCase {
 
     private ClaimApplicationIssueCloseResult resolveAfterConflict(ClaimApplicationIssueCloseCommand command) {
         ClaimApplication current = claimApplicationRepository.findByIssueNo(command.issueNo())
-                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
-                        "问题件不存在，issueNo=" + command.issueNo()));
+                .orElseThrow(() -> new DomainException("问题件不存在，issueNo=" + command.issueNo()));
         if (!current.closeIssue(command.issueNo(), command.auditor(), LocalDateTime.now(BUSINESS_ZONE_ID))) {
             log.info("问题件已被并发关闭，按幂等处理，issueNo={}，claimApplicationNo={}", command.issueNo(),
                     current.getClaimApplicationNo());
@@ -69,7 +66,6 @@ public class ClaimApplicationIssueCloseUseCase {
                     current.getClaimApplicationNo());
             return new ClaimApplicationIssueCloseResult(command.issueNo(), true);
         }
-        throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
-                "申请状态已被并发改变，无法关闭问题件，issueNo=" + command.issueNo());
+        throw new DomainException("申请状态已被并发改变，无法关闭问题件，issueNo=" + command.issueNo());
     }
 }

@@ -1,7 +1,5 @@
 package com.wangguangwu.claim.application.domain.claim;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
 import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
 import com.wangguangwu.claim.application.domain.claim.material.Material;
@@ -226,8 +224,7 @@ public class ClaimApplication {
     public void reapply(ClaimApplication submitted, String batchNo, LocalDateTime operatedAt) {
         AssertUtil.notNull(operatedAt, "重新申请时间不能为空");
         if (!isReapplicable()) {
-            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
-                    "仅受理失败的申请允许重新申请，claimApplicationNo=" + claimApplicationNo
+            throw new DomainException("仅受理失败的申请允许重新申请，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + status);
         }
         List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
@@ -256,8 +253,7 @@ public class ClaimApplication {
         AssertUtil.notNull(operatedAt, "租户补材时间不能为空");
         List<ClaimApplicationIssue> openIssues = openIssues();
         if (status != ClaimApplicationStatus.ISSUE || openIssues.isEmpty()) {
-            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
-                    "申请状态不合法，无法受理租户补材，claimApplicationNo=" + claimApplicationNo
+            throw new DomainException("申请状态不合法，无法受理租户补材，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + status + "，未关闭问题件数=" + openIssues.size());
         }
         List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
@@ -325,8 +321,7 @@ public class ClaimApplication {
         AssertUtil.notNull(completedAt, "审核完成时间不能为空");
         ensureStatus(ClaimApplicationStatus.WAIT_AUDIT, "完成审核签收");
         if (hasOpenIssue()) {
-            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
-                    "存在未关闭问题件，不允许完成审核签收，claimApplicationNo=" + claimApplicationNo);
+            throw new DomainException("存在未关闭问题件，不允许完成审核签收，claimApplicationNo=" + claimApplicationNo);
         }
         status = ClaimApplicationStatus.COMPLETED;
         this.completedAt = completedAt;
@@ -342,13 +337,11 @@ public class ClaimApplication {
      */
     public void raiseIssue(String issueNo, String reason, String raisedBy, String issueContent) {
         if (status != ClaimApplicationStatus.WAIT_AUDIT) {
-            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
-                    "申请状态不合法，无法下发问题件，claimApplicationNo=" + claimApplicationNo
+            throw new DomainException("申请状态不合法，无法下发问题件，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + status);
         }
         if (!openIssues().isEmpty()) {
-            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN,
-                    "同一申请已有未关闭问题件，claimApplicationNo=" + claimApplicationNo);
+            throw new DomainException("同一申请已有未关闭问题件，claimApplicationNo=" + claimApplicationNo);
         }
         issues.add(ClaimApplicationIssue.create(issueNo, reason, raisedBy, issueContent));
         status = ClaimApplicationStatus.ISSUE;
@@ -367,8 +360,7 @@ public class ClaimApplication {
         ClaimApplicationIssue issue = issues.stream()
                 .filter(candidate -> candidate.getIssueNo().equals(issueNo))
                 .findFirst()
-                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
-                        "问题件不存在，claimApplicationNo=" + claimApplicationNo + "，issueNo=" + issueNo));
+                .orElseThrow(() -> new DomainException("问题件不存在，claimApplicationNo=" + claimApplicationNo + "，issueNo=" + issueNo));
         if (issue.isClosed()) {
             return false;
         }
@@ -497,29 +489,25 @@ public class ClaimApplication {
         Set<Long> resultMaterialIds = new HashSet<>();
         for (MaterialProcessingResult result : results) {
             if (!resultMaterialIds.add(result.materialId())) {
-                throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
-                        "材料处理结果重复，claimApplicationNo=" + claimApplicationNo
+                throw new DomainException("材料处理结果重复，claimApplicationNo=" + claimApplicationNo
                                 + "，materialId=" + result.materialId());
             }
             if (!pendingMaterialIds.contains(result.materialId())) {
-                throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
-                        "材料处理结果包含未知或非待处理材料，claimApplicationNo=" + claimApplicationNo
+                throw new DomainException("材料处理结果包含未知或非待处理材料，claimApplicationNo=" + claimApplicationNo
                                 + "，materialId=" + result.materialId());
             }
         }
         if (resultMaterialIds.size() != pendingMaterialIds.size()) {
             Set<Long> missingMaterialIds = new HashSet<>(pendingMaterialIds);
             missingMaterialIds.removeAll(resultMaterialIds);
-            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
-                    "材料处理结果缺失待处理材料，claimApplicationNo=" + claimApplicationNo
+            throw new DomainException("材料处理结果缺失待处理材料，claimApplicationNo=" + claimApplicationNo
                             + "，缺失材料=" + missingMaterialIds);
         }
     }
 
     private void ensureStatus(ClaimApplicationStatus expectedStatus, String action) {
         if (status != expectedStatus) {
-            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
-                    "申请状态不允许" + action + "，claimApplicationNo=" + claimApplicationNo
+            throw new DomainException("申请状态不允许" + action + "，claimApplicationNo=" + claimApplicationNo
                             + "，期望状态=" + expectedStatus + "，实际状态=" + status);
         }
     }

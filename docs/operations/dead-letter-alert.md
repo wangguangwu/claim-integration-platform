@@ -14,13 +14,13 @@
 
 消息进入死信说明消费在重投耗尽后仍然失败。常见原因：申请不存在、消息载荷非法、租户不一致、申请状态不是 `WAIT_AUDIT`/`COMPLETED`、`WAIT_AUDIT` 仍存在未关闭问题件或数据库持续不可用。应用不会吞掉异常，失败原因以 ERROR 形式记录在应用日志，日志包含 `consumerGroup`、`claimApplicationNo`、`eventId` 与异常摘要。
 
-| 错误码 | HTTP 映射 | 触发场景 | 处置建议 |
-|---|---|---|---|
-| `CLAIM_APPLICATION_NOT_FOUND` | 404 | 平台不存在该申请 | 确认 `claimApplicationNo`，必要时补建申请后重放 |
-| `AUDIT_SIGNED_INVALID` | 400 | 消息载荷非法（如案件号为空、超长） | 由审核系统修正消息后发送新事件 |
-| `AUDIT_SIGNED_TENANT_MISMATCH` | 400 | 消息 `tenantCode` 与申请归属不一致 | 核对审核系统租户映射，修正后重发 |
-| `AUDIT_SIGNED_STATUS_INVALID` | 409 | 申请状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 存在未关闭问题件 | 核对申请当前状态与问题件，确认业务是否已变更 |
-| `CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR` | 500 | 未预期的系统异常 | 排查数据库与依赖后重放 |
+| 失败原因 | 触发场景 | 处置建议 |
+|---|---|---|
+| 申请不存在 | 平台不存在该申请 | 确认 `claimApplicationNo`，必要时补建申请后重放 |
+| 消息载荷非法 | 消息载荷非法（如案件号为空、超长） | 由审核系统修正消息后发送新事件 |
+| 租户不一致 | 消息 `tenantCode` 与申请归属不一致 | 核对审核系统租户映射，修正后重发 |
+| 状态不合法 | 申请状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 存在未关闭问题件 | 核对申请当前状态与问题件，确认业务是否已变更 |
+| 系统异常 | 未预期的系统异常 | 排查数据库与依赖后重放 |
 
 ## 告警邮件字段
 

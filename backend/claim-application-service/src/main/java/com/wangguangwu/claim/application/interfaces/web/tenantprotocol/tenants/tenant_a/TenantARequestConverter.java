@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.web.tenantprotocol.tenants.tenant_a;
 
-import com.wangguangwu.claim.application.interfaces.dto.TenantAIntakeRequest;
+import com.wangguangwu.claim.application.interfaces.web.dto.request.TenantAIntakeRequest;
 
 import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
 import com.wangguangwu.claim.application.domain.claim.person.Applicant;
@@ -8,8 +8,7 @@ import com.wangguangwu.claim.application.domain.claim.person.Gender;
 import com.wangguangwu.claim.application.domain.claim.material.MaterialSubmission;
 import com.wangguangwu.claim.application.domain.claim.person.Payee;
 import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.interfaces.web.tenantprotocol.core.stage.TenantProtocolConverter;
+import com.wangguangwu.claim.application.interfaces.web.tenantprotocol.stage.TenantProtocolConverter;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import com.wangguangwu.claim.application.application.command.ClaimApplicationIntakeCommand;
 import java.util.List;
@@ -72,8 +71,7 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
         return switch (sex.trim()) {
             case GENDER_MALE_CODE -> Gender.MALE;
             case GENDER_FEMALE_CODE -> Gender.FEMALE;
-            default -> throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
-                    "sex 仅支持 M 或 F");
+            default -> throw new BusinessException("sex 仅支持 M 或 F");
         };
     }
 

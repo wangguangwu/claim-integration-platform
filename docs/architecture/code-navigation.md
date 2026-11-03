@@ -21,9 +21,9 @@ interfaces → application → domain ← infrastructure
 
 `shared` 位于依赖图底部，只能被其他层引用。该方向由 `ClaimApplicationArchitectureTest` 在 Maven 测试阶段持续校验；新增代码不得通过跨层 import 绕过应用端口或领域模型。
 
-- `interfaces`：入站适配器，按 `web`、`consumer`、`dto`、`scheduler` 分包，只处理 HTTP、消息、调度、协议和响应映射。
+- `interfaces`：入站适配器，按 `web`、`consumer`、`scheduler` 分包，只处理 HTTP、消息、调度、协议和响应映射。
 - `application`：应用编排，按 `command`、`query`、`port`、`process`、`exception` 分包；拥有出站能力端口、端口模型、用例编排与应用异常（`ApplicationException`）。
-- `domain`：业务状态机、聚合根与聚合内实体、值对象、聚合外追加事实、聚合 Repository 和领域错误码（`DomainException`），不依赖具体技术实现。
+- `domain`：业务状态机、聚合根与聚合内实体、值对象、聚合外追加事实、聚合 Repository 和领域异常（`DomainException`），不依赖具体技术实现。
 - `infrastructure`：按 `persistence`、`adapter`（Redis、Redisson、发号、锁、熔断等技术适配）、`acl`（审核、承保、文件等外部系统实现）、`mq`、`config` 分包，实现 `application/port` 与 `domain` 聚合 Repository。
 - `shared`：按 `exception`、`message`、`util` 分包，承载传输无关异常基类、消息契约与无业务归属工具。
 
@@ -36,19 +36,18 @@ interfaces → application → domain ← infrastructure
 | `domain/claim` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合根、状态枚举；`material` 材料实体、`issue` 问题件实体、`person` 人员值对象 | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
 | `domain/claimcase` | 要表达不参与聚合加载的追加事实 | 案件关联追加事实与其端口 | 聚合状态迁移、材料/问题件实体 |
 | `domain/claim/port` | 要声明聚合生命周期契约 | 聚合 Repository | 读模型查询、锁、发号、外部系统调用 |
-| `domain/claim/exception` | 要表达领域拒绝 | 领域错误码 | HTTP 状态、应用编排错误 |
 | `application/process` | 要编排一次完整业务操作 | 用例、事务服务、结果模型、记录装配、冲突解析 | HTTP 注解、数据库对象、第三方 SDK 调用、业务不变式 |
 | `application/command` | 要描述用例入参 | 命令记录 | 协议字段、校验注解以外的框架细节 |
 | `application/query` | 要实现只读查询 | 查询用例与读模型 | 聚合加载、交互轨迹写入 |
 | `application/port` | 要声明出站能力 | 锁、发号、缓存、外部系统、Outbox、消费去重、补偿策略、读模型端口 | 端口实现、配置绑定 |
-| `application/exception` | 要表达应用层拒绝 | `ApplicationException`、异步错误码、内部冲突信号 | 领域不变式、HTTP 状态 |
+| `application/exception` | 要表达应用层拒绝 | `ApplicationException`、内部冲突信号 | 领域不变式、HTTP 状态 |
 | `infrastructure/persistence` | 要接入数据库 | DO、ORM Mapper、Converter、仓储与读模型实现 | 业务状态机、接口响应映射 |
 | `infrastructure/adapter` | 要接入 Redis、Redisson 等技术设施 | Redis 快照、发号、分布式锁与熔断 | 外部系统交互、用例流程决策 |
 | `infrastructure/acl` | 要对接审核、承保或文件服务 | 外部系统端口实现（`Logging*`，只打印调用日志） | Redis 技术实现、用例流程决策 |
 | `infrastructure/mq` | 要接入消息中间件 | Outbox 发布实现 | 消息契约、消费者 |
 | `infrastructure/config` | 要绑定配置或装配框架 | `*Properties`、MyBatis-Plus/Redisson 配置 | 业务参数决策 |
 | `interfaces` | 要承接外部输入或对外调度 | Controller、Consumer、Scheduler、租户协议流水线、请求响应 DTO | 领域规则和持久化实现 |
-| `shared` | 确属跨业务能力复用 | 异常基类、错误码接口、消息契约、无业务归属工具 | 单一业务域模型、HTTP 请求或响应模型 |
+| `shared` | 确属跨业务能力复用 | 异常基类、消息契约、无业务归属工具 | 单一业务域模型、HTTP 请求或响应模型 |
 
 ## 按业务能力定位
 
@@ -56,7 +55,7 @@ interfaces → application → domain ← infrastructure
 | --- | --- | --- | --- | --- |
 | 申请签收 | `domain/claim`（`ClaimApplication` 聚合根） | `application/process/{ClaimApplicationIntakeUseCase,ClaimApplicationIntakeTransactionService}`、`application/port` | `infrastructure/persistence`、`infrastructure/adapter`（锁、快照、发号） | `interfaces/web`、`interfaces/web/tenantprotocol` |
 | 材料处理 | `domain/claim/material`（`Material` 聚合内实体） | `application/process/{MaterialProcessingUseCase,MaterialProcessingTransactionService}` | `infrastructure/acl/LoggingMaterialFileProcessor` | `interfaces/consumer/MaterialProcessConsumer` |
-| 自动承保 | `domain/claim` 的状态推进 | `application/process/{UnderwritingUseCase,UnderwritingTransactionService,UnderwritingCallbackUseCase}`、`application/port/UnderwritingSystemPort` | `infrastructure/acl/LoggingUnderwritingSystem` | `interfaces/web/UnderwritingCallbackController` |
+| 自动承保 | `domain/claim` 的状态推进 | `application/process/{UnderwritingUseCase,UnderwritingTransactionService,UnderwritingCallbackUseCase}`、`application/process/compensation/UnderwritingCompensationHandler`、`application/port/UnderwritingSystemPort` | `infrastructure/acl/LoggingUnderwritingSystem` | `interfaces/scheduler/ClaimApplicationCompensationScheduler`（查询承保结果推进） |
 | 审核交付与签收完成 | `domain/claimcase`（`ClaimCaseRelation` 追加事实）、`domain/claim`（`WAIT_AUDIT → COMPLETED` 状态迁移） | `application/process/{AuditDeliveryUseCase,AuditSignedUseCase,AuditSignedTransactionService}`、`application/port/AuditSystemPort` | `infrastructure/persistence`、`infrastructure/acl/LoggingAuditSystem` | `interfaces/consumer/{AuditDeliveryConsumer,AuditSignedConsumer}` |
 | 问题件 | `domain/claim/issue`（`ClaimApplicationIssue` 聚合内实体） | `application/process/{ClaimApplicationIssueIntakeUseCase,ClaimApplicationIssueCloseUseCase,ClaimApplicationIssueQueryUseCase}` | `infrastructure/persistence` | `interfaces/web/ClaimApplicationIssueIntakeController`、`ClaimApplicationIssueQueryController` |
 | 详情查询 | — | `application/query/ClaimApplicationDetailQueryUseCase`、`application/port/ClaimApplicationDetailQuery` | `infrastructure/persistence/MyBatisClaimApplicationDetailQuery` | `interfaces/web/ClaimApplicationQueryController` |
@@ -68,7 +67,7 @@ interfaces → application → domain ← infrastructure
 | --- | --- | --- |
 | 签收请求为什么被拒绝 | `interfaces/web` 的异常映射 | `application/process/ClaimApplicationIntakeUseCase` → `domain/claim` → `infrastructure/persistence` |
 | 材料为何导致受理失败 | `interfaces/consumer/MaterialProcessConsumer` | `application/process/MaterialProcessingUseCase` → `domain/claim` → `infrastructure/persistence` |
-| 承保回调为什么未推进状态 | `interfaces/web/UnderwritingCallbackController` | `application/process/UnderwritingCallbackUseCase` → `domain/claim` → `application/port/UnderwritingSystemPort` |
+| 承保中滞留为什么未推进 | `interfaces/scheduler/ClaimApplicationCompensationScheduler` | `application/process/compensation/UnderwritingCompensationHandler` → `application/process/UnderwritingCallbackUseCase` → `domain/claim` → `application/port/UnderwritingSystemPort` |
 | 消息没有发出或重复发送 | `interfaces/scheduler/OutboxRelayScheduler` | `application/process/OutboxRelayUseCase` → `application/port/{OutboxEventRepository,OutboxEventPublisher}` → `infrastructure/mq` |
 | 问题件无法下发或关闭 | `interfaces/web/ClaimApplicationIssueIntakeController` | `application/process/ClaimApplicationIssue*UseCase` → `domain/claim` → `infrastructure/persistence` |
 | 审核签收为什么未推进完成 | `interfaces/consumer/AuditSignedConsumer` | `application/process/AuditSignedUseCase` → `application/process/AuditSignedTransactionService` → `domain/claim`（`completeAudit`）→ `infrastructure/persistence` |

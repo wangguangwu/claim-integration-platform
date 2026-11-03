@@ -1,11 +1,10 @@
 package com.wangguangwu.claim.application.interfaces.web.tenantprotocol.tenants.tenant_a;
 
-import com.wangguangwu.claim.application.interfaces.dto.TenantAIntakeRequest;
+import com.wangguangwu.claim.application.interfaces.web.dto.request.TenantAIntakeRequest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.interfaces.web.tenantprotocol.core.stage.TenantProtocolParser;
+import com.wangguangwu.claim.application.interfaces.web.tenantprotocol.stage.TenantProtocolParser;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +34,7 @@ public class TenantARequestParser implements TenantProtocolParser<TenantAIntakeR
         } catch (JsonProcessingException exception) {
             // 只记录异常类型：报文原文含证件号，不允许进日志。
             log.warn("A 租户申请报文解析失败，原因类型={}", exception.getClass().getSimpleName());
-            throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
-                    "租户申请报文不是合法的 A 租户协议 JSON", exception);
+            throw new BusinessException("租户申请报文不是合法的 A 租户协议 JSON", exception);
         }
     }
 }

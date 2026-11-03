@@ -2,8 +2,6 @@ package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.port.model.InteractionAction;
@@ -50,21 +48,17 @@ public class ClaimApplicationIntakeConflictResolver {
                                                 String requestId, String traceId) {
         ClaimApplication current = claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(tenantCode,
                         externalClaimApplicationNo)
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
-                        "理赔申请处理冲突且无法重读，claimApplicationNo=" + claimApplicationNo));
+                .orElseThrow(() -> new ApplicationException("理赔申请处理冲突且无法重读，claimApplicationNo=" + claimApplicationNo));
         if (current.getClaimApplicationAttempt() > attemptBefore) {
             recordReused(current.getClaimApplicationNo(), requestId, traceId);
             return new ClaimApplicationIntakeResult(current.getClaimApplicationNo(),
                     ClaimApplicationIntakeDisposition.REUSED);
         }
         if (supplement && current.getStatus() != ClaimApplicationStatus.ISSUE) {
-            throw new ApplicationException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
-                    "补材时申请状态已变化，claimApplicationNo=" + claimApplicationNo
+            throw new ApplicationException("补材时申请状态已变化，claimApplicationNo=" + claimApplicationNo
                             + "，当前状态=" + current.getStatus());
         }
-        throw new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
-                "理赔申请正在处理中，claimApplicationNo=" + claimApplicationNo);
+        throw new ApplicationException("理赔申请正在处理中，claimApplicationNo=" + claimApplicationNo);
     }
 
     private void recordReused(String claimApplicationNo, String requestId, String traceId) {

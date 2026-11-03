@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.application.process;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.query.model.IssueView;
@@ -32,9 +31,7 @@ public class ClaimApplicationIssueQueryUseCase {
      */
     public ClaimApplicationIssueQueryResult queryByCaseNo(String tenantCode, String caseNo) {
         String claimApplicationNo = claimCaseRelationRepository.findClaimApplicationNo(tenantCode, caseNo)
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationIssueErrorCode.CASE_RELATION_NOT_FOUND,
-                        "案件关联不存在，tenantCode=" + tenantCode + "，caseNo=" + caseNo));
+                .orElseThrow(() -> new ApplicationException("案件关联不存在，tenantCode=" + tenantCode + "，caseNo=" + caseNo));
         return claimApplicationDetailQuery.findOpenIssue(tenantCode, claimApplicationNo)
                 .map(issue -> openIssueResult(claimApplicationNo, caseNo, issue))
                 .orElseGet(() -> new ClaimApplicationIssueQueryResult(claimApplicationNo, caseNo, false, null, null,

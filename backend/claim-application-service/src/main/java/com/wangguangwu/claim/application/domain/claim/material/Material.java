@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.domain.claim.material;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.foundation.common.util.AssertUtil;
 import java.time.LocalDateTime;
@@ -87,8 +86,7 @@ public class Material {
      */
     public void applyProcessResult(boolean succeeded, String uploadedFileUrl) {
         if (status != MaterialStatus.PENDING_PROCESS) {
-            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_STATUS_INVALID,
-                    "仅待处理材料允许写入处理结果，batchNo=" + batchNo + "，materialType=" + materialType
+            throw new DomainException("仅待处理材料允许写入处理结果，batchNo=" + batchNo + "，materialType=" + materialType
                             + "，当前状态=" + status);
         }
         if (succeeded) {

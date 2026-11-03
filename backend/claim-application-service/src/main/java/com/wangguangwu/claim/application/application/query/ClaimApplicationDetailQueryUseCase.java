@@ -1,6 +1,5 @@
 package com.wangguangwu.claim.application.application.query;
 
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationQueryErrorCode;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationDetailQuery;
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationWithCases;
@@ -12,7 +11,7 @@ import org.springframework.stereotype.Service;
 /**
  * 理赔申请详情查询用例，按租户与申请编号返回读模型。
  *
- * <p>查询不加载领域聚合、不写交互轨迹；申请不存在与租户不匹配使用同一错误码，避免暴露跨租户数据存在性。</p>
+ * <p>查询不加载领域聚合、不写交互轨迹；申请不存在与租户不匹配返回相同失败响应，避免暴露跨租户数据存在性。</p>
  *
  * @author wangguangwu
  * @since 2026-11-03
@@ -60,7 +59,6 @@ public class ClaimApplicationDetailQueryUseCase {
     }
 
     private ApplicationException notFound(String claimApplicationNo) {
-        return new ApplicationException(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_NOT_FOUND,
-                "理赔申请不存在，claimApplicationNo=" + claimApplicationNo);
+        return new ApplicationException("理赔申请不存在，claimApplicationNo=" + claimApplicationNo);
     }
 }

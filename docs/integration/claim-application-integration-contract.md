@@ -16,7 +16,7 @@
 | MQ 信封与载荷字段 | `applicationNo` | `claimApplicationNo` |
 | 事件类型 | `APPLICATION_CREATED`、`APPLICATION_REAPPLIED` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` |
 | 交互类型 | `APPLICATION_INTAKE` | `CLAIM_APPLICATION_INTAKE` |
-| 错误码 | `APPLICATION_INTAKE_INVALID`、`APPLICATION_INTAKE_BUSY`、`APPLICATION_INTAKE_SYSTEM_ERROR` | `CLAIM_APPLICATION_INTAKE_INVALID`、`CLAIM_APPLICATION_INTAKE_BUSY`、`CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR` |
+| 错误码 | `APPLICATION_INTAKE_INVALID`、`APPLICATION_INTAKE_BUSY`、`APPLICATION_INTAKE_SYSTEM_ERROR` | 已统一移除，失败响应只返回 `FAILURE` |
 | HTTP 接口前缀 | `/api/application/v1`，网关 `Path=/api/application/**` | `/api/claim/v1`，网关 `Path=/api/claim/**` |
 
 MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；租户私有入参字段名不受影响。
@@ -52,12 +52,13 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `/api/claim/v1/application/{claimApplicationNo}/materials` | `GET` | 租户系统 | 查询申请摘要与未删除材料 | `claimApplicationNo` |
 | `/api/claim/v1/application/{claimApplicationNo}/issues` | `GET` | 租户系统 | 查询申请摘要与全部问题件 | `claimApplicationNo` |
 | `/api/claim/v1/application/{claimApplicationNo}/cases` | `GET` | 租户系统 | 查询申请摘要与案件关联 | `claimApplicationNo` |
-| `/api/claim/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
 | `/api/claim/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
 | `/api/claim/v1/callbacks/audit-issues/{issueNo}/close` | `POST` | 审核系统 | 关闭问题件 | `issueNo`、`X-Request-Id` |
 | `/api/claim/v1/cases/{caseNo}/issue` | `GET` | 审核系统 | 查询案件是否存在未关闭问题件 | `caseNo` |
 
 审核签收不再使用 HTTP 回调，改为消费 `claim_application_audit_signed_v1`，消息结构见下文 MQ 契约。
+
+自动承保完成不提供 HTTP 回调入口：平台通过补偿任务调用承保系统的结果查询接口推进 `UNDERWRITING → WAIT_AUDIT`，承保系统只需保证结果查询接口可用。
 
 成功响应：
 
@@ -74,7 +75,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 ```json
 {
-  "code": "INVALID_REQUEST",
+  "code": "FAILURE",
   "message": "请求参数不合法",
   "traceId": "5bba2a7f468c4efe",
   "data": null
@@ -106,7 +107,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 |---|---|---|
 | 有未关闭问题件 | 200 | `hasOpenIssue=true`，返回 `issueNo`、`reason`、`raisedAt` |
 | 无未关闭问题件 | 200 | `hasOpenIssue=false`，其余问题件字段为 `null` |
-| 案件关系不存在 | 404 | 错误码 `CASE_RELATION_NOT_FOUND` |
+| 案件关系不存在 | 400 | `code=FAILURE` |
 
 ### 理赔申请详情查询
 
@@ -118,30 +119,30 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `GET /api/claim/v1/application/{claimApplicationNo}/issues` | 申请摘要 + 全部问题件 |
 | `GET /api/claim/v1/application/{claimApplicationNo}/cases` | 申请摘要 + 案件关联 |
 
-| 场景 | HTTP 状态 | 错误码 |
+| 场景 | HTTP 状态 | 响应 code |
 |---|---|---|
-| 申请不存在或不属于当前租户 | 404 | `CLAIM_APPLICATION_QUERY_NOT_FOUND` |
-| 缺少租户上下文 | 400 | `CLAIM_APPLICATION_QUERY_INVALID` |
-| 未预期系统异常 | 500 | `CLAIM_APPLICATION_QUERY_SYSTEM_ERROR` |
+| 申请不存在或不属于当前租户 | 400 | `FAILURE` |
+| 缺少租户上下文 | 400 | `FAILURE` |
+| 未预期系统异常 | 500 | `FAILURE` |
 
-子集合为空返回 200 与空数组。材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。跨租户与不存在使用同一错误码，避免暴露其他租户数据的存在性。
+子集合为空返回 200 与空数组。材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。跨租户与不存在返回相同状态与响应，避免暴露其他租户数据的存在性。
 
 ### 签收幂等判定
 
 - 未携带 `claimApplicationNo` 时：首次提交创建申请并返回新 `claimApplicationNo`；同一 `externalClaimApplicationNo` 的重复提交返回同一 `claimApplicationNo`，不覆盖人员、材料与状态。
-- 携带 `claimApplicationNo` 时跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致；申请不存在或编号不一致返回 HTTP 400 与 `CLAIM_APPLICATION_INTAKE_INVALID`，且不新建申请。
+- 携带 `claimApplicationNo` 时跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致；申请不存在或编号不一致返回 HTTP 400 与 `FAILURE`，且不新建申请。
 - 携带 `claimApplicationNo` 且状态为 `ACCEPT_FAILED` 时返回 `REAPPLIED`：人员与材料整体替换，旧材料逻辑删除，尝试次数加 1，状态回到 `PENDING_ACCEPT`。
 - 携带 `claimApplicationNo`、状态为 `ISSUE` 且存在未关闭问题件时返回 `SUPPLEMENTED`：关闭该问题件（关闭人 `TENANT_SUPPLEMENT`），报文人员不生效，旧材料逻辑删除并写入新批次，尝试次数加 1，状态回到 `PENDING_ACCEPT`，随后异步处理材料。
 - 携带 `claimApplicationNo` 的其他状态（含 `COMPLETED`）返回 `REUSED`，只写交互轨迹，不触发重新申请或补材。
-- 聚合保存冲突时，尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 HTTP 400 与 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 HTTP 503 与 `CLAIM_APPLICATION_INTAKE_BUSY`，调用方可重试。
+- 聚合保存冲突时，尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 HTTP 400 与 `FAILURE`；其余返回 HTTP 503 与 `FAILURE`，调用方可重试。
 - 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT`、`COMPLETED` 四种可复用状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT`、`ACCEPT_FAILED` 与 `ISSUE` 每次都回源数据库确认。
 - 该缓存不改变对调用方可见的响应结构与响应码。
 
 ### Redis 降级
 
 - 连续失败达到 3 次后熔断打开 10 秒，期间签收不依赖 Redis：锁降级为无锁、判定快照只走进程内缓存与 MySQL、编号改为本节点串行取当天最大尾号加一。
-- 降级期间本节点签收并发受信号量限制（默认 10），超出时返回 HTTP 500 与 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`，调用方可按原重试策略重试。
-- 降级不改变编号格式与长度；跨节点并发产生的唯一键冲突由平台内部重试（上限 5 次）消化，重试耗尽同样返回 `CLAIM_APPLICATION_INTAKE_SYSTEM_ERROR`。
+- 降级期间本节点签收并发受信号量限制（默认 10），超出时返回 HTTP 500 与 `FAILURE`，调用方可按原重试策略重试。
+- 降级不改变编号格式与长度；跨节点并发产生的唯一键冲突由平台内部重试（上限 5 次）消化，重试耗尽同样返回 HTTP 500 与 `FAILURE`。
 
 ## MQ 契约
 
@@ -220,7 +221,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | `REUSED` | 申请处于 `COMPLETED`，本次全部案件号已登记过 |
 | `SKIPPED` | 同一 `eventId` 已被本消费组登记 |
 
-审核签收在同一事务内完成消费登记、案件关联追加、`WAIT_AUDIT → COMPLETED` 迁移与轨迹写入。租户不一致返回 `AUDIT_SIGNED_TENANT_MISMATCH`（400）；申请不存在返回 `CLAIM_APPLICATION_NOT_FOUND`（404）；状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件，返回 `AUDIT_SIGNED_STATUS_INVALID`（409）。失败时不写入任何业务数据，由 MQ 重投后进入死信。案件生命周期由案件服务承载。
+审核签收在同一事务内完成消费登记、案件关联追加、`WAIT_AUDIT → COMPLETED` 迁移与轨迹写入。租户不一致、申请不存在、状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件时，均以业务异常失败，不写入任何业务数据，由 MQ 重投后进入死信。案件生命周期由案件服务承载。
 
 样例中的 `eventVersion`、`occurredAt` 属于历史信封字段，平台不再读取；审核系统继续携带这两个字段或其他契约外字段时按未知字段忽略，不影响处理。
 

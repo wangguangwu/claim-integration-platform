@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.exception.ClaimApplicationIntakeConflictException;
 import com.wangguangwu.claim.application.application.command.ClaimApplicationIntakeCommand;
@@ -136,8 +135,7 @@ public class ClaimApplicationIntakeUseCase {
                 forceCreate = false;
             }
         }
-        throw new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
-                "理赔申请唯一键冲突重试次数超限，tenantCode=" + submitted.getTenantCode()
+        throw new ApplicationException("理赔申请唯一键冲突重试次数超限，tenantCode=" + submitted.getTenantCode()
                         + "，externalClaimApplicationNo=" + submitted.getExternalClaimApplicationNo());
     }
 

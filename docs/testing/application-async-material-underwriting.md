@@ -13,7 +13,7 @@
 | 签收后自动投递 | 提交申请报文 | 签收成功写入 Outbox，投递器把事件发到材料处理 Topic |
 | 材料处理成功 | 提交合法材料 | 材料变为 `PROCESSED`，申请进入承保分流 |
 | 无有效保单 | 默认行为（日志实现固定返回无有效保单） | 申请进入 `UNDERWRITING` |
-| 承保完成回调 | 调用承保完成回调接口 | 申请推进到 `WAIT_AUDIT`，生成审核交付事件 |
+| 承保完成 | 自动承保发起后日志实现固定返回 `COMPLETED` | 申请同步推进到 `WAIT_AUDIT`，生成审核交付事件 |
 | 审核交付 | 申请进入 `WAIT_AUDIT` | 消费审核交付 Topic，写入 `AUDIT_DELIVERY` 行为组 |
 | 重复消息与重复回调 | 重投同一条消息或重复调用回调 | 不产生重复材料处理与重复审核交付 |
 | MQ 停机与待受理滞留补偿 | 停止 Broker 后提交申请，等待超过 `pending-accept-timeout` | 签收仍成功；补偿直接重放材料处理并推进状态 |
@@ -30,7 +30,7 @@
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "SHOW TABLES;"
 ```
 
-日志实现没有延迟、失败或结果开关，验证不同分支时通过承保回调与审核签收消息驱动，不需要额外启动模拟服务。
+日志实现没有延迟、失败或结果开关，验证不同分支时通过自动承保与审核签收消息驱动，不需要额外启动模拟服务。
 
 ## 提交申请
 
@@ -69,26 +69,18 @@ echo "$APP_NO"
 
 ## 场景一：无有效保单进入承保中
 
-日志实现固定按无有效保单返回，链路为：签收 → 投递 → 材料处理 → `UNDERWRITING` → 承保完成回调 → `WAIT_AUDIT` → 审核交付。
+日志实现固定按无有效保单返回，链路为：签收 → 投递 → 材料处理 → `UNDERWRITING` → 自动承保完成 → `WAIT_AUDIT` → 审核交付。
 
-日志实现不发送承保完成通知，承保结果查询固定返回 `PROCESSING`，因此 `UNDERWRITING` 不会由补偿推进，需要显式调用承保完成回调：
+日志实现不发送承保完成通知，但在发起自动承保后查询结果固定返回 `COMPLETED`，服务同步推进 `UNDERWRITING → WAIT_AUDIT`，无需人工回调。查询失败或返回 `PROCESSING` 时保持承保中状态，交由补偿调度推进。
 
-```bash
-curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-Id: verify-009-callback-001' \
-  -H 'X-Trace-Id: trace-009-callback-001' \
-  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
-```
-
-1. 提交申请后确认申请处于承保中状态：
+1. 提交申请后确认申请已进入待审核状态：
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db \
   -e "SELECT claim_application_no, status, claim_application_attempt FROM t_claim_application WHERE claim_application_no='$APP_NO';"
 ```
 
-2. 调用承保完成回调后核对最终状态、材料、轨迹、事件与消费登记：
+2. 核对最终状态、材料、轨迹、事件与消费登记：
 
 ```bash
 docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "
@@ -106,7 +98,6 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 - `t_claim_application.status = WAIT_AUDIT`。
 - `t_claim_application_material.status = PROCESSED`，`uploaded_file_url` 为租户提交的原始地址。
 - `t_claim_interaction_log` 依次出现 `MATERIAL_PROCESS`、`UNDERWRITING`（含自动承保请求）、`UNDERWRITING_CALLBACK` 与 `AUDIT_DELIVERY` 的 `STARTED`/`COMPLETED`，同一行为的 `interaction_no` 相同。
-- 回调推进的承保回调记录 `request_id = verify-009-callback-001`。
 - `t_claim_outbox_event` 中 `CLAIM_APPLICATION_CREATED` 与 `AUDIT_DELIVERY_REQUESTED` 均为 `PUBLISHED`。
 - `t_claim_consumed_event` 含 `claim-application-material-processor-v1` 与 `claim-application-audit-delivery-v1` 两条记录。
 
@@ -127,20 +118,9 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 
 预期同一 `interaction_no` 下有 `STARTED` 与 `COMPLETED` 两条记录，`request_id` 为消息 `eventId`，申请状态保持 `WAIT_AUDIT` 不变。
 
-## 场景四：重复消息与重复回调
+## 场景四：重复消息
 
-1. 重复调用承保完成回调：
-
-```bash
-curl -sS -X POST http://127.0.0.1:8081/api/claim/v1/callbacks/underwriting-completed \
-  -H 'Content-Type: application/json' \
-  -H 'X-Request-Id: verify-009-callback-dup' \
-  -d "{\"claimApplicationNo\": \"$APP_NO\"}"
-```
-
-预期返回 200，`data.disposition` 为 `REUSED`；`t_claim_outbox_event` 中 `AUDIT_DELIVERY_REQUESTED` 仍只有一条，申请状态不变。
-
-2. 重复消费验证：MQ 为至少一次投递，重复消息由 `t_claim_consumed_event` 的唯一约束拦截，材料不会重复上传、审核不会重复交付。核对 `t_claim_application_material` 行数不变、`t_claim_consumed_event` 中同一 `event_id` 仍只有一行。需要主动制造重复时，用 `mqadmin resetOffsetByTime` 回拨消费位点重投同一事件，日志出现「审核交付事件已消费，跳过处理」。
+MQ 为至少一次投递，重复消息由 `t_claim_consumed_event` 的唯一约束拦截，材料不会重复上传、审核不会重复交付。核对 `t_claim_application_material` 行数不变、`t_claim_consumed_event` 中同一 `event_id` 仍只有一行。需要主动制造重复时，用 `mqadmin resetOffsetByTime` 回拨消费位点重投同一事件，日志出现「审核交付事件已消费，跳过处理」。
 
 ## 场景五：MQ 停机与待受理滞留补偿
 
@@ -186,7 +166,7 @@ docker start claim-rocketmq-broker
 
 ## 场景六：材料处理失败
 
-材料处理失败依赖文件系统明确拒绝（`FileUploadResult.success=false`）。`LoggingMaterialFileProcessor` 固定返回成功，本地无法构造该分支；接入真实文件服务后再验证：申请进入 `ACCEPT_FAILED`，被拒绝的材料置为 `FAILED` 且不写上传地址，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 与对应错误码。重新申请必须携带原 `claimApplicationNo` 再次提交，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料；未携带平台编号时按重复请求复用，不会触发重新申请。
+材料处理失败依赖文件系统明确拒绝（`FileUploadResult.success=false`）。`LoggingMaterialFileProcessor` 固定返回成功，本地无法构造该分支；接入真实文件服务后再验证：申请进入 `ACCEPT_FAILED`，被拒绝的材料置为 `FAILED` 且不写上传地址，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 与失败原因。重新申请必须携带原 `claimApplicationNo` 再次提交，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料；未携带平台编号时按重复请求复用，不会触发重新申请。
 
 租户补材复用 `CLAIM_APPLICATION_REAPPLIED` 事件：补材提交后申请回到 `PENDING_ACCEPT`，材料处理消费者按新的受理尝试次数重新处理新批次材料，再进入承保分流与审核交付。材料处理事务会校验 `PENDING_ACCEPT` 与 `claimApplicationAttempt`，过期批次只记录 `REUSED` 轨迹。
 

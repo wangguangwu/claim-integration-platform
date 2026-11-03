@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.application.shared.exception.RepositoryConflictException;
@@ -43,8 +42,7 @@ public class ClaimApplicationIssueIntakeUseCase {
         }
         ClaimApplication claimApplication = claimApplicationRepository
                 .findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND,
-                        "申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
+                .orElseThrow(() -> new DomainException("申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
         claimApplication.raiseIssue(command.issueNo(), command.reason(), command.auditor(),
                 command.issueContent());
         return saveOrResolveConflict(claimApplication, command);
@@ -74,8 +72,7 @@ public class ClaimApplicationIssueIntakeUseCase {
             return idempotentResult(command);
         }
         ClaimApplication current = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND,
-                        "申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
+                .orElseThrow(() -> new DomainException("申请不存在，claimApplicationNo=" + command.claimApplicationNo()));
         current.raiseIssue(command.issueNo(), command.reason(), command.auditor(), command.issueContent());
         if (transactionService.save(current)) {
             markMutable(current);
@@ -83,8 +80,7 @@ public class ClaimApplicationIssueIntakeUseCase {
                     command.claimApplicationNo());
             return new ClaimApplicationIssueIntakeResult(command.issueNo(), command.claimApplicationNo(), true);
         }
-        throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
-                "申请状态已被并发改变，无法下发问题件，claimApplicationNo=" + command.claimApplicationNo());
+        throw new DomainException("申请状态已被并发改变，无法下发问题件，claimApplicationNo=" + command.claimApplicationNo());
     }
 
     /**
