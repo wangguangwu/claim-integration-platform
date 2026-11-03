@@ -66,7 +66,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory`、`*Resolver` | `application/process` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationDetailQueryUseCase`、`ClaimApplicationIntakeConflictResolver`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `application/command`、`application/process` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult`、`AuditSignedOutcome` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/{web,consumer,scheduler}`；流水线实现另入 `web/tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
-| 报文防腐组件 | `TenantProtocolSignatureVerifier`、`TenantProtocolDecryptor`、`*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/web/tenantprotocol/core/stage`（五个阶段端口与默认实现）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `DefaultTenantProtocolSignatureVerifier`、`DefaultTenantProtocolDecryptor`、`TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
+| 报文防腐组件 | `TenantProtocolSignatureVerifier`、`TenantProtocolDecryptor`、`*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/web/tenantprotocol/core/stage`（五个阶段端口与默认实现）与 `tenants/tenant_a`（租户 request/解析/转换） | `DefaultTenantProtocolSignatureVerifier`、`DefaultTenantProtocolDecryptor`、`TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
 | 响应渲染 | `*ResponseRenderer`（唯一实现，不再按租户路由） | `interfaces/web/render` | `ClaimApplicationResponseRenderer`、`ClaimApplicationIssueResponseRenderer` |
 | 跨域契约 | 消息密封接口与具体消息 record、错误码接口、异常基类、异步错误码 | `shared/message`、`shared/exception`、`application/exception` | `ClaimApplicationEventMessage`、`MaterialProcessMessage`、`AuditDeliveryRequestedMessage`、`AuditSignedMessage`、`BusinessErrorCode`、`BusinessException`、`ClaimApplicationAsyncErrorCode` |
 
@@ -76,14 +76,14 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 | 顶层包 | 子包 | 类数 | 说明 |
 |---|---|---|---|
-| `interfaces` | `web`（含 `render`、`tenantprotocol`）、`consumer`、`dto`、`scheduler` | 45 | `web` 28 个，其中 20 个是租户协议防腐层；`consumer` 5 个；`dto` 10 个；`scheduler` 2 个 |
-| `application` | `command`、`query`（含 `model`）、`port`（含 `model`）、`process`、`exception` | 84 | `command` 7 个；`query` 8 个；`port` 33 个；`process` 32 个；`exception` 4 个 |
-| `domain` | `claim`（含 `port`、`exception`） | 21 | 聚合与领域模型 15 个；聚合仓储 2 个；领域错误码 4 个 |
-| `infrastructure` | `persistence`、`adapter`、`acl`、`mq`、`config` | 40 | 持久化 25 个；技术适配 5 个；外部系统 3 个；消息发布 1 个；配置 6 个 |
-| `shared` | `exception`、`message`、`util` | 12 | 异常与错误码接口 3 个；消息契约 8 个；摘要工具 1 个 |
+| `interfaces` | `web`（含 `render`、`tenantprotocol`）、`consumer`、`dto`、`scheduler` | 40 | `web` 24 个，其中 14 个是租户协议防腐层；`consumer` 5 个；`dto` 9 个；`scheduler` 2 个 |
+| `application` | `command`、`query`（含 `model`）、`port`（含 `model`）、`process`、`exception` | 89 | `command` 7 个；`query` 8 个；`port` 32 个；`process` 38 个；`exception` 4 个 |
+| `domain` | `claim`（含 `port`、`exception`）、`claimcase`（含 `port`） | 21 | 聚合与领域模型 14 个；聚合仓储 2 个；领域错误码 4 个；`Gender` 等值对象计入模型 |
+| `infrastructure` | `persistence`、`adapter`、`acl`、`mq`、`config` | 39 | 持久化 25 个；技术适配 4 个；外部系统 3 个；消息发布 1 个；配置 6 个 |
+| `shared` | `exception`、`message`、`util` | 13 | 异常与错误码接口 4 个；消息契约 8 个；摘要工具 1 个 |
 | 根包 | — | 1 | `ClaimApplicationServiceApplication` |
 
-- `interfaces/web` 的 28 个类里有 20 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
+- `interfaces/web` 的 24 个类里有 14 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/tenant_a` 放租户 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务错误码。
 - 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `application/{command,query,port,process,exception}`、`interfaces/{web,consumer,dto,scheduler}`、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`、`domain/claim/{material,issue,person,port,exception}`、`domain/claimcase/{port}`。
 - 异步内核（Outbox 投递、消费去重、交互轨迹、滞留补偿）不再单独成域：端口与端口模型在 `application/port` 与 `application/port/model`，编排在 `application/process`，持久化在 `infrastructure/persistence`，调度入口在 `interfaces/scheduler`。记录装配工厂只做载荷序列化与标识生成，交互事件本身由 `InteractionLog.of(...)` 装配。

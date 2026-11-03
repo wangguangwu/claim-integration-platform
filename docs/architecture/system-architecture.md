@@ -419,8 +419,7 @@ interfaces/web/tenantprotocol
 │  ├─ pipeline
 │  └─ stage
 └─ tenants
-   ├─ tenant_a
-   └─ tenant_b
+   └─ tenant_a
 ```
 
 协议路由：

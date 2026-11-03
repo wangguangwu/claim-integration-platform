@@ -150,7 +150,7 @@ docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topi
 
 ## 场景四之二：审核签收租户不一致与状态不合法
 
-1. 准备一笔 `WAIT_AUDIT` 申请，发送 `tenantCode=tenant-b` 的 `AUDIT_SIGNED` 消息，`caseNos` 非空。
+1. 准备一笔 `WAIT_AUDIT` 申请，发送 `tenantCode=tenant-x` 的 `AUDIT_SIGNED` 消息，`caseNos` 非空。
 2. 预期重投耗尽后进入死信，应用日志包含 `AUDIT_SIGNED_TENANT_MISMATCH`；`t_claim_case_relation`、`t_claim_consumed_event` 与 `t_claim_application` 均无新增或状态变化。
 3. 对处于 `ISSUE` 的申请发送合法租户的签收消息，预期重投后进入死信，日志包含 `AUDIT_SIGNED_STATUS_INVALID`，申请仍为 `ISSUE` 且无案件关联写入。
 4. 将数据构造为 `WAIT_AUDIT` 且存在未关闭问题件，再次发送签收消息，预期同样返回 `AUDIT_SIGNED_STATUS_INVALID`，不允许带着问题件完成。
@@ -291,7 +291,7 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 - 审核完成后摘要 `status=COMPLETED` 且 `completedAt` 非空；等待审核阶段 `completedAt` 为 `null`。
 - 问题件响应包含 `raisedBy` 与 `closedBy`：未关闭问题件 `closedBy`、`closedAt` 为 `null`；审核关闭后 `closedBy` 为关闭人；租户补材关闭后 `closedBy=TENANT_SUPPLEMENT`，`raisedBy` 保持原下发人。
 - 空集合返回 200 与空数组，不返回 404。
-- 使用 `X-Tenant-Code: tenant-b` 查询同一申请返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`。
+- 使用 `X-Tenant-Code: tenant-x` 查询同一申请返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`。
 - 缺少租户请求头时返回 400 `CLAIM_APPLICATION_QUERY_INVALID`。
 - 查询前后 `t_claim_interaction_log` 行数不变。
 

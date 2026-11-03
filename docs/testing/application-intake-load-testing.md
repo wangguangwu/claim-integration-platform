@@ -88,7 +88,7 @@ export CLAIM_APPLICATION_RATE_LIMIT_DEFAULT_QPS=500
 
 1. 用 `CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS=2` 重启网关，连续提交 50 次签收请求：`tenant-a` 应返回 HTTP 429 与 `code=CLAIM_APPLICATION_RATE_LIMITED`，响应头带 `X-Trace-Id`；预期首批 2 次返回 200，其余 429。
 2. 配额被打满时，同一 `tenant-a` 调用承保回调 `POST /api/claim/v1/callbacks/underwriting-completed` 应正常返回 200，证明接口级配额只作用于签收接口。
-3. 同时用 `X-Tenant-Code: tenant-b` 提交签收，请求应正常返回 200，证明租户之间互不影响。
+3. 同时用未接入的 `X-Tenant-Code: tenant-b` 提交签收，请求返回 400 `TENANT_PROTOCOL_UNSUPPORTED` 而非 429，证明接口级配额只作用于已接入租户。
 4. 核对理赔申请服务日志：被限流的 `tenant-a` 请求没有签收日志，`t_claim_interaction_log` 也没有对应轨迹，说明请求没有进入业务服务。
 5. 恢复阈值并重启网关后，同样的请求重新返回 200。
 
