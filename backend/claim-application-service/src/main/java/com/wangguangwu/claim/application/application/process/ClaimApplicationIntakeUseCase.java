@@ -11,6 +11,7 @@ import com.wangguangwu.claim.application.application.port.ClaimApplicationIntake
 import com.wangguangwu.claim.application.application.port.ClaimApplicationIntakeSnapshotQuery;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationNoGenerator;
 import com.wangguangwu.claim.application.shared.exception.RepositoryConflictException;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -52,6 +53,7 @@ public class ClaimApplicationIntakeUseCase {
      * @param traceId   链路标识
      * @return 签收结果
      */
+    @FlowLog("理赔申请签收")
     public ClaimApplicationIntakeResult intake(ClaimApplicationIntakeCommand command, String requestId, String traceId) {
         String batchNo = nextBatchNo();
         ClaimApplication submitted = ClaimApplication.submit(command.tenantCode(), command.externalClaimApplicationNo(),

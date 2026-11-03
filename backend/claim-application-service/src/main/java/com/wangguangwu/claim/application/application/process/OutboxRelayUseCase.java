@@ -13,6 +13,7 @@ import com.wangguangwu.claim.application.application.port.model.OutboxEvent;
 import com.wangguangwu.claim.application.application.port.OutboxEventPublisher;
 import com.wangguangwu.claim.application.application.port.OutboxEventRepository;
 import com.wangguangwu.claim.application.application.port.OutboxRelayPolicy;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -43,6 +44,7 @@ public class OutboxRelayUseCase {
      *
      * @return 本次投递成功的事件数
      */
+    @FlowLog("Outbox 事件投递")
     public int relayOnce() {
         LocalDateTime publishBefore = LocalDateTime.now(BUSINESS_ZONE_ID);
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingToPublish(publishBefore,

@@ -2,6 +2,7 @@ package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.application.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.application.port.ConsumedEventRepository;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class AuditSignedUseCase {
      * @param command 审核签收命令
      * @return 处理结果
      */
+    @FlowLog("审核签收处理")
     public AuditSignedOutcome record(AuditSignedCommand command) {
         if (consumedEventRepository.exists(AuditSignedTransactionService.CONSUMER_GROUP, command.eventId())) {
             log.info("审核签收事件已消费，跳过处理，claimApplicationNo={}，eventId={}", command.claimApplicationNo(),

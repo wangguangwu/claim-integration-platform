@@ -4,6 +4,7 @@ import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.application.application.command.ClaimApplicationIssueCloseCommand;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class ClaimApplicationIssueCloseUseCase {
      * @param command 问题件关闭命令
      * @return 关闭结果
      */
+    @FlowLog("问题件关闭")
     public ClaimApplicationIssueCloseResult close(ClaimApplicationIssueCloseCommand command) {
         ClaimApplication claimApplication = claimApplicationRepository.findByIssueNo(command.issueNo())
                 .orElseThrow(() -> new DomainException("问题件不存在，issueNo=" + command.issueNo()));

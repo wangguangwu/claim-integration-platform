@@ -7,6 +7,7 @@ import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepos
 import com.wangguangwu.claim.application.application.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.command.AuditDeliveryCommand;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class AuditDeliveryUseCase {
      *
      * @param command 审核交付命令
      */
+    @FlowLog("审核交付")
     public void deliver(AuditDeliveryCommand command) {
         if (consumedEventRepository.exists(AuditDeliveryTransactionService.CONSUMER_GROUP, command.eventId())) {
             log.info("审核交付事件已消费，跳过处理，claimApplicationNo={}，eventId={}", command.claimApplicationNo(),

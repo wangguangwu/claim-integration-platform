@@ -5,11 +5,12 @@ import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import com.wangguangwu.claim.foundation.observability.trace.TraceHeaders;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -40,12 +41,11 @@ public class WebExceptionHandler {
      * @return 统一失败响应
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception,
-                                                                     HttpServletRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleBusinessException(BusinessException exception, HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.warn("业务请求被拒绝，traceId={}，message={}", traceId, exception.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.failure(exception.getMessage(), traceId));
+        return ApiResponse.failure(exception.getMessage(), traceId);
     }
 
     /**
@@ -56,16 +56,16 @@ public class WebExceptionHandler {
      * @return 统一失败响应
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(MethodArgumentNotValidException exception,
-                                                                  HttpServletRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleInvalidRequest(MethodArgumentNotValidException exception,
+                                                  HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .findFirst()
-                .map(error -> error.getDefaultMessage())
+                .map(DefaultMessageSourceResolvable::getDefaultMessage)
                 .orElse(INVALID_REQUEST_MESSAGE);
         log.warn("请求报文校验失败，traceId={}，message={}", traceId, message);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.failure(message, traceId));
+        return ApiResponse.failure(message, traceId);
     }
 
     /**
@@ -76,12 +76,12 @@ public class WebExceptionHandler {
      * @return 统一失败响应
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnreadableMessage(HttpMessageNotReadableException exception,
-                                                                     HttpServletRequest request) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleUnreadableMessage(HttpMessageNotReadableException exception,
+                                                     HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.warn("请求报文无法解析，traceId={}", traceId);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.failure(INVALID_REQUEST_MESSAGE, traceId));
+        return ApiResponse.failure(INVALID_REQUEST_MESSAGE, traceId);
     }
 
     /**
@@ -92,12 +92,11 @@ public class WebExceptionHandler {
      * @return 统一失败响应
      */
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException exception,
-                                                            HttpServletRequest request) {
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleNotFound(NoResourceFoundException exception, HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.warn("请求的路由不存在，traceId={}，path={}", traceId, request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.failure(NOT_FOUND_MESSAGE, traceId));
+        return ApiResponse.failure(NOT_FOUND_MESSAGE, traceId);
     }
 
     /**
@@ -108,11 +107,10 @@ public class WebExceptionHandler {
      * @return 统一失败响应
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleSystemException(Exception exception,
-                                                                   HttpServletRequest request) {
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse<Void> handleSystemException(Exception exception, HttpServletRequest request) {
         String traceId = request.getHeader(TraceHeaders.TRACE_ID);
         log.error("请求处理异常，traceId={}", traceId, exception);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.failure(SYSTEM_ERROR_MESSAGE, traceId));
+        return ApiResponse.failure(SYSTEM_ERROR_MESSAGE, traceId);
     }
 }

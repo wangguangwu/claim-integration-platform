@@ -88,6 +88,11 @@ management:
         readiness:
           include: db
 
+logging:
+  pattern:
+    # 控制台日志统一输出链路、租户、事件与当前流程；缺失字段输出为空。
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}] [tenantCode=%X{tenantCode:-}] [protocolVersion=%X{protocolVersion:-}] [eventId=%X{eventId:-}] [flow=%X{flow:-}] %logger{36} - %msg%n'
+
 claim:
   outbox:
     relay:

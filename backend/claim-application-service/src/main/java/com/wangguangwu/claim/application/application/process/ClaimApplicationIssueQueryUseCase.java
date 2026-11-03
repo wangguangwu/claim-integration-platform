@@ -4,6 +4,7 @@ import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelation
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.query.model.IssueView;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationDetailQuery;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class ClaimApplicationIssueQueryUseCase {
      * @param caseNo     案件号
      * @return 问题件状态
      */
+    @FlowLog("问题件状态查询")
     public ClaimApplicationIssueQueryResult queryByCaseNo(String tenantCode, String caseNo) {
         String claimApplicationNo = claimCaseRelationRepository.findClaimApplicationNo(tenantCode, caseNo)
                 .orElseThrow(() -> new ApplicationException("案件关联不存在，tenantCode=" + tenantCode + "，caseNo=" + caseNo));

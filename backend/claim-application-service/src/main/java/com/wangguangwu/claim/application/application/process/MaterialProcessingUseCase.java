@@ -10,6 +10,7 @@ import com.wangguangwu.claim.application.application.command.MaterialProcessComm
 import com.wangguangwu.claim.application.application.port.model.FileUploadResult;
 import com.wangguangwu.claim.application.application.port.model.MaterialUploadRequest;
 import com.wangguangwu.claim.application.application.port.MaterialFileProcessor;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +49,7 @@ public class MaterialProcessingUseCase {
      *
      * @param command 材料处理命令
      */
+    @FlowLog("材料处理")
     public void process(MaterialProcessCommand command) {
         if (consumedEventRepository.exists(MaterialProcessingTransactionService.CONSUMER_GROUP, command.eventId())) {
             log.info("材料处理事件已消费，跳过处理，claimApplicationNo={}，eventId={}", command.claimApplicationNo(),

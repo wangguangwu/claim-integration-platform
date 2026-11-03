@@ -108,13 +108,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <!-- 在单元测试阶段验证各分层的依赖方向，避免架构约束只停留在文档。 -->
-            <groupId>com.tngtech.archunit</groupId>
-            <artifactId>archunit</artifactId>
-            <version>${archunit.version}</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>

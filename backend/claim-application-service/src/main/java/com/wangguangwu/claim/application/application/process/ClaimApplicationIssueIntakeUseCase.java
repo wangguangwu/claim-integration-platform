@@ -6,6 +6,7 @@ import com.wangguangwu.claim.application.shared.exception.DomainException;
 import com.wangguangwu.claim.application.shared.exception.RepositoryConflictException;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationIntakeSnapshotQuery;
 import com.wangguangwu.claim.application.application.command.ClaimApplicationIssueIntakeCommand;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ClaimApplicationIssueIntakeUseCase {
      * @param command 问题件下发命令
      * @return 下发结果
      */
+    @FlowLog("问题件下发")
     public ClaimApplicationIssueIntakeResult receive(ClaimApplicationIssueIntakeCommand command) {
         if (claimApplicationRepository.findByIssueNo(command.issueNo()).isPresent()) {
             log.info("问题件已存在，按幂等处理，issueNo={}，claimApplicationNo={}", command.issueNo(),

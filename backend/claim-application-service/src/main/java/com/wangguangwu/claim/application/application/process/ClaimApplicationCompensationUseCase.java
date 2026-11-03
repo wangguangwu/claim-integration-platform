@@ -5,6 +5,7 @@ import com.wangguangwu.claim.application.application.process.compensation.Outbox
 import com.wangguangwu.claim.application.application.process.compensation.PendingAcceptCompensationHandler;
 import com.wangguangwu.claim.application.application.process.compensation.UnderwritingCompensationHandler;
 import com.wangguangwu.claim.application.application.process.compensation.WaitAuditCompensationHandler;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ public class ClaimApplicationCompensationUseCase {
      *
      * @return 重置条数
      */
+    @FlowLog("补偿-投递滞留重置")
     public int resetStuckSendingEvents() {
         return outboxSendingCompensationHandler.reset();
     }
@@ -40,6 +42,7 @@ public class ClaimApplicationCompensationUseCase {
      *
      * @return 尝试补偿的申请条数
      */
+    @FlowLog("补偿-待受理滞留")
     public int redrivePendingAcceptClaimApplications() {
         return pendingAcceptCompensationHandler.redrive();
     }
@@ -49,6 +52,7 @@ public class ClaimApplicationCompensationUseCase {
      *
      * @return 尝试补偿的申请条数
      */
+    @FlowLog("补偿-已受理滞留")
     public int redispatchAcceptedClaimApplications() {
         return acceptedCompensationHandler.redispatch();
     }
@@ -58,6 +62,7 @@ public class ClaimApplicationCompensationUseCase {
      *
      * @return 尝试补偿的申请条数
      */
+    @FlowLog("补偿-承保中滞留")
     public int recoverUnderwritingClaimApplications() {
         return underwritingCompensationHandler.recover();
     }
@@ -67,6 +72,7 @@ public class ClaimApplicationCompensationUseCase {
      *
      * @return 尝试补偿的申请条数
      */
+    @FlowLog("补偿-等待审核滞留")
     public int recoverWaitAuditClaimApplications() {
         return waitAuditCompensationHandler.recover();
     }

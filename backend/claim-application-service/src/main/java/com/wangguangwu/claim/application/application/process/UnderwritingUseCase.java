@@ -6,6 +6,7 @@ import com.wangguangwu.claim.application.application.command.UnderwritingComplet
 import com.wangguangwu.claim.application.application.port.model.InteractionAction;
 import com.wangguangwu.claim.application.application.port.model.UnderwritingResult;
 import com.wangguangwu.claim.application.application.port.UnderwritingSystemPort;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class UnderwritingUseCase {
      * @param claimApplicationNo 平台申请编号
      * @param traceId       链路标识
      */
+    @FlowLog("承保分流")
     public void dispatch(String claimApplicationNo, String traceId) {
         ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(claimApplicationNo)
                 .orElseThrow(() -> new IllegalStateException("承保分流对应的申请不存在，claimApplicationNo=" + claimApplicationNo));

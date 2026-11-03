@@ -5,6 +5,7 @@ import com.wangguangwu.claim.application.application.port.ClaimApplicationDetail
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationWithCases;
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationWithIssues;
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationWithMaterials;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class ClaimApplicationDetailQueryUseCase {
      * @param claimApplicationNo 平台申请编号
      * @return 申请摘要与材料
      */
+    @FlowLog("申请材料查询")
     public ClaimApplicationWithMaterials findWithMaterials(String tenantCode, String claimApplicationNo) {
         return claimApplicationDetailQuery.findWithMaterials(tenantCode, claimApplicationNo)
                 .orElseThrow(() -> notFound(claimApplicationNo));
@@ -41,6 +43,7 @@ public class ClaimApplicationDetailQueryUseCase {
      * @param claimApplicationNo 平台申请编号
      * @return 申请摘要与问题件
      */
+    @FlowLog("申请问题件查询")
     public ClaimApplicationWithIssues findWithIssues(String tenantCode, String claimApplicationNo) {
         return claimApplicationDetailQuery.findWithIssues(tenantCode, claimApplicationNo)
                 .orElseThrow(() -> notFound(claimApplicationNo));
@@ -53,6 +56,7 @@ public class ClaimApplicationDetailQueryUseCase {
      * @param claimApplicationNo 平台申请编号
      * @return 申请摘要与案件关联
      */
+    @FlowLog("申请案件查询")
     public ClaimApplicationWithCases findWithCases(String tenantCode, String claimApplicationNo) {
         return claimApplicationDetailQuery.findWithCases(tenantCode, claimApplicationNo)
                 .orElseThrow(() -> notFound(claimApplicationNo));

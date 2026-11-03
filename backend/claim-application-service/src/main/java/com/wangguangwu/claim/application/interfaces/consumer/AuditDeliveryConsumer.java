@@ -4,6 +4,8 @@ import com.wangguangwu.claim.application.shared.message.AuditDeliveryRequestedMe
 import com.wangguangwu.claim.application.application.process.AuditDeliveryTransactionService;
 import com.wangguangwu.claim.application.application.process.AuditDeliveryUseCase;
 import com.wangguangwu.claim.application.application.command.AuditDeliveryCommand;
+import com.wangguangwu.claim.foundation.common.logging.MdcContext;
+import com.wangguangwu.claim.foundation.common.logging.MdcKeys;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,12 +39,27 @@ public class AuditDeliveryConsumer {
         return message -> {
             AuditDeliveryRequestedMessage event = message.getPayload();
             try {
+                bindEventContext(event);
                 auditDeliveryUseCase.deliver(toCommand(event));
             } catch (RuntimeException exception) {
                 logConsumeFailure(event, exception);
                 throw exception;
+            } finally {
+                MdcContext.clear();
             }
         };
+    }
+
+    /**
+     * 把消息信封中的链路与租户标识写入 MDC，链路标识缺失时使用事件标识。
+     *
+     * @param event 审核交付消息
+     */
+    private void bindEventContext(AuditDeliveryRequestedMessage event) {
+        String traceId = event.traceId();
+        MdcContext.put(MdcKeys.TRACE_ID, traceId == null || traceId.isBlank() ? event.eventId() : traceId);
+        MdcContext.put(MdcKeys.TENANT_CODE, event.tenantCode());
+        MdcContext.put(MdcKeys.EVENT_ID, event.eventId());
     }
 
     private AuditDeliveryCommand toCommand(AuditDeliveryRequestedMessage event) {

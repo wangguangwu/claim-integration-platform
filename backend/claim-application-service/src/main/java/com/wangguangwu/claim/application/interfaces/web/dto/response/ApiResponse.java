@@ -12,9 +12,9 @@ package com.wangguangwu.claim.application.interfaces.web.dto.response;
  */
 public record ApiResponse<T>(String code, String message, String traceId, T data) {
 
-    private static final String SUCCESS_CODE = "SUCCESS";
+    private static final String SUCCESS_CODE = "0";
 
-    private static final String FAILURE_CODE = "FAILURE";
+    private static final String FAILURE_CODE = "1";
 
     /**
      * 构建成功响应。

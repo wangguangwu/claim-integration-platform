@@ -4,6 +4,7 @@ import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepos
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.command.UnderwritingCompletedCommand;
+import com.wangguangwu.claim.foundation.observability.flow.FlowLog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class UnderwritingCallbackUseCase {
      * @param command 承保完成通知命令
      * @return 处理结果；重复、迟到或状态不匹配时返回复用结果
      */
+    @FlowLog("承保完成推进")
     public UnderwritingCallbackResult complete(UnderwritingCompletedCommand command) {
         validate(command);
         ClaimApplication claimApplication = claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
