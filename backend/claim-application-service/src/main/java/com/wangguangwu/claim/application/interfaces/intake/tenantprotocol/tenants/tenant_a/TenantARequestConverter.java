@@ -33,7 +33,9 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
     @Override
     public ClaimApplicationIntakeCommand convert(String tenantCode, TenantAIntakeRequest request) {
         return ClaimApplicationIntakeCommand.builder().tenantCode(tenantCode)
-                .externalClaimApplicationNo(request.requestNo().trim()).applicant(toApplicant(request.applicant()))
+                .externalClaimApplicationNo(request.requestNo().trim())
+                .claimApplicationNo(normalize(request.claimApplicationNo()))
+                .applicant(toApplicant(request.applicant()))
                 .primaryInsured(toPrimaryInsured(request.insured())).accidentPerson(toAccidentPerson(request.accident()))
                 .payee(toPayee(request.payee())).materials(toMaterials(request.attachments())).build();
     }
@@ -71,6 +73,19 @@ public class TenantARequestConverter implements TenantProtocolConverter<TenantAI
             default -> throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
                     "sex 仅支持 M 或 F");
         };
+    }
+
+    /**
+     * 空串按未携带平台申请编号处理，避免空值参与编号比对。
+     *
+     * @param claimApplicationNo 报文携带的平台申请编号
+     * @return 去除首尾空白后的编号；未携带时为空
+     */
+    private String normalize(String claimApplicationNo) {
+        if (claimApplicationNo == null || claimApplicationNo.isBlank()) {
+            return null;
+        }
+        return claimApplicationNo.trim();
     }
 
     private List<MaterialSubmission> toMaterials(List<TenantAIntakeRequest.TenantAAttachment> attachments) {

@@ -26,5 +26,17 @@ public enum ClaimApplicationStatus {
     WAIT_AUDIT,
 
     /** 审核退回补正，存在未关闭的问题件。 */
-    ISSUE
+    ISSUE;
+
+    /**
+     * 判断该状态下的申请是否已通过签收、可按重复请求直接复用。
+     *
+     * <p>可复用结论属于申请状态语义：已受理、承保中与等待审核都已完成签收。状态并非严格单调，
+     * {@code WAIT_AUDIT} 可因问题件回退到 {@code ISSUE}，因此复用结论依赖问题件下发时主动失效快照。</p>
+     *
+     * @return 属于可复用状态时为 true
+     */
+    public boolean isReusableAfterIntake() {
+        return this == ACCEPTED || this == UNDERWRITING || this == WAIT_AUDIT;
+    }
 }

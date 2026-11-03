@@ -1,5 +1,6 @@
 package com.wangguangwu.claim.application.domain.claim.person;
 
+import com.wangguangwu.claim.foundation.common.util.AssertUtil;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.experimental.Accessors;
@@ -40,19 +41,13 @@ public abstract sealed class PersonInfo permits Applicant, PrimaryInsured, Accid
      * @param certificateNo   证件号码
      */
     protected PersonInfo(String name, Gender gender, String certificateType, String certificateNo) {
-        this.name = requireText(name, "姓名");
-        if (gender == null) {
-            throw new IllegalArgumentException("性别不能为空");
-        }
+        AssertUtil.notBlank(name, "姓名不能为空");
+        AssertUtil.notNull(gender, "性别不能为空");
+        this.name = name;
         this.gender = gender;
-        this.certificateType = requireText(certificateType, "证件类型");
-        this.certificateNo = requireText(certificateNo, "证件号");
-    }
-
-    private static String requireText(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(fieldName + "不能为空");
-        }
-        return value;
+        AssertUtil.notBlank(certificateType, "证件类型不能为空");
+        AssertUtil.notBlank(certificateNo, "证件号不能为空");
+        this.certificateType = certificateType;
+        this.certificateNo = certificateNo;
     }
 }

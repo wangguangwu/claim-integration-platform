@@ -13,6 +13,7 @@ import java.util.List;
  * 违规由流水线默认的校验节点统一翻译为平台业务异常。</p>
  *
  * @param requestNo   外部申请编号
+ * @param claimApplicationNo 平台申请编号，重新申请与补材时可选携带
  * @param applicant   申请人
  * @param insured     被保险人
  * @param accident    出险人
@@ -23,6 +24,7 @@ import java.util.List;
  */
 public record TenantAIntakeRequest(
         @NotBlank(message = "不能为空") String requestNo,
+        String claimApplicationNo,
         @NotNull(message = "不能缺失") @Valid TenantAPerson applicant,
         @NotNull(message = "不能缺失") @Valid TenantAPerson insured,
         @NotNull(message = "不能缺失") @Valid TenantAPerson accident,

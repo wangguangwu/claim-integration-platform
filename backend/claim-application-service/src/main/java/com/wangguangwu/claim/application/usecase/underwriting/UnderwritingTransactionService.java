@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
 import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
@@ -13,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 承保分流的数据库事务服务，只推进状态、写入审核交付事件与外部调用轨迹。
+ * 承保分流的数据库事务服务，只推进聚合状态、写入审核交付事件与外部调用轨迹。
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -28,7 +27,7 @@ public class UnderwritingTransactionService {
     private final ClaimApplicationLifecycleRecordFactory recordFactory;
 
     /**
-     * 把有有效保单的申请推进到等待审核签收，并写入审核交付事件。
+     * 把有有效保单的申请推进到等待审核签收，并在保存成功后写入审核交付事件。
      *
      * @param claimApplication 处于已受理状态的申请
      * @param traceId     链路标识
@@ -37,7 +36,7 @@ public class UnderwritingTransactionService {
     @Transactional
     public boolean promoteToWaitAudit(ClaimApplication claimApplication, String traceId) {
         claimApplication.waitAudit();
-        if (!claimApplicationRepository.updateStatus(claimApplication, ClaimApplicationStatus.ACCEPTED)) {
+        if (!claimApplicationRepository.save(claimApplication)) {
             return false;
         }
         outboxEventRepository.insert(recordFactory.auditDeliveryRequestedEvent(claimApplication, traceId));
@@ -53,7 +52,7 @@ public class UnderwritingTransactionService {
     @Transactional
     public boolean startUnderwriting(ClaimApplication claimApplication) {
         claimApplication.startUnderwriting();
-        return claimApplicationRepository.updateStatus(claimApplication, ClaimApplicationStatus.ACCEPTED);
+        return claimApplicationRepository.save(claimApplication);
     }
 
     /**

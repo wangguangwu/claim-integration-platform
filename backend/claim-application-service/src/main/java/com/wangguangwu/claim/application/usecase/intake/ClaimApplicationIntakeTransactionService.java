@@ -1,18 +1,19 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
+import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
+import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
+import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
+import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookupKind;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeSnapshot;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
-import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
-import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionType;
-import com.wangguangwu.claim.application.usecase.integration.outbox.port.OutboxEventRepository;
-import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeDisposition;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
-import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 申请签收的数据库事务服务，只负责持久化编排，不访问 Redis。
+ *
+ * <p>首次签收、重新申请与租户补材都在同一事务内完成聚合落库、交互轨迹与 Outbox 写入；
+ * 聚合保存失败时抛出内部冲突信号让整个事务回滚，交由用例在新事务中重新分类。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -29,23 +33,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClaimApplicationIntakeTransactionService {
 
     private final ClaimApplicationRepository claimApplicationRepository;
-    private final MaterialRepository materialRepository;
     private final InteractionLogRepository interactionLogRepository;
     private final OutboxEventRepository outboxEventRepository;
-    private final ClaimApplicationIntakeMaterialFactory materialFactory;
     private final ClaimApplicationLifecycleRecordFactory lifecycleRecordFactory;
 
     /**
-     * 在本地事务中完成首次签收、重复复用或受理失败后的重新申请。
-     *
-     * <p>存在但状态可变时读到的聚合状态即是回源观察结论：安全状态随结果返回可复用快照，
-     * 供用例在事务提交后升级判定缓存，避免同一申请号反复回源。</p>
-     *
-     * <p>判定为存在但按外部申请号读不到时返回空结果，由用例重新判定并重试；
-     * 该不一致属于局部控制流，不用异常表达。</p>
+     * 未携带平台申请编号时的签收：不存在则创建，存在一律按重复请求复用。
      *
      * @param submitted                   协议转换后的理赔申请
-     * @param lookupKind                  签收判定结论：不存在时创建，存在时读取聚合判定
+     * @param lookupKind                  签收判定结论：不存在时创建，存在时读取后复用
      * @param candidateClaimApplicationNo 判定为不存在时必须提供的候选平台申请编号
      * @param requestId                   请求标识
      * @param traceId                     链路标识
@@ -62,7 +58,59 @@ public class ClaimApplicationIntakeTransactionService {
         }
         return claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(submitted.getTenantCode(),
                         submitted.getExternalClaimApplicationNo())
-                .map(claimApplication -> processExisting(claimApplication, submitted, requestId, traceId));
+                .map(claimApplication -> processExistingAsReused(claimApplication, requestId, traceId));
+    }
+
+    /**
+     * 携带平台申请编号时的签收：严格校验编号后按状态重新申请、补材或复用。
+     *
+     * @param submitted                   协议转换后的理赔申请
+     * @param expectedClaimApplicationNo  报文携带的平台申请编号
+     * @param batchNo                     本次提交生成的材料批次编号
+     * @param requestId                   请求标识
+     * @param traceId                     链路标识
+     * @return 签收结果；其余状态按重复请求复用
+     * @throws ApplicationException 编号与库中记录不一致时拒绝签收
+     */
+    @Transactional
+    public ClaimApplicationIntakeOutcome intakeExisting(ClaimApplication submitted, String expectedClaimApplicationNo,
+                                                        String batchNo, String requestId, String traceId) {
+        ClaimApplication claimApplication = claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(
+                        submitted.getTenantCode(), submitted.getExternalClaimApplicationNo())
+                .orElseThrow(() -> new ApplicationException(
+                        ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
+                        "平台申请编号无法匹配既有申请，tenantCode=" + submitted.getTenantCode()
+                                + "，externalClaimApplicationNo=" + submitted.getExternalClaimApplicationNo()));
+        if (!expectedClaimApplicationNo.equals(claimApplication.getClaimApplicationNo())) {
+            throw new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
+                    "报文平台申请编号与既有申请不一致，externalClaimApplicationNo="
+                            + submitted.getExternalClaimApplicationNo()
+                            + "，报文编号=" + expectedClaimApplicationNo
+                            + "，实际编号=" + claimApplication.getClaimApplicationNo());
+        }
+        String claimApplicationNo = claimApplication.getClaimApplicationNo();
+        int attemptBefore = claimApplication.getClaimApplicationAttempt();
+        String interactionNo = lifecycleRecordFactory.newInteractionNo();
+        recordStarted(claimApplicationNo, interactionNo, requestId, traceId);
+        if (claimApplication.isReapplicable()) {
+            claimApplication.reapply(submitted, batchNo);
+            saveOrConflict(claimApplication, attemptBefore, false);
+            outboxEventRepository.insert(lifecycleRecordFactory.claimApplicationReappliedEvent(claimApplication, traceId));
+            recordFinished(claimApplicationNo, interactionNo, requestId, traceId, true);
+            return ClaimApplicationIntakeOutcome.withoutSnapshot(new ClaimApplicationIntakeResult(claimApplicationNo,
+                    ClaimApplicationIntakeDisposition.REAPPLIED));
+        }
+        if (claimApplication.isSupplementable()) {
+            claimApplication.supplement(submitted, batchNo);
+            saveOrConflict(claimApplication, attemptBefore, true);
+            outboxEventRepository.insert(lifecycleRecordFactory.claimApplicationReappliedEvent(claimApplication, traceId));
+            recordFinished(claimApplicationNo, interactionNo, requestId, traceId, true);
+            return ClaimApplicationIntakeOutcome.withoutSnapshot(new ClaimApplicationIntakeResult(claimApplicationNo,
+                    ClaimApplicationIntakeDisposition.SUPPLEMENTED));
+        }
+        recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
+        return outcome(new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED),
+                claimApplication);
     }
 
     /**
@@ -78,7 +126,7 @@ public class ClaimApplicationIntakeTransactionService {
                                                                           String requestId, String traceId) {
         return claimApplicationRepository.findByTenantAndExternalClaimApplicationNo(submitted.getTenantCode(),
                         submitted.getExternalClaimApplicationNo())
-                .map(claimApplication -> processExisting(claimApplication, submitted, requestId, traceId));
+                .map(claimApplication -> processExistingAsReused(claimApplication, requestId, traceId));
     }
 
     /**
@@ -113,49 +161,41 @@ public class ClaimApplicationIntakeTransactionService {
 
         String interactionNo = lifecycleRecordFactory.newInteractionNo();
         recordStarted(candidateClaimApplicationNo, interactionNo, requestId, traceId);
-        materialRepository.insertAll(materialFactory.createMaterials(candidateClaimApplicationNo, submitted.getMaterials()));
         outboxEventRepository.insert(lifecycleRecordFactory.claimApplicationCreatedEvent(submitted, traceId));
         recordFinished(candidateClaimApplicationNo, interactionNo, requestId, traceId, true);
         return new ClaimApplicationIntakeResult(candidateClaimApplicationNo, ClaimApplicationIntakeDisposition.CREATED);
     }
 
     /**
-     * 根据当前状态处理重复请求或重新申请。
+     * 未携带平台编号时，既有申请不修改人员、材料与状态，只按重复请求复用。
      *
-     * <p>重新申请使用状态条件更新：并发请求已先完成重新申请时更新行数为 0，
-     * 本次请求按重复请求复用已有申请，不覆盖对方写入的人员与材料。</p>
-     *
-     * @param claimApplication 当前理赔申请
-     * @param submitted   协议转换后的理赔申请
-     * @param requestId   请求标识
-     * @param traceId     链路标识
-     * @return 复用或重新申请结果，以及读到的可复用快照
+     * @param claimApplication 已存在的理赔申请
+     * @param requestId        请求标识
+     * @param traceId          链路标识
+     * @return 复用结果，以及读到的可复用快照
      */
-    private ClaimApplicationIntakeOutcome processExisting(ClaimApplication claimApplication,
-                                                         ClaimApplication submitted,
-                                                         String requestId, String traceId) {
+    private ClaimApplicationIntakeOutcome processExistingAsReused(ClaimApplication claimApplication, String requestId,
+                                                                  String traceId) {
         String claimApplicationNo = claimApplication.getClaimApplicationNo();
         String interactionNo = lifecycleRecordFactory.newInteractionNo();
         recordStarted(claimApplicationNo, interactionNo, requestId, traceId);
-        if (!claimApplication.isReapplicable()) {
-            recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
-            return outcome(new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED),
-                    claimApplication);
-        }
+        recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
+        return outcome(new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED),
+                claimApplication);
+    }
 
-        claimApplication.reapply(submitted);
-        if (!claimApplicationRepository.updateForReapply(claimApplication)) {
-            recordFinished(claimApplicationNo, interactionNo, requestId, traceId, false);
-            return ClaimApplicationIntakeOutcome.withoutSnapshot(
-                    new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REUSED));
+    /**
+     * 保存聚合，版本过期时抛出内部冲突信号使本次事务回滚。
+     *
+     * @param claimApplication 已变更的聚合
+     * @param attemptBefore    变更前的受理尝试次数
+     * @param supplement       本次是否为租户补材
+     */
+    private void saveOrConflict(ClaimApplication claimApplication, int attemptBefore, boolean supplement) {
+        if (!claimApplicationRepository.save(claimApplication)) {
+            throw new ClaimApplicationIntakeConflictException(claimApplication.getClaimApplicationNo(), attemptBefore,
+                    supplement);
         }
-
-        materialRepository.softDeleteByClaimApplicationNo(claimApplicationNo);
-        materialRepository.insertAll(materialFactory.createMaterials(claimApplicationNo, submitted.getMaterials()));
-        outboxEventRepository.insert(lifecycleRecordFactory.claimApplicationReappliedEvent(claimApplication, traceId));
-        recordFinished(claimApplicationNo, interactionNo, requestId, traceId, true);
-        return ClaimApplicationIntakeOutcome.withoutSnapshot(
-                new ClaimApplicationIntakeResult(claimApplicationNo, ClaimApplicationIntakeDisposition.REAPPLIED));
     }
 
     /**
@@ -168,7 +208,7 @@ public class ClaimApplicationIntakeTransactionService {
     private ClaimApplicationIntakeOutcome outcome(ClaimApplicationIntakeResult result,
                                                   ClaimApplication claimApplication) {
         ClaimApplicationStatus status = claimApplication.getStatus();
-        if (!ClaimApplicationIntakeSnapshot.isReusableStatus(status)) {
+        if (!status.isReusableAfterIntake()) {
             return ClaimApplicationIntakeOutcome.withoutSnapshot(result);
         }
         return ClaimApplicationIntakeOutcome.withSnapshot(result,

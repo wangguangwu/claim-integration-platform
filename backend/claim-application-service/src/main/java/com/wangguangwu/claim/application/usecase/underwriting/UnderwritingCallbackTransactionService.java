@@ -1,7 +1,6 @@
 package com.wangguangwu.claim.application.usecase.underwriting;
 
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.usecase.integration.interaction.model.InteractionAction;
 import com.wangguangwu.claim.application.usecase.integration.interaction.port.InteractionLogRepository;
@@ -33,8 +32,8 @@ public class UnderwritingCallbackTransactionService {
     /**
      * 在同一事务中写入开始轨迹、推进状态、写入审核交付事件与结束轨迹。
      *
-     * <p>申请不在自动承保中时按重复通知处理，只记录复用轨迹。条件更新影响行数为 0
-     * 说明并发通知已先推进状态，同样按重复处理。开始与结束轨迹同事务落库，
+     * <p>申请不在自动承保中时按重复通知处理，只记录复用轨迹。聚合保存返回 false
+     * 说明并发通知已先推进状态，同样按重复处理且不写审核交付事件。开始与结束轨迹同事务落库，
      * 事务回滚时不会留下没有结束的行为组。</p>
      *
      * @param command       承保完成通知命令；claimApplicationNo 已通过校验
@@ -51,7 +50,7 @@ public class UnderwritingCallbackTransactionService {
             return new UnderwritingCallbackResult(command.claimApplicationNo(), UnderwritingCallbackDisposition.REUSED);
         }
         claimApplication.finishUnderwriting();
-        if (!claimApplicationRepository.updateStatus(claimApplication, ClaimApplicationStatus.UNDERWRITING)) {
+        if (!claimApplicationRepository.save(claimApplication)) {
             recordFinished(command, interactionNo, InteractionAction.REUSED);
             return new UnderwritingCallbackResult(command.claimApplicationNo(), UnderwritingCallbackDisposition.REUSED);
         }

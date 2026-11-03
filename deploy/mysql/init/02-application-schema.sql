@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS t_claim_application (
     external_claim_application_no VARCHAR(128) NOT NULL COMMENT '租户侧申请编号，与租户编码组成幂等键',
     status VARCHAR(32) NOT NULL COMMENT '理赔申请生命周期状态',
     claim_application_attempt INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '同一外部申请编号的受理尝试次数',
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '聚合乐观锁版本号',
     applicant_json JSON NULL COMMENT '申请人标准化信息 JSON',
     primary_insured_json JSON NULL COMMENT '主被保险人标准化信息 JSON',
     accident_person_json JSON NULL COMMENT '出险人标准化信息 JSON',

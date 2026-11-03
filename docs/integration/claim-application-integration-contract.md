@@ -47,9 +47,11 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 | 接口 | 方法 | 调用方 | 用途 | 关联字段 |
 |---|---|---|---|---|
-| `/api/claim/v1/application/intake` | `POST` | 租户系统 | 提交理赔申请| `externalClaimApplicationNo` |
-| `/api/claim/v1/application/{claimApplicationNo}/materials` | `POST` | 租户系统 | 提交补充材料 | `claimApplicationNo`、`batchNo` |
-| `/api/claim/v1/application/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销 | `claimApplicationNo` |
+| `/api/claim/v1/application/intake` | `POST` | 租户系统 | 提交理赔申请；补材同样经此接口携带 `claimApplicationNo` | `externalClaimApplicationNo`、可选 `claimApplicationNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/revoke` | `POST` | 租户系统 | 发起理赔申请撤销（规划，未开放） | `claimApplicationNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/materials` | `GET` | 租户系统 | 查询申请摘要与未删除材料 | `claimApplicationNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/issues` | `GET` | 租户系统 | 查询申请摘要与全部问题件 | `claimApplicationNo` |
+| `/api/claim/v1/application/{claimApplicationNo}/cases` | `GET` | 租户系统 | 查询申请摘要与案件关联 | `claimApplicationNo` |
 | `/api/claim/v1/callbacks/underwriting-completed` | `POST` | 承保系统 | 通知自动承保完成 | `claimApplicationNo`、`X-Request-Id` |
 | `/api/claim/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo`、`X-Request-Id` |
 | `/api/claim/v1/callbacks/audit-issues/{issueNo}/close` | `POST` | 审核系统 | 关闭问题件 | `issueNo`、`X-Request-Id` |
@@ -106,11 +108,33 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 | 无未关闭问题件 | 200 | `hasOpenIssue=false`，其余问题件字段为 `null` |
 | 案件关系不存在 | 404 | 错误码 `CASE_RELATION_NOT_FOUND` |
 
+### 理赔申请详情查询
+
+三个查询接口均按 `TenantContext` 中的租户隔离，只读读模型，不加载聚合、不写交互轨迹：
+
+| 接口 | 返回 |
+|---|---|
+| `GET /api/claim/v1/application/{claimApplicationNo}/materials` | 申请摘要 + 未删除材料 |
+| `GET /api/claim/v1/application/{claimApplicationNo}/issues` | 申请摘要 + 全部问题件 |
+| `GET /api/claim/v1/application/{claimApplicationNo}/cases` | 申请摘要 + 案件关联 |
+
+| 场景 | HTTP 状态 | 错误码 |
+|---|---|---|
+| 申请不存在或不属于当前租户 | 404 | `CLAIM_APPLICATION_QUERY_NOT_FOUND` |
+| 缺少租户上下文 | 400 | `CLAIM_APPLICATION_QUERY_INVALID` |
+| 未预期系统异常 | 500 | `CLAIM_APPLICATION_QUERY_SYSTEM_ERROR` |
+
+子集合为空返回 200 与空数组。材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。跨租户与不存在使用同一错误码，避免暴露其他租户数据的存在性。
+
 ### 签收幂等判定
 
-- 首次提交创建申请并返回新 `claimApplicationNo`；同一 `externalClaimApplicationNo` 的重复提交返回同一 `claimApplicationNo`。
-- 状态为 `ACCEPT_FAILED` 的申请允许用同一外部申请号重新提交，平台覆盖当前内容并沿用原 `claimApplicationNo`。
-- 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT` 三种单调状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT` 与 `ACCEPT_FAILED` 每次都回源数据库确认，因此受理失败仍可重新提交。
+- 未携带 `claimApplicationNo` 时：首次提交创建申请并返回新 `claimApplicationNo`；同一 `externalClaimApplicationNo` 的重复提交返回同一 `claimApplicationNo`，不覆盖人员、材料与状态。
+- 携带 `claimApplicationNo` 时跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致；申请不存在或编号不一致返回 HTTP 400 与 `CLAIM_APPLICATION_INTAKE_INVALID`，且不新建申请。
+- 携带 `claimApplicationNo` 且状态为 `ACCEPT_FAILED` 时返回 `REAPPLIED`：人员与材料整体替换，旧材料逻辑删除，尝试次数加 1，状态回到 `PENDING_ACCEPT`。
+- 携带 `claimApplicationNo`、状态为 `ISSUE` 且存在未关闭问题件时返回 `SUPPLEMENTED`：关闭该问题件（关闭人 `TENANT_SUPPLEMENT`），报文人员不生效，旧材料逻辑删除并写入新批次，尝试次数加 1，状态回到 `PENDING_ACCEPT`，随后异步处理材料。
+- 携带 `claimApplicationNo` 的其他状态返回 `REUSED`，只写交互轨迹。
+- 聚合保存冲突时，尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 HTTP 400 与 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 HTTP 503 与 `CLAIM_APPLICATION_INTAKE_BUSY`，调用方可重试。
+- 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT` 三种单调状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT`、`ACCEPT_FAILED` 与 `ISSUE` 每次都回源数据库确认。
 - 该缓存不改变对调用方可见的响应结构与响应码。
 
 ### Redis 降级
@@ -123,7 +147,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 | Topic | 事件类型 | 消费者组 | 职责 |
 |---|---|---|---|
-| `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请或重新申请的材料 |
+| `claim_application_material_process_v1` | `CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED` | `claim-application-material-processor-v1` | 异步处理首次申请、重新申请或租户补材的材料 |
 | `claim_application_audit_delivery_v1` | `AUDIT_DELIVERY_REQUESTED` | `claim-application-audit-delivery-v1` | 将已具备审核条件的申请交付审核系统 |
 | `claim_application_audit_signed_v1` | `AUDIT_SIGNED` | `claim-application-audit-signed-v1` | 接收审核系统回传的签收结果与案件号 |
 
@@ -143,7 +167,7 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 平台是 `claim_application_material_process_v1` 与 `claim_application_audit_delivery_v1` 的唯一生产者，消息只携带消费方实际读取的字段。
 
-材料处理消息（`CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED`）：
+材料处理消息（`CLAIM_APPLICATION_CREATED`、`CLAIM_APPLICATION_REAPPLIED`；租户补材复用 `CLAIM_APPLICATION_REAPPLIED`）：
 
 ```json
 {

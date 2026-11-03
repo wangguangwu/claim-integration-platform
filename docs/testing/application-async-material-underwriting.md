@@ -213,7 +213,9 @@ java -jar backend/claim-application-service/target/claim-application-service-*.j
 {"type": "MATERIAL_TYPE_REJECTED", "sourceUrl": "https://files.example.com/rejected.pdf"}
 ```
 
-预期申请进入 `ACCEPT_FAILED`，命中失败名单的材料置为 `FAILED` 且不写上传地址，其余材料正常 `PROCESSED`，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 及错误码 `LOCAL_UPLOAD_REJECTED`。相同租户外部申请号可再次提交触发重新申请，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料。
+预期申请进入 `ACCEPT_FAILED`，命中失败名单的材料置为 `FAILED` 且不写上传地址，其余材料正常 `PROCESSED`，`t_claim_interaction_log` 记录 `MATERIAL_PROCESS` 的 `FAILED` 及错误码 `LOCAL_UPLOAD_REJECTED`。重新申请必须携带原 `claimApplicationNo` 再次提交，走 `CLAIM_APPLICATION_REAPPLIED` 事件重新处理材料；未携带平台编号时按重复请求复用，不会触发重新申请。
+
+租户补材复用 `CLAIM_APPLICATION_REAPPLIED` 事件：补材提交后申请回到 `PENDING_ACCEPT`，材料处理消费者按新的受理尝试次数重新处理新批次材料，再进入承保分流与审核交付。材料处理事务会校验 `PENDING_ACCEPT` 与 `claimApplicationAttempt`，过期批次只记录 `REUSED` 轨迹。
 
 注意：外部系统异常与明确拒绝不同，异常向上抛出由 binder 重投，材料与申请保持原状态；`claim.integration.local.delay` 可放大调用耗时，便于观察消费占用。
 

@@ -1,11 +1,11 @@
 package com.wangguangwu.claim.application.usecase.issue;
 
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;
+import com.wangguangwu.claim.application.usecase.query.model.IssueView;
+import com.wangguangwu.claim.application.usecase.query.port.ClaimApplicationDetailQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class ClaimApplicationIssueQueryUseCase {
 
     private final ClaimCaseRelationRepository claimCaseRelationRepository;
-    private final ClaimApplicationIssueRepository claimApplicationIssueRepository;
+    private final ClaimApplicationDetailQuery claimApplicationDetailQuery;
 
     /**
      * 查询案件对应的申请当前是否有未关闭问题件。
@@ -36,15 +36,15 @@ public class ClaimApplicationIssueQueryUseCase {
                 .orElseThrow(() -> new ApplicationException(
                         ClaimApplicationIssueErrorCode.CASE_RELATION_NOT_FOUND,
                         "案件关联不存在，tenantCode=" + tenantCode + "，caseNo=" + caseNo));
-        return claimApplicationIssueRepository.findOpenByClaimApplicationNo(claimApplicationNo)
+        return claimApplicationDetailQuery.findOpenIssue(tenantCode, claimApplicationNo)
                 .map(issue -> openIssueResult(claimApplicationNo, caseNo, issue))
                 .orElseGet(() -> new ClaimApplicationIssueQueryResult(claimApplicationNo, caseNo, false, null, null,
                         null));
     }
 
     private ClaimApplicationIssueQueryResult openIssueResult(String claimApplicationNo, String caseNo,
-                                                             ClaimApplicationIssue issue) {
-        return new ClaimApplicationIssueQueryResult(claimApplicationNo, caseNo, true, issue.getIssueNo(),
-                issue.getReason(), issue.getCreatedAt());
+                                                             IssueView issue) {
+        return new ClaimApplicationIssueQueryResult(claimApplicationNo, caseNo, true, issue.issueNo(),
+                issue.reason(), issue.createdAt());
     }
 }

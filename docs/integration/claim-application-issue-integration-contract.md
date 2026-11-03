@@ -15,7 +15,7 @@
 
 - **版本**：v1
 - **生效日期**：2026-10-31
-- **关联 Spec**：012-problem-document-workflow
+- **关联 Spec**：012-problem-document-workflow、018-audit-inbound-mq-integration、024-intake-ddd-redesign
 
 ## HTTP 契约
 
@@ -31,8 +31,8 @@
 
 | 接口 | 方法 | 调用方 | 用途 | 关键参数 |
 |---|---|---|---|---|
-| `/api/application/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo` |
-| `/api/application/v1/callbacks/audit-issues/{issueNo}/close` | `POST` | 审核系统 | 关闭问题件 | `issueNo`（路径参数） |
+| `/api/claim/v1/callbacks/audit-issues` | `POST` | 审核系统 | 下发问题件 | `claimApplicationNo`、`issueNo` |
+| `/api/claim/v1/callbacks/audit-issues/{issueNo}/close` | `POST` | 审核系统 | 关闭问题件 | `issueNo`（路径参数） |
 
 ---
 
@@ -45,7 +45,7 @@
 #### 请求
 
 **HTTP 方法**：`POST`  
-**路径**：`/api/application/v1/callbacks/audit-issues`  
+**路径**：`/api/claim/v1/callbacks/audit-issues`  
 **Content-Type**：`application/json`
 
 **请求体字段**：
@@ -142,11 +142,11 @@
 
 3. **状态变更**：
    - 问题件创建成功后，申请状态从 `WAIT_AUDIT` 变更为 `ISSUE`
-   - 问题件与申请状态变更在同一事务内完成
+   - 问题件是 `ClaimApplication` 聚合内实体，与申请状态在同一次聚合 `save` 中提交
 
 4. **并发控制**：
    - 数据库唯一约束 `uk_open_issue_claim_application` 保证同一申请最多一个 `OPEN` 问题件
-   - 并发冲突时返回幂等成功，不抛异常
+   - 聚合保存使用 `t_claim_application.version` 乐观锁；保存失败时在保存事务之外重读：同一 `issueNo` 已落库按幂等成功返回，否则按状态冲突返回 400
 
 ---
 
@@ -157,7 +157,7 @@
 #### 请求
 
 **HTTP 方法**：`POST`  
-**路径**：`/api/application/v1/callbacks/audit-issues/{issueNo}/close`  
+**路径**：`/api/claim/v1/callbacks/audit-issues/{issueNo}/close`  
 **Content-Type**：`application/json`
 
 **路径参数**：
@@ -249,7 +249,7 @@
    - 记录 `closedAt` 为当前时间
    - 更新 `auditor` 为处理人
    - 申请状态从 `ISSUE` 回退到 `WAIT_AUDIT`
-   - 问题件与申请状态变更在同一事务内完成
+   - 问题件是 `ClaimApplication` 聚合内实体，与申请状态在同一次聚合 `save` 中提交
 
 ---
 
@@ -319,7 +319,7 @@ CLOSED（已关闭）
 **Step 1：审核系统下发问题件**
 
 ```bash
-curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
+curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
   -H "Content-Type: application/json" \
   -H "X-Trace-Id: trace-001" \
   -d '{
@@ -348,7 +348,7 @@ curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
 **Step 2：租户补充材料后，审核系统关闭问题件**
 
 ```bash
-curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues/ISS202610310001/close \
+curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues/ISS202610310001/close \
   -H "Content-Type: application/json" \
   -H "X-Trace-Id: trace-002" \
   -d '{
@@ -375,7 +375,7 @@ curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues/ISS
 
 ```bash
 # 第一次下发
-curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
+curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
   -H "Content-Type: application/json" \
   -d '{
     "claimApplicationNo": "CLA202610310001",
@@ -387,7 +387,7 @@ curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
 # 响应：created=true
 
 # 第二次下发（相同 issueNo）
-curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
+curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
   -H "Content-Type: application/json" \
   -d '{
     "claimApplicationNo": "CLA202610310001",
@@ -404,7 +404,7 @@ curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
 **申请不存在**：
 
 ```bash
-curl -X POST http://localhost:8080/api/application/v1/callbacks/audit-issues \
+curl -X POST http://localhost:8080/api/claim/v1/callbacks/audit-issues \
   -H "Content-Type: application/json" \
   -d '{
     "claimApplicationNo": "CLA_NOT_EXIST",

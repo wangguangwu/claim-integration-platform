@@ -1,24 +1,29 @@
 package com.wangguangwu.claim.application.usecase.intake;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
+import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookup;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookupKind;
-import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakePolicy;
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeLock;
+import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakePolicy;
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeSnapshotQuery;
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationNoGenerator;
-import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
+import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeDisposition;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialBatchNoGenerator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 /**
- * 理赔申请统一接入签收用例入口，负责并发锁、事务外准备数据与唯一冲突恢复。
+ * 理赔申请统一接入签收用例入口，负责并发锁、事务外准备数据与冲突恢复。
  *
- * <p>报文必填由租户 request 上的 Bean Validation 约束负责，领域不变式由聚合与值对象在构造处自守，
- * 本类不重复字段校验，只编排锁、签收判定、编号生成与事务落库。</p>
+ * <p>未携带平台申请编号时按外部申请编号判定：可复用快照只写轨迹，库中无记录则创建，
+ * 已有记录一律复用；携带平台申请编号时跳过快照直接读库并严格比对，只有受理失败与未关闭问题件
+ * 才分别触发重新申请与租户补材。保存冲突由独立入口在新事务中重读分类。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -30,8 +35,10 @@ public class ClaimApplicationIntakeUseCase {
     private final ClaimApplicationIntakeLock claimApplicationIntakeLock;
     private final ClaimApplicationIntakeSnapshotQuery claimApplicationIntakeSnapshotQuery;
     private final ClaimApplicationNoGenerator claimApplicationNoGenerator;
+    private final MaterialBatchNoGenerator materialBatchNoGenerator;
     private final ClaimApplicationIntakePolicy claimApplicationIntakePolicy;
     private final ClaimApplicationIntakeTransactionService transactionService;
+    private final ClaimApplicationIntakeConflictResolver conflictResolver;
 
     /**
      * 创建理赔申请，并在同一外部申请号锁内完成签收。
@@ -42,87 +49,126 @@ public class ClaimApplicationIntakeUseCase {
      * @return 签收结果
      */
     public ClaimApplicationIntakeResult intake(ClaimApplicationIntakeCommand command, String requestId, String traceId) {
-        ClaimApplication claimApplication = ClaimApplication.submit(command.tenantCode(), command.externalClaimApplicationNo(),
+        String batchNo = materialBatchNoGenerator.nextBatchNo();
+        ClaimApplication submitted = ClaimApplication.submit(command.tenantCode(), command.externalClaimApplicationNo(),
                 command.applicant(), command.primaryInsured(), command.accidentPerson(), command.payee(),
-                command.materials());
-        return claimApplicationIntakeLock.execute(claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo(),
-                () -> executeInLock(claimApplication, requestId, traceId));
+                command.materials(), batchNo);
+        String expectedClaimApplicationNo = normalize(command.claimApplicationNo());
+        return claimApplicationIntakeLock.execute(submitted.getTenantCode(),
+                submitted.getExternalClaimApplicationNo(),
+                () -> expectedClaimApplicationNo == null
+                        ? executeWithoutPlatformNumber(submitted, requestId, traceId)
+                        : executeWithPlatformNumber(submitted, expectedClaimApplicationNo, batchNo, requestId, traceId));
     }
 
     /**
-     * 在锁内完成签收判定，可复用结论只写轨迹，其余结论交由事务服务落库。
+     * 携带平台申请编号的签收：跳过快照，严格比对后按状态分流，保存冲突在新事务中重读分类。
      *
-     * <p>唯一键冲突说明并发请求已创建同一外部申请号，先按重复请求解析；解析不到时重新判定并重试，
-     * 重试上限由配置给出。事务服务返回空结果表示存在性判断与库中记录不一致，同样重建编号后重试。
-     * 判定缓存与实际数据不一致时也不淘汰缓存：安全状态单调不可逆，最多让本次请求多读一次库。</p>
-     *
-     * <p>事务内读到的安全状态随产物返回，事务提交后再把存在标记升级为可复用快照，
-     * 使后续重复请求不再回源。</p>
-     *
-     * @param claimApplication 待签收的理赔申请
-     * @param requestId        请求标识
-     * @param traceId          链路标识
+     * @param submitted                 待签收的理赔申请
+     * @param expectedClaimApplicationNo 报文携带的平台申请编号
+     * @param batchNo                   本次提交的材料批次编号
+     * @param requestId                 请求标识
+     * @param traceId                   链路标识
      * @return 签收结果
      */
-    private ClaimApplicationIntakeResult executeInLock(ClaimApplication claimApplication, String requestId, String traceId) {
+    private ClaimApplicationIntakeResult executeWithPlatformNumber(ClaimApplication submitted,
+                                                                   String expectedClaimApplicationNo, String batchNo,
+                                                                   String requestId, String traceId) {
+        try {
+            ClaimApplicationIntakeOutcome outcome = transactionService.intakeExisting(submitted,
+                    expectedClaimApplicationNo, batchNo, requestId, traceId);
+            if (outcome.result().disposition() != ClaimApplicationIntakeDisposition.REUSED) {
+                markMutable(submitted);
+            }
+            return upgradedResult(submitted, outcome);
+        } catch (ClaimApplicationIntakeConflictException conflict) {
+            return conflictResolver.resolve(submitted.getTenantCode(),
+                    submitted.getExternalClaimApplicationNo(), conflict.claimApplicationNo(),
+                    conflict.attemptBefore(), conflict.supplement(), requestId, traceId);
+        }
+    }
+
+    /**
+     * 未携带平台申请编号的签收：可复用快照只写轨迹，不存在则创建，存在则读取后复用。
+     *
+     * @param submitted 待签收的理赔申请
+     * @param requestId 请求标识
+     * @param traceId   链路标识
+     * @return 签收结果
+     */
+    private ClaimApplicationIntakeResult executeWithoutPlatformNumber(ClaimApplication submitted, String requestId,
+                                                                      String traceId) {
         boolean forceCreate = false;
         for (int retryTimes = 0; retryTimes < claimApplicationIntakePolicy.uniqueKeyRetryTimes(); retryTimes++) {
             try {
                 ClaimApplicationIntakeLookup lookup = forceCreate
                         ? ClaimApplicationIntakeLookup.absent()
-                        : claimApplicationIntakeSnapshotQuery.lookup(claimApplication.getTenantCode(),
-                                claimApplication.getExternalClaimApplicationNo());
+                        : claimApplicationIntakeSnapshotQuery.lookup(submitted.getTenantCode(),
+                                submitted.getExternalClaimApplicationNo());
                 if (lookup.kind() == ClaimApplicationIntakeLookupKind.REUSABLE) {
                     return transactionService.recordReused(lookup.snapshot().claimApplicationNo(), requestId, traceId);
                 }
                 boolean absent = lookup.kind() == ClaimApplicationIntakeLookupKind.ABSENT;
                 String candidateClaimApplicationNo = absent ? claimApplicationNoGenerator.nextClaimApplicationNo() : null;
-                Optional<ClaimApplicationIntakeOutcome> outcome = transactionService.intake(claimApplication,
+                Optional<ClaimApplicationIntakeOutcome> outcome = transactionService.intake(submitted,
                         lookup.kind(), candidateClaimApplicationNo, requestId, traceId);
                 if (outcome.isEmpty()) {
                     forceCreate = true;
                     continue;
                 }
                 if (absent) {
-                    markMutable(claimApplication);
+                    markMutable(submitted);
                 }
-                return upgradedResult(claimApplication, outcome.get());
+                return upgradedResult(submitted, outcome.get());
             } catch (DuplicateKeyException exception) {
                 Optional<ClaimApplicationIntakeOutcome> resolvedOutcome = transactionService.resolveAfterDuplicateKey(
-                        claimApplication, requestId, traceId);
+                        submitted, requestId, traceId);
                 if (resolvedOutcome.isPresent()) {
-                    markMutable(claimApplication);
-                    return upgradedResult(claimApplication, resolvedOutcome.get());
+                    markMutable(submitted);
+                    return upgradedResult(submitted, resolvedOutcome.get());
                 }
                 claimApplicationNoGenerator.synchronizeDailyCounter();
                 forceCreate = false;
             }
         }
-        throw new IllegalStateException("理赔申请唯一键冲突重试次数超限，tenantCode=" + claimApplication.getTenantCode()
-                + ", externalClaimApplicationNo=" + claimApplication.getExternalClaimApplicationNo());
+        throw new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY,
+                "理赔申请唯一键冲突重试次数超限，tenantCode=" + submitted.getTenantCode()
+                        + "，externalClaimApplicationNo=" + submitted.getExternalClaimApplicationNo());
     }
 
     /**
      * 返回对外结果，并顺带把事务内观察到的可复用快照写入判定缓存。
      *
-     * @param claimApplication 本次签收的理赔申请
-     * @param outcome          事务产物
+     * @param submitted 本次签收的理赔申请
+     * @param outcome   事务产物
      * @return 对外签收结果
      */
-    private ClaimApplicationIntakeResult upgradedResult(ClaimApplication claimApplication,
-                                                        ClaimApplicationIntakeOutcome outcome) {
+    private ClaimApplicationIntakeResult upgradedResult(ClaimApplication submitted, ClaimApplicationIntakeOutcome outcome) {
         outcome.reusableSnapshot().ifPresent(snapshot -> claimApplicationIntakeSnapshotQuery.markReusable(
-                claimApplication.getTenantCode(), claimApplication.getExternalClaimApplicationNo(), snapshot));
+                submitted.getTenantCode(), submitted.getExternalClaimApplicationNo(), snapshot));
         return outcome.result();
     }
 
     /**
      * 把新创建或并发已创建的申请标记为存在且状态可变，覆盖之前的空标记。
      *
-     * @param claimApplication 已存在的理赔申请
+     * @param submitted 已存在的理赔申请
      */
-    private void markMutable(ClaimApplication claimApplication) {
-        claimApplicationIntakeSnapshotQuery.markMutable(claimApplication.getTenantCode(),
-                claimApplication.getExternalClaimApplicationNo());
+    private void markMutable(ClaimApplication submitted) {
+        claimApplicationIntakeSnapshotQuery.markMutable(submitted.getTenantCode(),
+                submitted.getExternalClaimApplicationNo());
+    }
+
+    /**
+     * 空串按未携带平台申请编号处理。
+     *
+     * @param claimApplicationNo 报文携带的平台申请编号
+     * @return 去除首尾空白后的编号；未携带时为空
+     */
+    private String normalize(String claimApplicationNo) {
+        if (claimApplicationNo == null || claimApplicationNo.isBlank()) {
+            return null;
+        }
+        return claimApplicationNo.trim();
     }
 }

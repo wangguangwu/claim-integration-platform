@@ -1,6 +1,6 @@
 # 标准 DDD 架构说明
 
-本文回答一个问题：什么叫"符合标准 DDD"，判定依据是什么，以及 `claim-application-service` 的 192 个类各自落在哪一层。
+本文回答一个问题：什么叫"符合标准 DDD"，判定依据是什么，以及 `claim-application-service` 的 207 个类各自落在哪一层。
 文档面向本项目开发者，术语以 Eric Evans / Vaughn Vernon《实现域驱动设计》、业界广泛引用的四层结构、Alibaba COLA 4.0 与 Fowler《企业应用架构模式》为基准。
 
 ## 1. 标准只规定三件事
@@ -28,7 +28,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 |---|---|---|---|
 | `interfaces` | 把外部请求翻译成用例调用（Ports & Adapters 里的 driving adapter） | Controller、MQ 消费者、定时任务触发器、租户协议解析与防腐、HTTP 请求/响应 DTO、字段渲染 | 业务规则、数据库访问、事务编排、聚合组装 |
 | `usecase` | 用例编排：按顺序调用领域与端口，管理事务、幂等与重试 | UseCase、TransactionService、记录装配工厂、命令入参与结果出参、出站能力端口、配置策略端口、端口查询/请求/结果模型 | 业务不变式（属于聚合）、DO、框架化的持久化细节、配置绑定 |
-| `domain` | 业务本身：状态、不变式、词汇 | 聚合根、实体、值对象、状态枚举、领域事件、领域服务、聚合 Repository 接口（`domain/<聚合>/port`）、业务异常与错误码 | Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ、Jackson；DO；任何序列化细节；锁、发号、外部系统调用、Outbox 等技术能力端口 |
+| `domain` | 业务本身：状态、不变式、词汇 | 聚合根、聚合内实体、值对象、状态枚举、聚合 Repository 接口（`domain/<聚合>/port`）、业务异常与错误码 | Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ、Jackson；DO；任何序列化细节；锁、发号、外部系统调用、Outbox 等技术能力端口 |
 | `infrastructure` | 端口的技术实现（driven adapter） | `*DO`、ORM `*DOMapper`、DO↔领域对象 `*Converter`、`MyBatis*Repository` 实现、Redis/锁/编号生成、Feign 客户端、MQ 发送、`*Policy` 端口的 `*Properties` 配置适配器 | 业务规则、用例流程决策 |
 
 三条最容易搞错的归属，逐条说明：
@@ -41,24 +41,27 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 | 角色 | 后缀/形态 | 所在层 | 本项目实例 |
 |---|---|---|---|
-| 聚合根 | 业务名词，record/class，构造器私有或只暴露命名工厂 | `domain/<聚合>` | `domain/claim/ClaimApplication`、`domain/material/Material`、`domain/issue/ClaimApplicationIssue` |
+| 聚合根 | 业务名词，record/class，构造器私有或只暴露命名工厂 | `domain/<聚合>` | `domain/claim/ClaimApplication` |
+| 聚合内实体 | 业务名词，只能由聚合根创建与修改 | `domain/<聚合>/<子域>` | `domain/claim/material/Material`、`domain/claim/issue/ClaimApplicationIssue` |
+| 聚合外追加事实 | 业务名词，只追加、不参与聚合加载与保存 | `domain/<聚合>` | `domain/claim/ClaimCaseRelation`（审核签收案件关联） |
 | 值对象 | 业务名词 | `domain`，人员角色另入 `domain/claim/person` | `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`MaterialSubmission` |
 | 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | 业务状态在 `domain`；异步内核枚举在 `usecase/integration` | `domain`：`ClaimApplicationStatus`、`MaterialStatus`、`ClaimApplicationIssueStatus`；`usecase/integration`：`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionType`、`InteractionDirection`、`InteractionAction`、`InteractionResultStatus` |
 | 枚举自带的业务映射 | 枚举字段与方法 | 随枚举所在层 | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
-| 聚合仓储端口 | `*Repository` | `domain/<聚合>/port` | `ClaimApplicationRepository`、`ClaimCaseRelationRepository`、`MaterialRepository`、`ClaimApplicationIssueRepository` |
-| 外部能力端口与配置策略 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `usecase/<域>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`ClaimApplicationIntakeSnapshotQuery`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ClaimApplicationIntakePolicy`、`ServiceAuditSystemPort`（16 个端口，全部在 `port` 子包） |
-| 端口模型 | 随端口一起被用例与基础设施共享的查询/请求/结果 record 或枚举 | `usecase/<域>/model` | `ClaimApplicationIntakeLookup`、`ClaimApplicationIntakeSnapshot`、`AuditDeliveryRequest`、`UnderwritingResult`、`MaterialUploadRequest`、`FileUploadResult` |
+| 聚合仓储端口 | `*Repository` | `domain/<聚合>/port` | `ClaimApplicationRepository`、`ClaimCaseRelationRepository`（材料与问题件不设独立仓储） |
+| 外部能力端口与配置策略 | `*Query`、`*Generator`、`*Lock`、`*Requester`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `usecase/<域>/port` | `ValidPolicyQuery`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`ClaimApplicationIntakeSnapshotQuery`、`ClaimApplicationDetailQuery`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ClaimApplicationIntakePolicy`、`ServiceAuditSystemPort` |
+| 端口模型 | 随端口一起被用例与基础设施共享的查询/请求/结果 record 或枚举 | `usecase/<域>/model` | `ClaimApplicationIntakeLookup`、`ClaimApplicationIntakeSnapshot`、`AuditDeliveryRequest`、`UnderwritingResult`、`MaterialUploadRequest`、`FileUploadResult`、`ClaimApplicationWithMaterials`、`ClaimApplicationWithIssues`、`ClaimApplicationWithCases`、`IssueView` |
 | 异步内核模型 | Outbox、交互轨迹及其状态/类型枚举 | `usecase/integration/<子域>/model` | `OutboxEvent`、`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionLog`、`InteractionType`、`InteractionAction`、`InteractionDirection`、`InteractionResultStatus` |
 | 配置适配器 | `*Properties`（实现 `usecase` 的 `*Policy` 端口） | `infrastructure/<域>/config` | `OutboxRelayProperties`、`ClaimApplicationCompensationProperties`、`ClaimApplicationIntakeProperties` |
-| 仓储实现 | `MyBatis*Repository` | `infrastructure/<域>/persistence` | `infrastructure/intake/persistence/MyBatisClaimApplicationRepository` |
+| 仓储实现 | `MyBatis*Repository` | `infrastructure/claim/persistence` | `MyBatisClaimApplicationRepository`、`ClaimCaseRelationRepositoryImpl` |
+| 读模型实现 | `MyBatis*Query` | `infrastructure/<域>/persistence` | `infrastructure/query/persistence/MyBatisClaimApplicationDetailQuery` |
 | 持久化对象 | `*DO` | `infrastructure/<域>/persistence` | `ClaimApplicationDO`、`MaterialDO`、`OutboxEventDO` |
 | ORM 映射 | `*DOMapper` | `infrastructure/<域>/persistence` | `ClaimApplicationDOMapper` |
 | DO↔领域转换器 | `*DataConverter` | `infrastructure/<域>/persistence` | `ClaimApplicationDataConverter`、`MaterialDataConverter` |
 | 外部系统实现 | 进程内本地实现用 `Local*`；接入真实系统时另加适配器 | `infrastructure/<域>/external` | `LocalMaterialFileProcessor`、`LocalValidPolicyQuery`、`LocalAutoUnderwritingRequester`、`LocalUnderwritingResultQuery`、`LocalAuditSystemClient` |
 | 缓存/锁/编号/消息实现 | 技术前缀 + 端口名 | `infrastructure/<域>/{cache,lock,number,messaging,resilience}` | `RedisClaimApplicationIntakeSnapshotQuery`、`RedissonClaimApplicationIntakeLock`、`RocketMqOutboxPublisher`、`RedisAvailabilityCircuit` |
-| 业务异常与错误码 | `BusinessException`（传输无关基类）、`DomainException`（领域拒绝）、`ApplicationException`（用例拒绝）+ `*ErrorCode implements BusinessErrorCode` | `shared/contract`（异常基类与跨域错误码）、`domain/exception`、`usecase/exception`、`domain/<聚合>/exception`（域内错误码） | `BusinessException`、`DomainException`、`ApplicationException`、`ClaimApplicationIntakeErrorCode`、`ClaimApplicationIssueErrorCode`、`ClaimApplicationAsyncErrorCode` |
+| 业务异常与错误码 | `BusinessException`（传输无关基类）、`DomainException`（领域拒绝）、`ApplicationException`（用例拒绝）+ `*ErrorCode implements BusinessErrorCode` | `shared/contract`（异常基类与跨域错误码）、`domain/exception`、`usecase/exception`、`domain/<聚合>/exception`（域内错误码） | `BusinessException`、`DomainException`、`ApplicationException`、`ClaimApplicationErrorCode`、`ClaimApplicationIntakeErrorCode`、`ClaimApplicationIssueErrorCode`、`ClaimApplicationAsyncErrorCode` |
 | 入站错误码声明与异常渲染 | `ApiErrorCodeProvider`、`BusinessErrorStatusRegistry`、`WebExceptionHandler` | `interfaces/web` | 控制器声明请求非法码与系统错误码；注册表是错误码到 HTTP 状态的唯一映射；全局处理器是唯一 `@RestControllerAdvice` |
-| 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationIntakeMaterialFactory`、`ClaimApplicationLifecycleRecordFactory` |
+| 用例与编排 | `*UseCase`（具体类，不再保留单实现接口）、`*TransactionService`、`*RecordFactory`、`*Factory` | `usecase/<域>` | `ClaimApplicationIntakeUseCase`、`MaterialProcessingUseCase`、`ClaimApplicationDetailQueryUseCase`、`ClaimApplicationIntakeConflictResolver`、`ClaimApplicationLifecycleRecordFactory` |
 | 命令入参/结果出参 | `*Command`、`*Result`、`*Disposition`、`*Outcome` | `usecase/<域>/{command,result}` | `MaterialProcessCommand`、`ClaimApplicationIntakeCommand`、`ClaimApplicationIntakeResult` |
 | 入站通道 | `*Controller`、`*Consumer`、`*Scheduler`、`*Pipeline` | `interfaces/<域>/{web,messaging,scheduling,tenantprotocol}`；流水线实现另入 `tenantprotocol/core/pipeline` 与 `tenants/<租户>` | `ClaimApplicationIntakeController`、`MaterialProcessConsumer`、`OutboxRelayScheduler`、`TenantAProtocolPipeline` |
 | 报文防腐组件 | `TenantProtocolSignatureVerifier`、`TenantProtocolDecryptor`、`*Parser`、`*Converter`、`TenantProtocolValidator`（注解适配器）；必填约束以 `jakarta.validation` 注解声明在租户 request 上 | `interfaces/<域>/tenantprotocol/core/stage`（五个阶段端口与默认实现）与 `tenants/{tenant_a,tenant_b}`（每租户一套 request/解析/转换） | `DefaultTenantProtocolSignatureVerifier`、`DefaultTenantProtocolDecryptor`、`TenantARequestParser`、`BeanValidationTenantProtocolValidator`、`TenantARequestConverter`（输出 `ClaimApplicationIntakeCommand`） |
@@ -67,20 +70,23 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 ## 4. 本项目的落位
 
-根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`。类数合计 201（不含 `package-info`），目录 109 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
+根包是四层，业务域是层内第二级；`domain` 层的理赔申请聚合子包按聚合本身命名叫 `claim`，材料与问题件作为聚合内实体位于 `claim/material` 与 `claim/issue`。类数合计 207（不含 `package-info`），目录 107 个，`application` 之下最深 5 级包（`interfaces/intake/tenantprotocol/core/pipeline`）。
 
 | 域键 | `interfaces` | `usecase` | `domain` | `infrastructure` |
 |---|---|---|---|---|
-| 申请签收（`intake` / 聚合 `claim`） | 23 | 14 | 13 | 15 |
-| 材料处理（`material`） | 1 | 8 | 3 | 6 |
+| 申请签收（`intake` / 聚合 `claim`） | 23 | 15 | 15 | 21 |
+| 材料处理（`material`） | 1 | 8 | 3 | 2 |
 | 承保确认（`underwriting`） | 2 | 11 | 0 | 3 |
-| 审核交付（`audit`） | 3 | 10 | 0 | 1 |
-| 问题件（`issue`） | 8 | 8 | 9 | 6 |
+| 审核交付（`audit`） | 4 | 10 | 0 | 1 |
+| 问题件（`issue`） | 8 | 9 | 3 | 0 |
+| 详情查询（`query`） | 1 | 9 | 0 | 1 |
 | 异步集成（`integration`） | 2 | 20 | 0 | 14 |
-| 分层异常（`exception`） | — | 1 | 1 | — |
+| 分层异常与入站公共（`interfaces/web`、`usecase/exception`、`domain/exception`） | 4 | 1 | 1 | — |
 | `shared` | — | — | — | 1（另有 `contract` 11） |
 | `support` | — | — | — | 2（`support/config`） |
 | 根包 | 4（`interfaces/web`） | — | — | 1（`ClaimApplicationServiceApplication`） |
+
+`infrastructure/claim/persistence` 的 15 个类由申请、材料、问题件与案件关联共用，统一计入申请签收域；材料与问题件不再拥有独立写仓储。
 
 - `interfaces/intake` 的 23 个类里有 20 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务异常，共 12 个文件。
@@ -99,7 +105,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 2. 它承载业务不变式或业务词汇吗？是 → `domain`（哪怕它是接口或异常）。
 3. 它只是把外部请求翻译成用例调用吗？是 → `interfaces`。三者都不是 → `usecase`。
 
-可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 6、第 8b 项应为 2、第 15 项应为 19 外，其余必须为 0）：
+可执行的扫描（在 `backend/claim-application-service/src/main/java/com/wangguangwu/claim/application` 下执行，除第 8 项应为 2、第 15 项应为 19 外，其余必须为 0）：
 
 ```bash
 P=com.wangguangwu.claim.application
@@ -120,9 +126,9 @@ done; done; done | wc -l
 # 6 DO 跨出 infrastructure；7 非 ORM 的 *Mapper
 grep -rl -E '\b[A-Za-z]+DO\b' --include='*.java' . | grep -vc '^./infrastructure/'
 find . -name '*Mapper.java' | grep -vc 'DOMapper\.java$'
-# 8 domain 接口只剩聚合 Repository 与领域事件端口（应为 6）
+# 8 domain 接口只剩聚合 Repository（应为 2：ClaimApplicationRepository、ClaimCaseRelationRepository）
 grep -rl '^public interface' --include='*.java' domain | wc -l
-# 8b domain 接口不在 port 子包的应为 2（IssueDomainEvent、IssueDomainEventPublisher）
+# 8b domain 接口必须全部位于 port 子包（应为 0）
 grep -rl '^public interface' --include='*.java' domain | grep -vc '/port/'
 # 9 聚合根封装：domain 内不得有 Lombok @Setter 或显式 public setter
 grep -rn '@Setter\|public void set' --include='*.java' domain | wc -l
@@ -151,13 +157,13 @@ grep -rn '^import .*shared\.contract\.BusinessException' --include='*.java' doma
   | grep -v '/exception/' | wc -l
 ```
 
-当前结果：第 1～7、9～14、16～18 项均为 0；第 8 项 6 个接口（4 个聚合 Repository 在 `port` 子包，另有 `IssueDomainEvent` 与 `IssueDomainEventPublisher`），第 8b 项 2；第 15 项 19，全部是有装配逻辑的构造器，按类别列入白名单：三个异常类需要 `super(...)`、四个人员角色值对象需要 `super(...)`、两个租户流水线需要 `super(...)` 装配组件、`RedissonClaimApplicationIntakeLock` 需要按配置初始化信号量、`RedisAvailabilityCircuit` 需要把配置换算成纳秒并初始化日志节流、五个 `Local*` 外部实现需要按配置决定休眠与失败。生产类 192、目录 108。
+当前结果：第 1～7、9～14、16～18 项均为 0；第 8 项 2 个接口（`ClaimApplicationRepository`、`ClaimCaseRelationRepository`，均在 `port` 子包），第 8b 项 0；第 15 项 19，全部是有装配逻辑的构造器，按类别列入白名单：三个异常类需要 `super(...)`、四个人员角色值对象需要 `super(...)`、两个租户流水线需要 `super(...)` 装配组件、`RedissonClaimApplicationIntakeLock` 需要按配置初始化信号量、`RedisAvailabilityCircuit` 需要把配置换算成纳秒并初始化日志节流、五个 `Local*` 外部实现需要按配置决定休眠与失败。生产类 207、目录 107（不含 `package-info`）。
 
-单元测试代码在功能定稿前只保留分层与问题件相关用例，`mvn -B -pl backend/claim-application-service -am package` 编译通过；经 `claim-gateway` 的黄金路径（首次签收、同号幂等、改造前落库的人员 JSON 由新代码按角色还原、tenant-b 协议、未支持租户错误映射、同号并发单行、异步链路至 `WAIT_AUDIT`、材料失败与重新申请覆盖四个角色字段并进入第 2 次尝试）逐项一致。
+单元测试覆盖聚合边界、签收分流、重新申请与补材、版本冲突、读模型与分层规则，`mvn -B -pl backend/claim-application-service -am package` 编译与测试通过；经 `claim-gateway` 的运行栈黄金路径在 T18 逐项复验。
 
-第 14、15 项是样板收敛的量化口径，属于本项目方言而不是标准强制项：依赖注入统一 `@RequiredArgsConstructor` + `private final`，日志统一 `@Slf4j`，多字段装配统一 `@Builder`（`ClaimApplication`、`Material` 的建造者是 `@Builder(access = PRIVATE)`，公开的创建入口仍只有 `submit`/`createPending`/`restore`/`reapply`；`ClaimApplicationIntakeCommand` 与 `*DO` 用公开建造者）。第 16 项约束人员角色的装配口径：四类人员不共用一个 `PersonInfo` 位置参数，而是由 `PersonInfo` 基类派生 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个密封（sealed）终态子类，聚合字段、受理命令与租户转换器一律按角色类型声明，四个同名字段被按位置装错在编译期就不可能；基类只持有四个基础字段与相等语义，新增角色必须显式出现在 `permits` 列表里。方言改动不得松动第 9、10 项：聚合的字段写入只能发生在聚合自己内部。
+第 14、15 项是样板收敛的量化口径，属于本项目方言而不是标准强制项：依赖注入统一 `@RequiredArgsConstructor` + `private final`，日志统一 `@Slf4j`，多字段装配统一 `@Builder`（`ClaimApplication`、`Material`、`ClaimApplicationIssue` 的建造者是 `@Builder(access = PRIVATE)`，公开的创建入口仍只有 `submit`/`restore`/`reapply`/`supplement` 与聚合内实体的工厂方法；`ClaimApplicationIntakeCommand` 与 `*DO` 用公开建造者）。第 16 项约束人员角色的装配口径：四类人员不共用一个 `PersonInfo` 位置参数，而是由 `PersonInfo` 基类派生 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个密封（sealed）终态子类，聚合字段、受理命令与租户转换器一律按角色类型声明，四个同名字段被按位置装错在编译期就不可能；基类只持有四个基础字段与相等语义，新增角色必须显式出现在 `permits` 列表里。方言改动不得松动第 9、10 项：聚合的字段写入只能发生在聚合自己内部。
 
-第 9、10、12、13 项对应"层的职责"里的聚合封装与所有权和"依赖方向"里的配置归属，此前不满足（`ClaimApplication`、`Material` 暴露 Lombok setter；`usecase/intake` 直接构造材料聚合与异步记录聚合，与 `integration` 的记录装配工厂形成两套实现；交互事件本身也靠在用例层 `new InteractionLog` 拼装），由 005 的 T6、T8、T9 归位后归零；两个聚合的构造器已改私有，只能经 `submit`/`createPending`/`restore` 工厂创建；异步内核模型只能经 `OutboxEvent.pending`/`InteractionLog.of` 创建，持久化还原由 `infrastructure` 直接调用规范构造器。第 11 项是同一规则的另一面：装配入口不得自带一套业务词汇。"层的职责"第三条——不变式失败改说本域业务异常与错误码——会改变对外错误语义，不在 005 范围，另立 Spec。
+第 9、10、12、13 项对应"层的职责"里的聚合封装与所有权和"依赖方向"里的配置归属，此前不满足（`ClaimApplication`、`Material` 暴露 Lombok setter；`usecase/intake` 直接构造材料实体与异步记录聚合，与 `integration` 的记录装配工厂形成两套实现；交互事件本身也靠在用例层 `new InteractionLog` 拼装），由 005 的 T6、T8、T9 归位后归零；聚合与聚合内实体构造器已改私有，只能经工厂方法创建（024 后材料与问题件仅由 `ClaimApplication.submit`/`reapply`/`supplement`/`raiseIssue` 创建）；异步内核模型只能经 `OutboxEvent.pending`/`InteractionLog.of` 创建，持久化还原由 `infrastructure` 直接调用规范构造器。第 11 项是同一规则的另一面：装配入口不得自带一套业务词汇。"层的职责"第三条——不变式失败改说本域业务异常与错误码——会改变对外错误语义，不在 005 范围，另立 Spec。
 
 ## 6. 本项目的标准与方言分界
 

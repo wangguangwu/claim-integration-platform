@@ -20,9 +20,10 @@
 ### 边界内
 
 - 多租户理赔申请统一接入、校验与签收。
-- 理赔申请、Material、Issue、CaseRelation 和交互记录管理。
+- 理赔申请聚合（材料与问题件为聚合内实体）、案件关联事实和交互记录管理。
 - 有效保单查询与无保单场景下的自动承保协同。
 - 审核申请交付、签收回调、问题件回调和补材重提。
+- 理赔申请详情读模型查询（材料、问题件、案件关联）。
 - 理赔申请撤销。
 - 异步事件可靠投递、消费幂等和补偿恢复。
 
@@ -37,11 +38,12 @@
 | 职责 | 说明 |
 | --- | --- |
 | 统一接入 | 接收不同租户协议，完成验签、解密、解析、校验、映射和响应转换。 |
-| 申请受理 | 使用 `tenantCode + externalClaimApplicationNo` 确认唯一性，创建或重置理赔申请。 |
-| 材料管理 | 管理首次材料与补材批次，保留软删除材料的审计轨迹。 |
+| 申请受理 | 使用 `tenantCode + externalClaimApplicationNo` 确认唯一性，创建或按平台编号分流重新申请与补材。 |
+| 材料管理 | 聚合内材料实体管理首次材料与补材批次，保留软删除材料的审计轨迹。 |
 | 承保协同 | 查询有效保单；无保单时发起自动承保并等待完成通知。 |
-| 审核协同 | 提交审核申请，接收一次性返回全部案件的审核签收回调。 |
-| 问题件处理 | 同时只维护一条未关闭 Issue；租户提交补材后立即关闭当前 Issue。 |
+| 审核协同 | 提交审核申请，接收一次性返回全部案件的审核签收回调，只追加案件关联。 |
+| 问题件处理 | 聚合内问题件实体同时只维护一条未关闭记录；租户补材后立即关闭并重新走签收链路。 |
+| 详情查询 | 通过读模型返回申请摘要及材料、问题件、案件关联，不加载聚合、不写轨迹。 |
 | 撤销处理 | 撤销对象是理赔申请；已完成审核签收时需经审核系统确认、锁定和撤销。 |
 
 ## 总体架构
@@ -54,22 +56,22 @@ flowchart LR
 
     subgraph APPLICATION["claim-application-service"]
         ACCESS["统一接入"]
-        APP["理赔申请业务域"]
-        MATERIAL["Material"]
-        ISSUE["Issue"]
+        APP["理赔申请聚合<br/>ClaimApplication"]
+        QUERY["详情查询<br/>读模型"]
         OUTBOX["Outbox / MQ"]
     end
 
     FILE["文件系统"]
     INSURED["承保系统"]
     AUDIT["审核系统"]
+    DB[("MySQL")]
 
     GATEWAY --> ACCESS
     ACCESS --> APP
-    APP --> MATERIAL
-    APP --> ISSUE
+    APP --> DB
+    QUERY --> DB
     APP --> OUTBOX
-    MATERIAL --> FILE
+    APP --> FILE
     APP --> INSURED
     APP <--> AUDIT
     OUTBOX --> AUDIT
@@ -88,8 +90,10 @@ flowchart TB
     subgraph APPLICATION["claim-application-service"]
         direction TB
         INTAKE["intake<br/>申请签收、租户协议、申请聚合"]
-        MATERIAL["material<br/>材料处理、文件适配"]
+        MATERIAL["material<br/>材料处理（聚合内实体）"]
         UNDERWRITING["underwriting<br/>保单查询、自动承保、回调"]
+        ISSUE["issue<br/>问题件下发与关闭（聚合内实体）"]
+        QUERY["query<br/>详情读模型"]
         INTEGRATION["integration<br/>Outbox、MQ、交互日志、补偿"]
         AUDIT_DELIVERY["audit<br/>审核交付、审核系统适配"]
         SHARED["shared / support<br/>跨域契约、响应、异常、配置"]
@@ -99,10 +103,13 @@ flowchart TB
         MATERIAL --> UNDERWRITING
         UNDERWRITING --> INTEGRATION
         INTEGRATION --> AUDIT_DELIVERY
+        ISSUE --> INTEGRATION
         SHARED -. "提供通用支撑" .-> INTAKE
         SHARED -. "提供通用支撑" .-> MATERIAL
         SHARED -. "提供通用支撑" .-> UNDERWRITING
+        SHARED -. "提供通用支撑" .-> ISSUE
         SHARED -. "提供通用支撑" .-> AUDIT_DELIVERY
+        SHARED -. "提供通用支撑" .-> QUERY
     end
 
     MATERIAL --> FILE["文件系统"]
@@ -113,9 +120,9 @@ flowchart TB
 
 代码目录采用“层级优先、层内分域”的组织方式：
 
-- 根包是 DDD 四层 `interfaces`、`usecase`、`domain`、`infrastructure`，业务域 `intake`、`material`、`underwriting`、`audit`、`issue`、`integration` 作为每层的第二级子包；`shared`、`support` 保留为额外根包。
+- 根包是 DDD 四层 `interfaces`、`usecase`、`domain`、`infrastructure`，业务域 `intake`、`material`、`underwriting`、`audit`、`issue`、`query`、`integration` 作为每层的第二级子包；`shared`、`support` 保留为额外根包。
 - 依赖方向为 `interfaces → usecase → domain ← infrastructure`；`domain` 不依赖任何上层，`infrastructure` 只依赖 `usecase/<域>/{port,model}` 与 `domain`，不依赖用例编排或 `interfaces`，`usecase` 不依赖 `interfaces`/`infrastructure`。
-- 目录命名遵循标准 DDD 词典：`interfaces/<域>` 按入站通道分为 `web`、`messaging`、`scheduling`、`tenantprotocol`，不设 `inbound` 中转层（出站适配器属于 `infrastructure`）；`tenantprotocol/core/{pipeline,stage}` 分放流水线装配与五个阶段端口（验签、解密、解析、校验、转换，默认验签/解密实现直通），`tenantprotocol/tenants/{tenant_a,tenant_b}` 按租户各一套 request/流水线/解析/校验/转换，租户响应渲染在 `interfaces/intake/web/render`，问题件响应渲染在 `interfaces/issue/web/render`；`domain` 只含聚合、值对象、状态枚举、领域事件、领域服务、聚合 Repository、业务异常与错误码，零框架依赖，聚合 Repository 在 `domain/<聚合>/port`（理赔申请的人员基类与四个角色在 `domain/claim/person`），锁、发号、快照查询、外部系统调用、Outbox 等技术能力端口与端口模型在 `usecase/<域>/{port,model}`，聚合根不暴露 setter 且构造器私有；DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter` 和仓储实现一律在 `infrastructure/<域>/persistence`，单聚合平铺、多聚合按与 `domain` 同名的子包分组。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
+- 目录命名遵循标准 DDD 词典：`interfaces/<域>` 按入站通道分为 `web`、`messaging`、`scheduling`、`tenantprotocol`，不设 `inbound` 中转层（出站适配器属于 `infrastructure`）；`tenantprotocol/core/{pipeline,stage}` 分放流水线装配与五个阶段端口（验签、解密、解析、校验、转换，默认验签/解密实现直通），`tenantprotocol/tenants/{tenant_a,tenant_b}` 按租户各一套 request/流水线/解析/校验/转换，租户响应渲染在 `interfaces/intake/web/render`，问题件响应渲染在 `interfaces/issue/web/render`；`domain` 只含聚合根（`ClaimApplication`）、聚合内实体（`claim/material`、`claim/issue`）、聚合外追加事实（`ClaimCaseRelation`）、值对象、状态枚举、聚合 Repository、业务异常与错误码，零框架依赖，聚合 Repository 在 `domain/claim/port`（理赔申请的人员基类与四个角色在 `domain/claim/person`），锁、发号、快照查询、读模型查询、外部系统调用、Outbox 等技术能力端口与端口模型在 `usecase/<域>/{port,model}`，聚合根不暴露 setter 且构造器私有；DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter` 和仓储实现一律在 `infrastructure/claim/persistence`，读模型实现在 `infrastructure/query/persistence`。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md)，标准 DDD 各层的职责与判定方法见 [标准 DDD 架构说明](ddd-standard-architecture.md)。
 - `shared` 放被多域复用的构件：`shared/contract` 只承载消息信封、错误码接口、业务异常基类与异步错误码，另有统一响应模型（`interfaces/web`）与加密工具（`shared/infrastructure`）；承保完成命令等应用输入随用例归位到 `usecase/<域>/command`；`support` 只放配置；文件系统、承保系统与审核系统由 `infrastructure/<域>/external` 的进程内本地实现提供，接真实系统时替换为对应适配器。
 - `integration` 定位平台异步内核，承载 Outbox 投递、消费去重、交互日志记录装配与滞留补偿；其模型与端口位于 `usecase/integration/{outbox,consumption,compensation,interaction}/{model,port}`。补偿允许重放业务域用例，业务域允许复用内核的记录装配入口 `usecase/integration/record`。
 - 跨域引用只允许落在对方 `domain`、`shared`、对方 `usecase` 的 `port`/`model`，或 `integration` 对外提供的记录装配与补偿用例；禁止引用其他业务域的 `interfaces`、`infrastructure` 与用例编排类，DO 不得跨域传递，`domain` 包不得依赖 Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ 与 Jackson；规则由包名前缀即可判定，详见 [005 Spec 依赖方向规则](../../specs/005-application-service-package-refactoring/design.md)。
@@ -125,11 +132,12 @@ flowchart TB
 
 | 交互 | 发起方 | 处理方式 | 业务含义 |
 | --- | --- | --- | --- |
-| 理赔申请提交 | 租户系统 | 同步 | 完成校验、幂等、理赔申请落库并返回 `claimApplicationNo`。 |
+| 理赔申请提交 | 租户系统 | 同步 | 完成校验、幂等、理赔申请落库并返回 `claimApplicationNo`；携带平台编号时按状态走重新申请或补材。 |
 | 材料处理 | 理赔申请| 异步 | 材料处理完成后推进承保确认。 |
 | 自动承保完成通知 | 承保系统 | 异步 | 无有效保单时进入 `UNDERWRITING`，通知后推进审核交付。 |
-| 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，建立关联后完成理赔申请。 |
-| 问题件回调 | 审核系统 | 异步 | 创建未关闭 Issue 并等待租户补材。 |
+| 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，只追加案件关联，不改变申请状态。 |
+| 问题件回调 | 审核系统 | 异步 | 创建未关闭问题件并挂起申请；关闭问题件后恢复等待审核。 |
+| 详情查询 | 租户系统 | 同步 | 按申请编号返回摘要及材料、问题件或案件关联，租户不匹配返回 404。 |
 | 理赔申请撤销 | 租户系统 | 同步发起 | 未完成审核签收时直接撤销；完成后协同审核系统撤销。 |
 
 ## 核心数据模型
@@ -138,10 +146,11 @@ flowchart TB
 
 | 对象 | 职责 | 关键约束 |
 | --- | --- | --- |
-| `ClaimApplication` | 申请聚合根，持有生命周期状态、外部申请号和人员信息。 | `(tenantCode, externalClaimApplicationNo)` 唯一。 |
-| `Material` | 首次材料和补材记录。 | 使用 `batchNo` 区分材料批次；重新申请时旧材料软删除。 |
-| `Issue` | 审核系统下发的问题件。 | 同一理赔申请同时只允许一条未关闭记录。 |
-| `CaseRelation` | 理赔申请与审核签收返回案件的关联，归属 `domain/claim`，不构成独立聚合。 | `(tenantCode, claimApplicationNo, caseNo)` 唯一。 |
+| `ClaimApplication` | 唯一聚合根，持有生命周期状态、受理尝试次数、人员信息、当前有效材料与全部问题件，并用 `version` 做乐观锁。 | `(tenantCode, externalClaimApplicationNo)` 唯一；`save` 以 `id + version` 条件更新。 |
+| `Material` | 聚合内实体，首次材料和补材记录。 | 归属由根决定；使用 `batchNo` 区分材料批次；重新申请与补材时旧材料软删除。 |
+| `ClaimApplicationIssue` | 聚合内实体，审核系统下发的问题件。 | 同一理赔申请同时只允许一条未关闭记录。 |
+| `ClaimCaseRelation` | 理赔申请与审核签收返回案件的关联，是聚合外追加事实。 | `(tenantCode, claimApplicationNo, caseNo)` 唯一；不参与聚合加载与保存。 |
+| `ClaimApplicationView` | 详情查询读模型（摘要 + 材料/问题件/案件关联）。 | 按租户与申请编号查询，不加载聚合、不写轨迹。 |
 | `InteractionLog` | 外部系统调用、通知和回调的处理轨迹。 | 记录必要业务标识与结果，不记录完整敏感信息。 |
 | `OutboxEvent` | 与本地业务数据同事务持久化的待投递事件。 | `eventId` 唯一，按事件和理赔申请幂等消费。 |
 
@@ -161,6 +170,8 @@ erDiagram
         varchar claim_application_no
         varchar external_claim_application_no
         varchar status
+        int claim_application_attempt
+        bigint version
         json applicant_json
         json primary_insured_json
         json accident_person_json
@@ -181,7 +192,7 @@ erDiagram
         varchar claim_application_no
         varchar issue_no
         varchar status
-        boolean open
+        boolean is_open
     }
 
     CASE_RELATION {
@@ -212,32 +223,32 @@ erDiagram
 - 理赔申请使用 `applicantJson`、`primaryInsuredJson`、`accidentPersonJson`、`payeeJson` 四个 JSON 字段分别保存申请人、主被保险人、出险人和领款人，避免角色数据相互覆盖。
 - 每个 JSON 字段必须有明确的版本和必填字段约束；租户转换器负责外部字段映射，领域模型只接收标准化数据。
 - 证件号、银行卡号等敏感字段不得写入 INFO、WARN 和 ERROR 日志；日志仅记录脱敏值及 `claimApplicationNo`、租户和 TraceId。
-- 首次提交和每次补材分别创建新的 `batchNo`。材料软删除只用于重新申请覆盖旧材料，不物理删除审计数据。
+- 首次提交和每次补材分别创建新的 `batchNo`。材料软删除只用于重新申请与补材覆盖旧材料，不物理删除审计数据。
 
 ### 数据约束与幂等基础
 
 - 理赔申请主表唯一约束：`tenantCode + externalClaimApplicationNo`。
-- 同一理赔申请可以有多条历史 Issue，但同时只能有一条 `open = true` 的 Issue。
-- CaseRelation 唯一约束：`tenantCode + claimApplicationNo + caseNo`。
+- 理赔申请聚合写库使用 `version` 乐观锁：`save` 以 `id + version` 条件更新，失败返回 `false` 且不写材料与问题件子表。
+- 同一理赔申请可以有多条历史问题件，但同时只能有一条 `is_open = 1` 的问题件；数据库生成列唯一索引兜底。
+- `ClaimCaseRelation` 唯一约束：`tenantCode + claimApplicationNo + caseNo`。
 - OutboxEvent 以 `eventId` 唯一；消费者以事件标识和 `claimApplicationNo` 防止重复处理。
 
 ## 主状态机设计
 
 ### 状态定义
 
-当前实现覆盖签收、材料处理与承保分流，`ClaimApplicationStatus` 只保留这五个状态：
+当前实现覆盖签收、材料处理、承保分流与问题件链路，`ClaimApplicationStatus` 保留六个状态：
 
 | 状态 | 业务含义 |
 | --- | --- |
-| `PENDING_ACCEPT` | 理赔申请已签收，等待材料处理。 |
+| `PENDING_ACCEPT` | 理赔申请已签收（或补材后重新进入），等待材料处理。 |
 | `ACCEPTED` | 材料处理完成，申请受理成功。 |
 | `ACCEPT_FAILED` | 当前申请尝试受理失败。 |
 | `UNDERWRITING` | 未找到有效保单，自动承保处理中，等待完成通知。 |
 | `WAIT_AUDIT` | 已进入审核签收流程，等待审核系统处理。 |
+| `ISSUE` | 审核下发问题件，等待租户补材或审核关闭。 |
 
-审核能力落地后才引入 `ISSUE`（审核下发问题件，等待租户补材）、`COMPLETED`（审核签收完成，已建立全部案件关联）与 `REVOKED`（撤销完成，理赔申请的唯一生命周期终态）。006 整改已删除这三个尚未启用的枚举值，实现审核与撤销时按目标态迁移表重新加入。
-
-`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `claimApplicationNo` 并开始新的申请尝试。
+`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `claimApplicationNo` 并开始新的申请尝试。`COMPLETED` 与 `REVOKED` 尚未实现，审核签收当前只追加案件关联、不推进申请状态。
 
 ```mermaid
 stateDiagram-v2
@@ -246,19 +257,23 @@ stateDiagram-v2
     PENDING_ACCEPT --> ACCEPTED: 材料处理成功
     PENDING_ACCEPT --> ACCEPT_FAILED: 材料处理失败
     ACCEPT_FAILED --> PENDING_ACCEPT: 重新申请
+    ISSUE --> PENDING_ACCEPT: 租户补材
 
     ACCEPTED --> WAIT_AUDIT: 存在有效保单
     ACCEPTED --> UNDERWRITING: 不存在有效保单
     UNDERWRITING --> WAIT_AUDIT: 承保完成通知
+    WAIT_AUDIT --> ISSUE: 审核下发问题件
+    ISSUE --> WAIT_AUDIT: 审核关闭问题件
 ```
 
-审核签收之后的目标态迁移（尚未实现）：`WAIT_AUDIT → COMPLETED`（审核签收并返回全部案件）、`WAIT_AUDIT ⇄ ISSUE`（下发问题件与补材关闭）、`PENDING_ACCEPT/ACCEPTED/UNDERWRITING/WAIT_AUDIT/ISSUE/COMPLETED → REVOKED`（租户或审核系统撤销），`REVOKED` 为终态。
+补材与重新申请的区别只在人员：重新申请用报文人员整体替换，补材保留聚合原人员。后续 `WAIT_AUDIT → COMPLETED`、`→ REVOKED` 等状态迁移在对应能力实现时按目标态迁移表重新加入。
 
 状态推进规则：
 
-- 异步通知只能在理赔申请当前状态符合预期时推进状态；迟到通知、重复通知和已撤销理赔申请的通知只记录交互轨迹，不改变状态。
-- `COMPLETED` 后允许撤销，但只有审核系统按 `claimApplicationNo` 确认可撤销、锁定并撤销成功后才进入 `REVOKED`。
-- 理赔申请进入 `REVOKED` 后，审核签收、问题件、材料和承保通知都不能再次推进生命周期。
+- 异步通知只能在理赔申请当前状态符合预期时推进状态；迟到通知、重复通知和状态不匹配的通知只记录交互轨迹，不改变状态。
+- 所有写操作通过聚合根方法推进状态，并一次 `save` 落库；保存返回 `false` 说明版本已过期，按重复事件或冲突规则处理，不覆盖其他执行者已写入的结果。
+- 问题件下发与关闭由根统一迁移 `WAIT_AUDIT ⇄ ISSUE`；租户补材由根关闭未关闭问题件并迁移 `ISSUE → PENDING_ACCEPT`。
+- 撤销能力尚未实现；实现后，审核签收完成与撤销的状态迁移需在此表补充并通过根方法落地。
 
 ## 核心链路设计
 
@@ -271,88 +286,133 @@ sequenceDiagram
     participant G as Gateway
     participant A as TenantPipeline
     participant U as ClaimApplicationIntakeUseCase
+    participant R as 冲突解析器
     participant DB as MySQL
 
     T->>G: 提交理赔申请
     G->>A: 转发租户请求
     A->>A: 验签、解密、解析、校验、转换
-    A->>U: ClaimApplication
-    U->>DB: 按 tenantCode 与 externalClaimApplicationNo 查询
+    A->>U: ClaimApplication（含可选平台申请编号）
+    U->>U: 按 tenantCode 与外部申请号加锁
 
-    alt 首次申请
-        U->>DB: 生成 claimApplicationNo，创建理赔申请与 Material
-        U->>DB: 同事务写入 CLAIM_APPLICATION_CREATED OutboxEvent
-    else 已存在且状态为 ACCEPT_FAILED
-        U->>DB: 软删除旧 Material，覆盖当前申请内容
-        U->>DB: 复用 claimApplicationNo，状态重置为 PENDING_ACCEPT
-        U->>DB: 同事务写入 CLAIM_APPLICATION_REAPPLIED OutboxEvent
-    else 非失败状态的重复请求
-        DB-->>U: 返回既有 claimApplicationNo
+    alt 未携带平台申请编号
+        U->>DB: 先查签收判定快照
+        alt 命中可复用快照
+            U->>DB: 只写交互轨迹
+        else 未命中或快照状态可变
+            U->>DB: 回源按 tenantCode 与 externalClaimApplicationNo 查询
+            alt 不存在
+                U->>DB: 生成 claimApplicationNo，创建聚合与材料
+                U->>DB: 同事务写入 CLAIM_APPLICATION_CREATED OutboxEvent
+            else 已存在
+                U->>DB: 只写交互轨迹，返回既有 claimApplicationNo
+            end
+        end
+    else 携带平台申请编号
+        U->>DB: 跳过快照，直接读库并严格比对平台编号
+        alt 不存在或编号不一致
+            U-->>T: 400 CLAIM_APPLICATION_INTAKE_INVALID
+        else 状态为 ACCEPT_FAILED
+            U->>DB: 人员与材料整体替换，旧材料软删除，尝试次数加 1
+            U->>DB: 状态回到 PENDING_ACCEPT，写 CLAIM_APPLICATION_REAPPLIED OutboxEvent
+        else 状态为 ISSUE
+            U->>DB: 关闭未关闭问题件（TENANT_SUPPLEMENT），保留原人员
+            U->>DB: 旧材料软删除并写入新批次，尝试次数加 1
+            U->>DB: 状态回到 PENDING_ACCEPT，写 CLAIM_APPLICATION_REAPPLIED OutboxEvent
+        else 其余状态
+            U->>DB: 只写交互轨迹，返回既有 claimApplicationNo
+        end
     end
 
-    U-->>A: claimApplicationNo
+    opt 聚合保存返回 false（版本已被并发修改）
+        U->>R: 在新事务中重读聚合并分类
+        R-->>U: REUSED / ISSUE_APPLICATION_STATUS_INVALID / CLAIM_APPLICATION_INTAKE_BUSY
+    end
+
+    U-->>A: claimApplicationNo 与处置
     A-->>G: 租户协议响应
     G-->>T: 返回受理结果
 ```
 
-- 首次请求创建理赔申请并返回新 `claimApplicationNo`。
-- `ACCEPT_FAILED` 后的重新申请沿用原 `claimApplicationNo`，覆盖当前申请内容，旧 Material 软删除，历史失败原因和交互记录保留。
-- 除 `ACCEPT_FAILED` 外，重复请求不覆盖数据，只返回既有 `claimApplicationNo`。
+- 未携带平台申请编号：快照命中可直接复用时只写轨迹；库中不存在则创建；已存在一律按重复请求复用，不覆盖人员、材料与状态。
+- 携带平台申请编号：跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致，否则返回 `CLAIM_APPLICATION_INTAKE_INVALID`。
+- 携带平台编号且状态为 `ACCEPT_FAILED` 时返回 `REAPPLIED`，沿用原 `claimApplicationNo`，人员与材料整体替换，旧材料软删除，尝试次数加 1，状态回到 `PENDING_ACCEPT`。
+- 携带平台编号且状态为 `ISSUE` 并存在未关闭问题件时返回 `SUPPLEMENTED`，关闭该问题件（关闭人 `TENANT_SUPPLEMENT`），保留聚合原人员，旧材料软删除并写入新批次，尝试次数加 1，状态回到 `PENDING_ACCEPT`，随后重新走异步材料处理与承保分流。
+- 其余状态按重复请求返回 `REUSED`，不覆盖数据。
+- 首次创建、重新申请和补材的聚合、子表、交互轨迹与 OutboxEvent 在同一事务提交。
+- 聚合 `save` 返回 `false` 表示 `id + version` 条件未命中，事务抛出内部冲突信号并整体回滚；由 `ClaimApplicationIntakeConflictResolver` 以 `REQUIRES_NEW` 重读：尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 `CLAIM_APPLICATION_INTAKE_BUSY`。
 
 ### 材料处理与承保确认
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as ClaimApplicationIntakeUseCase
-    participant M as Material
+    participant U as MaterialProcessingUseCase
+    participant X as MaterialProcessingTransactionService
     participant F as 文件系统
+    participant W as UnderwritingTransactionService
     participant I as 承保系统
+    participant DB as MySQL
 
-    U->>M: 发起材料处理
-    M->>F: 获取并处理材料
-    F-->>M: 材料处理结果
+    U->>F: 获取并处理当前批次材料
+    F-->>U: 材料处理结果
 
-    alt 材料处理成功
-        M-->>U: 材料处理成功
-        U->>U: 状态变更为 ACCEPTED
-        U->>I: 查询有效保单
-        I-->>U: 返回承保信息
+    U->>X: 登记消费并提交处理结果
+    X->>DB: 重新加载聚合，校验 PENDING_ACCEPT 与受理尝试次数
+    alt 状态或尝试次数不匹配
+        X->>DB: 记录 REUSED 轨迹并登记消费
+    else 匹配
+        X->>DB: 根方法写入材料结果并一次 save（id + version）
+        alt save 返回 false
+            X->>DB: 记录 REUSED 轨迹，不覆盖他人结果
+        else save 成功
+            X->>DB: 记录完成或失败轨迹
+        end
+    end
 
+    alt 材料全部成功
+        U->>W: 查询有效保单后推进
         alt 已存在有效保单
-            U->>U: 状态变更为 WAIT_AUDIT
-            U->>U: 写入审核交付事件
+            W->>DB: 根方法 waitAudit + save
+            W->>DB: 保存成功后写入审核交付 OutboxEvent
         else 无有效保单
-            U->>U: 状态变更为 UNDERWRITING
+            W->>DB: 根方法 startUnderwriting + save
             U->>I: 发起自动承保
-            I-->>U: 承保完成通知
-            U->>U: 状态变更为 WAIT_AUDIT
-            U->>U: 写入审核交付事件
         end
     else 材料处理失败
-        M-->>U: 材料处理失败
-        U->>U: 状态变更为 ACCEPT_FAILED
+        U->>U: 聚合状态为 ACCEPT_FAILED
     end
 ```
 
-自动承保不定义业务失败状态。若完成通知遗漏，补偿任务查询承保结果；在取得完成通知或查询结果前，理赔申请保持 `UNDERWRITING`，前端可查询当前状态与交互记录。
+- 材料处理在事务外调用文件系统，事务内重新加载聚合、校验 `PENDING_ACCEPT` 与受理尝试次数后一次 `save`；过期事件、版本冲突和重复消费都只记录轨迹。
+- 承保分流从 `ACCEPTED` 出发：有保单时由根迁移 `WAIT_AUDIT` 并在保存成功后写审核交付事件；无保单时由根迁移 `UNDERWRITING` 后再发起外部调用。
+- 承保完成通知仅当申请处于 `UNDERWRITING` 时由根迁移 `WAIT_AUDIT`，保存成功后写审核交付事件；保存失败说明并发通知已先推进，按重复通知处理。
+- 自动承保不定义业务失败状态。若完成通知遗漏，补偿任务查询承保结果；在取得完成通知或查询结果前，理赔申请保持 `UNDERWRITING`，前端可查询当前状态与交互记录。
 
 ### 审核交付与签收
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as ClaimApplicationIntakeUseCase
+    participant O as Outbox 投递器
     participant A as 审核系统
-    participant CR as CaseRelation
+    participant U as AuditSignedTransactionService
+    participant CR as ClaimCaseRelation
+    participant DB as MySQL
 
-    U->>A: 提交审核申请
-    A-->>U: 审核签收回调，返回全部案件
-    U->>CR: 按唯一约束批量建立关联关系
-    U->>U: 状态变更为 COMPLETED
+    O->>A: 投递审核交付事件
+    A-->>U: 审核签收 MQ 消息，返回全部案件
+    U->>DB: 登记消费（消费组 + eventId + claimApplicationNo）
+    alt 已消费
+        U-->>A: SKIPPED，不重复处理
+    else 首次消费
+        U->>CR: 按 tenantCode + claimApplicationNo + caseNo 补齐缺失关联
+        U->>DB: 同事务写入开始与结束交互轨迹
+    end
 ```
 
-审核系统在一次签收回调中返回该理赔申请的全部 `caseNo`。重复回调只补齐缺失关系，不重复创建 CaseRelation，也不重复推进 `COMPLETED`。
+- 审核系统在一次签收回调中返回该理赔申请的全部 `caseNo`，重复回调只补齐缺失关系，不重复创建 `ClaimCaseRelation`。
+- 审核签收只追加案件关联事实，不加载或保存聚合，也不改变理赔申请状态；`COMPLETED` 状态迁移待撤销与审核签收目标态一起实现。
 
 ### 问题件与补材
 
@@ -360,28 +420,35 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant A as 审核系统
-    participant U as ClaimApplicationIntakeUseCase
-    participant I as Issue
+    participant U as ClaimApplicationIssueIntakeUseCase
+    participant C as ClaimApplicationIssueCloseUseCase
     participant T as 租户系统
-    participant M as Material
+    participant I as ClaimApplicationIntakeUseCase
+    participant DB as MySQL
 
     A->>U: 下发问题件
-    U->>I: 创建未关闭 Issue
-    U->>U: 状态变更为 ISSUE
-    U-->>T: 下发问题件通知
+    U->>DB: 加载聚合，根方法 raiseIssue + save
+    U->>DB: 状态 WAIT_AUDIT → ISSUE，写交互轨迹
+    U->>U: 签收判定快照标记为状态可变
 
-    T->>U: 提交补充材料
-    U->>I: 关闭当前 Issue
-    U->>M: 创建新的补材批次
-    U->>U: 状态变更为 WAIT_AUDIT
-    U->>M: 处理补充材料并重新提交审核
+    A->>C: 关闭问题件
+    C->>DB: 加载聚合，根方法 closeIssue + save
+    C->>DB: 未关闭问题件 → WAIT_AUDIT；已关闭按幂等返回 closed=false
+
+    T->>I: 携带平台编号提交补材
+    I->>DB: 根方法 supplement：关闭未关闭问题件（TENANT_SUPPLEMENT）
+    I->>DB: 保留原人员，旧材料软删除并写入新批次，尝试次数加 1
+    I->>DB: 状态 ISSUE → PENDING_ACCEPT，写 CLAIM_APPLICATION_REAPPLIED OutboxEvent
+    I->>I: 异步材料处理 → 承保分流 → 审核交付
 ```
 
-- 同一理赔申请可以经历多轮问题件，但同时只能有一条未关闭 Issue。
-- 租户提交补材时立即关闭当前 Issue，并以新的 `batchNo` 记录补材。
-- 重复下发同一未关闭问题件时，不创建新的 Issue，也不重复推进理赔申请状态。
+- 同一理赔申请可以经历多轮问题件，但同时只能有一条未关闭问题件；已有未关闭问题件时再次下发返回 `ISSUE_ALREADY_OPEN`。
+- 问题件下发要求申请处于 `WAIT_AUDIT`；关闭未关闭问题件要求申请处于 `ISSUE`，关闭后回到 `WAIT_AUDIT`。
+- 已关闭的问题件再次关闭按幂等返回 `closed=false`，不校验申请状态，也不写库。
+- 租户补材由签收入口承担：关闭未关闭问题件、保留原人员、旧材料软删除、写入新批次、尝试次数加 1，状态回到 `PENDING_ACCEPT` 后重新走异步链路。
+- 问题件下发、关闭与补材都通过一次 `save` 落库；保存失败时在保存事务之外重读聚合，已落库按幂等返回，否则返回状态冲突或处理中错误。
 
-### 理赔申请撤销
+### 理赔申请撤销（规划）
 
 ```mermaid
 sequenceDiagram
@@ -409,21 +476,42 @@ sequenceDiagram
 
 已完成审核签收的理赔申请在审核系统返回不可撤销、锁定失败或撤销失败时保持 `COMPLETED`，不进入 `REVOKED`。
 
+撤销能力尚未实现，本节仅约束后续实现的协同顺序与失败保持语义；目标终态 `REVOKED` 待随撤销能力一起加入状态机。
+
+## 详情查询读模型
+
+### 查询接口
+
+| 方法 | 路径 | 返回 |
+| --- | --- | --- |
+| GET | `/api/claim/v1/application/{claimApplicationNo}/materials` | 申请摘要 + 未删除材料 |
+| GET | `/api/claim/v1/application/{claimApplicationNo}/issues` | 申请摘要 + 全部问题件 |
+| GET | `/api/claim/v1/application/{claimApplicationNo}/cases` | 申请摘要 + 案件关联 |
+
+- 租户来自 `TenantContext`；摘要查询同时按 `claimApplicationNo` 与 `tenantCode` 定位，跨租户与不存在使用同一错误码返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`，不暴露存在性。
+- 缺少租户上下文返回 400 `CLAIM_APPLICATION_QUERY_INVALID`；未预期异常映射 500 `CLAIM_APPLICATION_QUERY_SYSTEM_ERROR`。
+- 子集合为空返回 200 与空数组；材料按主键升序，问题件按创建时间与主键倒序，案件关联按创建时间与主键升序。
+- 查询只经过 `usecase/query` 与 `infrastructure/query/persistence`，不加载领域聚合、不写交互轨迹；ArchUnit 规则禁止查询包依赖聚合仓储与轨迹仓储。
+- 问题件按案件号查询的既有接口 `/api/claim/v1/cases/{caseNo}/issue` 响应结构不变，内部改为读模型实现。
+
 ## 并发控制与幂等
 
-### 申请幂等
+### 申请幂等与并发
 
-- 理赔申请主表的唯一约束确保同一租户相同外部申请号不会创建多条主记录。
-- 创建、重复请求判断、重新申请重置和 Outbox 写入必须在同一事务内完成。
-- 非失败状态下的重复请求直接返回既有 `claimApplicationNo`。
-- 重新申请只允许在 `ACCEPT_FAILED` 发生；并发重新申请通过主记录锁或条件更新保证只有一次状态重置生效。
+- 理赔申请主表的唯一约束确保同一租户相同外部申请号不会创建多条主记录；签名锁在同一外部申请号上串行化签收。
+- 创建、重复请求判断、重新申请、补材和 Outbox 写入必须在同一事务内完成。
+- 未携带平台编号时，除创建外一律按重复请求复用；携带平台编号时只有 `ACCEPT_FAILED` 与未关闭问题件会改写聚合，其余状态只记录轨迹。
+- 聚合写库使用 `t_claim_application.version` 乐观锁：`save` 以 `id + version` 条件更新，并同时维护材料与问题件子表；条件不命中返回 `false`，不写任何子表。
+- `save` 返回 `false` 时事务抛出内部冲突信号并回滚，`ClaimApplicationIntakeConflictResolver` 以 `REQUIRES_NEW` 重读聚合完成分类：尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 `CLAIM_APPLICATION_INTAKE_BUSY`（HTTP 503）。
+- 冲突重读必须在新事务中进行：MySQL 默认 `REPEATABLE_READ` 下原事务内重读仍会返回旧快照。
 
 ### 回调与事件幂等
 
-- 审核签收回调通过 CaseRelation 唯一约束保证重复消息不重复建关联。
-- 问题件回调通过当前未关闭 Issue 保证重复消息不重复建问题件。
-- 承保完成通知仅允许将 `UNDERWRITING` 推进到 `WAIT_AUDIT`。
-- 所有异步处理在推进状态前校验理赔申请当前状态；状态不匹配时只记录 InteractionLog。
+- 审核签收回调通过 `ClaimCaseRelation` 唯一约束保证重复消息不重复建关联，且只追加事实、不改变申请状态。
+- 问题件回调通过当前未关闭问题件保证重复消息不重复建问题件；已关闭问题件再次关闭按幂等返回。
+- 承保完成通知仅允许将 `UNDERWRITING` 推进到 `WAIT_AUDIT`；条件不满足或保存失败只记录 InteractionLog。
+- 材料处理在事务内校验 `PENDING_ACCEPT` 与受理尝试次数，过期批次、迟到事件和版本冲突都只记录轨迹。
+- 所有异步处理在推进状态前通过聚合根方法校验当前状态；状态不匹配时只记录 InteractionLog。
 
 ## 入口保护：限流、判定快照与 Redis 降级
 
@@ -496,7 +584,7 @@ flowchart LR
 - 投递器只投递已提交的 OutboxEvent；投递失败的事件保留并由补偿任务重试。
 - 消费者按照 `eventId` 和 `claimApplicationNo` 幂等处理；至少一次投递不会造成重复数据或重复状态推进。
 - 承保完成通知缺失时，补偿任务查询承保结果，不将理赔申请标记为自动承保失败。
-- 已撤销或状态不匹配的理赔申请收到迟到事件时，只记录交互轨迹，不触发业务补偿。
+- 状态不匹配或已进入终态的理赔申请收到迟到事件时，只记录交互轨迹，不触发业务补偿。
 
 ## 异常处理与可观测性
 
@@ -506,7 +594,7 @@ flowchart LR
 - 异常按层分型：领域不变式抛 `DomainException`，用例编排抛 `ApplicationException`，两者继承 `BusinessException`；入站适配与基础设施在自身边界内直接使用基类，全局处理器仍只捕获基类，HTTP 状态与响应结构不变。
 - 不捕获异常后继续执行，不吞掉外部系统、MQ 或数据库异常。
 - 自动承保的完成通知缺失不产生业务失败状态，由补偿查询恢复；查询结果未得到前保持 `UNDERWRITING`。
-- 审核撤销失败时保持 `COMPLETED`，不修改 CaseRelation，也不将理赔申请标记为已撤销。
+- 撤销能力实现后，审核撤销失败时保持当前状态（规划为 `COMPLETED`），不修改 `ClaimCaseRelation`，也不将理赔申请标记为已撤销。
 
 ### 日志与追踪
 

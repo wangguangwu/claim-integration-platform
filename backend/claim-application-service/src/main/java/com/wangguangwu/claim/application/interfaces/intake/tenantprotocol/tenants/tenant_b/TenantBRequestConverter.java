@@ -33,7 +33,9 @@ public class TenantBRequestConverter implements TenantProtocolConverter<TenantBI
     @Override
     public ClaimApplicationIntakeCommand convert(String tenantCode, TenantBIntakeRequest request) {
         return ClaimApplicationIntakeCommand.builder().tenantCode(tenantCode)
-                .externalClaimApplicationNo(request.claimReference().trim()).applicant(toApplicant(request.claimant()))
+                .externalClaimApplicationNo(request.claimReference().trim())
+                .claimApplicationNo(normalize(request.claimApplicationNo()))
+                .applicant(toApplicant(request.claimant()))
                 .primaryInsured(toPrimaryInsured(request.mainInsured()))
                 .accidentPerson(toAccidentPerson(request.injured())).payee(toPayee(request.beneficiary()))
                 .materials(toMaterials(request.evidences())).build();
@@ -72,6 +74,19 @@ public class TenantBRequestConverter implements TenantProtocolConverter<TenantBI
             default -> throw new BusinessException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
                     "genderCode 仅支持 1 或 2");
         };
+    }
+
+    /**
+     * 空串按未携带平台申请编号处理，避免空值参与编号比对。
+     *
+     * @param claimApplicationNo 报文携带的平台申请编号
+     * @return 去除首尾空白后的编号；未携带时为空
+     */
+    private String normalize(String claimApplicationNo) {
+        if (claimApplicationNo == null || claimApplicationNo.isBlank()) {
+            return null;
+        }
+        return claimApplicationNo.trim();
     }
 
     private List<MaterialSubmission> toMaterials(List<TenantBIntakeRequest.TenantBEvidence> evidences) {

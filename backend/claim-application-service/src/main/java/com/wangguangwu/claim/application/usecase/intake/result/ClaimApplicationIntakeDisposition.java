@@ -15,5 +15,8 @@ public enum ClaimApplicationIntakeDisposition {
     REUSED,
 
     /** 原申请处于受理失败状态，已基于本次请求重新申请。 */
-    REAPPLIED
+    REAPPLIED,
+
+    /** 原申请存在未关闭问题件，已关闭问题件并写入本次补材。 */
+    SUPPLEMENTED
 }

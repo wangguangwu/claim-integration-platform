@@ -128,7 +128,7 @@ public class RedisClaimApplicationIntakeSnapshotQuery implements ClaimApplicatio
             return ClaimApplicationIntakeLookup.absent();
         }
         ClaimApplicationStatus status = claimApplication.get().getStatus();
-        if (!ClaimApplicationIntakeSnapshot.isReusableStatus(status)) {
+        if (!status.isReusableAfterIntake()) {
             writeQuietly(cacheKey, MUTABLE_MARKER, properties.snapshotCache().mutableTtl());
             return ClaimApplicationIntakeLookup.existing();
         }

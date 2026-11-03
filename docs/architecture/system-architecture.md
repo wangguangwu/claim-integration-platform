@@ -387,24 +387,21 @@ claim-application-service
    ├─ interfaces
    ├─ usecase
    ├─ domain
-   └─ infrastructure
-      ├─ persistence
-      ├─ adapter
-      ├─ file
-      └─ mq
+   ├─ infrastructure
+   ├─ shared
+   └─ support
 ```
 
 租户接入适配：
 
 ```
-adapter
-├─ tenant-a
-│  ├─ v1
-│  └─ v2
-├─ tenant-b
-│  └─ v1
-└─ tenant-c
-   └─ v1
+interfaces/intake/tenantprotocol
+├─ core
+│  ├─ pipeline
+│  └─ stage
+└─ tenants
+   ├─ tenant_a
+   └─ tenant_b
 ```
 
 协议路由：
@@ -424,7 +421,7 @@ TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → �
 
 **外部请求 → Tenant 识别 → TenantProtocolPipelineFactory → TenantProtocolPipelineRegistry → TenantProtocolPipeline（验签 → 解密 → Parser → Validator → Converter） → 理赔申请用例 → ClaimApplication**
 
-理赔申请内部的聚合、实体、值对象、领域服务、Repository、状态机及表结构由理赔申请业务域设计文档定义。
+理赔申请内部的聚合根、聚合内实体、值对象、Repository、状态机及表结构由理赔申请业务域设计文档定义。
 
 ### 3.4 claim-case-service
 

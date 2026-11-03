@@ -1,7 +1,9 @@
 package com.wangguangwu.claim.application.interfaces.web;
 
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationQueryErrorCode;
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;
 import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
 import java.util.HashMap;
@@ -53,8 +55,13 @@ public final class BusinessErrorStatusRegistry {
                 HttpStatus.INTERNAL_SERVER_ERROR);
         mappings.put(ClaimApplicationIntakeErrorCode.AUDIT_DELIVERY_APPLICATION_NOT_FOUND, HttpStatus.NOT_FOUND);
 
+        mappings.put(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID, HttpStatus.CONFLICT);
+        mappings.put(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID, HttpStatus.BAD_REQUEST);
+        mappings.put(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_STATUS_INVALID, HttpStatus.CONFLICT);
+
         mappings.put(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_NOT_FOUND, HttpStatus.NOT_FOUND);
         mappings.put(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID, HttpStatus.BAD_REQUEST);
+        mappings.put(ClaimApplicationIssueErrorCode.ISSUE_STATUS_INVALID, HttpStatus.CONFLICT);
         mappings.put(ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN, HttpStatus.CONFLICT);
         mappings.put(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND, HttpStatus.NOT_FOUND);
         mappings.put(ClaimApplicationIssueErrorCode.ISSUE_INTAKE_INVALID, HttpStatus.BAD_REQUEST);
@@ -66,6 +73,11 @@ public final class BusinessErrorStatusRegistry {
         mappings.put(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR);
         mappings.put(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID, HttpStatus.BAD_REQUEST);
+
+        mappings.put(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_NOT_FOUND, HttpStatus.NOT_FOUND);
+        mappings.put(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_INVALID, HttpStatus.BAD_REQUEST);
+        mappings.put(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_SYSTEM_ERROR,
+                HttpStatus.INTERNAL_SERVER_ERROR);
         return Map.copyOf(mappings);
     }
 }

@@ -17,6 +17,7 @@ import lombok.Builder;
  *
  * @param tenantCode            租户编码
  * @param externalClaimApplicationNo 租户侧申请编号
+ * @param claimApplicationNo    平台申请编号，重新申请与租户补材时携带，首次签收为空
  * @param applicant             申请人
  * @param primaryInsured        主被保险人
  * @param accidentPerson        出险人
@@ -29,6 +30,7 @@ import lombok.Builder;
 public record ClaimApplicationIntakeCommand(
         String tenantCode,
         String externalClaimApplicationNo,
+        String claimApplicationNo,
         Applicant applicant,
         PrimaryInsured primaryInsured,
         AccidentPerson accidentPerson,

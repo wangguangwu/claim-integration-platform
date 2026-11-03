@@ -10,6 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
+import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
+import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookup;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeLookupKind;
 import com.wangguangwu.claim.application.usecase.intake.model.ClaimApplicationIntakeSnapshot;
@@ -17,9 +20,9 @@ import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationInt
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakePolicy;
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationIntakeSnapshotQuery;
 import com.wangguangwu.claim.application.usecase.intake.port.ClaimApplicationNoGenerator;
-import com.wangguangwu.claim.application.usecase.intake.command.ClaimApplicationIntakeCommand;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeDisposition;
 import com.wangguangwu.claim.application.usecase.intake.result.ClaimApplicationIntakeResult;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialBatchNoGenerator;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
 /**
- * 签收用例单元测试：验证重试与幂等行为。
+ * 签收用例单元测试：验证编号分流、快照失效、冲突恢复与幂等行为。
  *
  * @author wangguangwu
  * @since 2026-10-31
@@ -39,14 +42,17 @@ class ClaimApplicationIntakeUseCaseTest {
     private static final String TENANT_CODE = "tenant-a";
     private static final String EXTERNAL_NO = "EXT-20261031-001";
     private static final String CLAIM_APPLICATION_NO = "A2026103100000001";
+    private static final String BATCH_NO = "B2026110300000001";
     private static final String REQUEST_ID = "req-001";
     private static final String TRACE_ID = "trace-001";
 
     private ClaimApplicationIntakeLock lock;
     private ClaimApplicationIntakeSnapshotQuery snapshotQuery;
     private ClaimApplicationNoGenerator noGenerator;
+    private MaterialBatchNoGenerator batchNoGenerator;
     private ClaimApplicationIntakePolicy policy;
     private ClaimApplicationIntakeTransactionService transactionService;
+    private ClaimApplicationIntakeConflictResolver conflictResolver;
 
     private ClaimApplicationIntakeUseCase useCase;
 
@@ -55,11 +61,15 @@ class ClaimApplicationIntakeUseCaseTest {
         lock = mock(ClaimApplicationIntakeLock.class);
         snapshotQuery = mock(ClaimApplicationIntakeSnapshotQuery.class);
         noGenerator = mock(ClaimApplicationNoGenerator.class);
+        batchNoGenerator = mock(MaterialBatchNoGenerator.class);
         policy = mock(ClaimApplicationIntakePolicy.class);
         transactionService = mock(ClaimApplicationIntakeTransactionService.class);
+        conflictResolver = mock(ClaimApplicationIntakeConflictResolver.class);
 
-        useCase = new ClaimApplicationIntakeUseCase(lock, snapshotQuery, noGenerator, policy, transactionService);
+        useCase = new ClaimApplicationIntakeUseCase(lock, snapshotQuery, noGenerator, batchNoGenerator, policy,
+                transactionService, conflictResolver);
 
+        when(batchNoGenerator.nextBatchNo()).thenReturn(BATCH_NO);
         when(policy.uniqueKeyRetryTimes()).thenReturn(5);
         when(lock.execute(eq(TENANT_CODE), eq(EXTERNAL_NO), any()))
                 .thenAnswer(invocation -> {
@@ -69,71 +79,11 @@ class ClaimApplicationIntakeUseCaseTest {
     }
 
     @Test
-    @DisplayName("首次创建：缓存未命中 → 生成编号 → 事务内创建 → 标记存在 → 返回 CREATED")
-    void intake_absentLookup_createsApplication() {
+    @DisplayName("未携带平台编号：缓存未命中 → 生成编号 → 创建 → 标记存在")
+    void intake_withoutPlatformNumber_absentLookup_createsApplication() {
         ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
         when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.absent());
         when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
-        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
-                eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.CREATED))));
-
-        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
-
-        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.CREATED);
-        assertThat(result.claimApplicationNo()).isEqualTo(CLAIM_APPLICATION_NO);
-        verify(snapshotQuery).markMutable(TENANT_CODE, EXTERNAL_NO);
-    }
-
-    @Test
-    @DisplayName("重复命中缓存：直接返回 REUSED，不读聚合、不调用外部系统")
-    void intake_reusableLookup_returnsReusedWithoutDatabaseAccess() {
-        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
-        ClaimApplicationIntakeSnapshot snapshot = new ClaimApplicationIntakeSnapshot(CLAIM_APPLICATION_NO,
-                ClaimApplicationStatus.WAIT_AUDIT);
-        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.reusable(snapshot));
-        when(transactionService.recordReused(CLAIM_APPLICATION_NO, REQUEST_ID, TRACE_ID))
-                .thenReturn(new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED));
-
-        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
-
-        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
-        assertThat(result.claimApplicationNo()).isEqualTo(CLAIM_APPLICATION_NO);
-        verify(transactionService, never()).intake(any(), any(), any(), any(), any());
-        verify(noGenerator, never()).nextClaimApplicationNo();
-    }
-
-    @Test
-    @DisplayName("重复未命中缓存：回源后返回 REUSED 并回填快照")
-    void intake_existingLookup_returnsReusedAndMarksReusable() {
-        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
-        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.existing());
-        ClaimApplicationIntakeSnapshot snapshot = new ClaimApplicationIntakeSnapshot(CLAIM_APPLICATION_NO,
-                ClaimApplicationStatus.WAIT_AUDIT);
-        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.EXISTING), eq(null),
-                eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED),
-                        snapshot)));
-
-        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
-
-        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
-        verify(snapshotQuery).markReusable(TENANT_CODE, EXTERNAL_NO, snapshot);
-    }
-
-    @Test
-    @DisplayName("存在性不一致：事务返回空结果 → 重建编号重试并返回 CREATED")
-    void intake_existenceMismatch_retriesWithNewClaimApplicationNo() {
-        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
-        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO))
-                .thenReturn(ClaimApplicationIntakeLookup.existing())
-                .thenReturn(ClaimApplicationIntakeLookup.absent());
-        when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
-        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.EXISTING), eq(null),
-                eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(Optional.empty());
         when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
                 eq(REQUEST_ID), eq(TRACE_ID)))
                 .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
@@ -148,30 +98,119 @@ class ClaimApplicationIntakeUseCaseTest {
     }
 
     @Test
-    @DisplayName("唯一键冲突重试成功：resolveAfterDuplicateKey 返回结果 → 返回 REUSED")
-    void intake_duplicateKeyResolved_returnsReused() {
+    @DisplayName("未携带平台编号：可复用快照只写轨迹，不读库")
+    void intake_withoutPlatformNumber_reusableLookup_returnsReused() {
         ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
-        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.absent());
-        when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
-        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
-                eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenThrow(new DuplicateKeyException("duplicate"))
-                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED))));
-        when(transactionService.resolveAfterDuplicateKey(any(), eq(REQUEST_ID), eq(TRACE_ID)))
-                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withoutSnapshot(
-                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO, ClaimApplicationIntakeDisposition.REUSED))));
+        ClaimApplicationIntakeSnapshot snapshot = new ClaimApplicationIntakeSnapshot(CLAIM_APPLICATION_NO,
+                ClaimApplicationStatus.WAIT_AUDIT);
+        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO))
+                .thenReturn(ClaimApplicationIntakeLookup.reusable(snapshot));
+        when(transactionService.recordReused(CLAIM_APPLICATION_NO, REQUEST_ID, TRACE_ID))
+                .thenReturn(new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                        ClaimApplicationIntakeDisposition.REUSED));
 
         ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
 
         assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
+        verify(transactionService, never()).intake(any(), any(), any(), any(), any());
+        verify(noGenerator, never()).nextClaimApplicationNo();
+    }
+
+    @Test
+    @DisplayName("未携带平台编号：库中已存在时回源复用并回填快照")
+    void intake_withoutPlatformNumber_existingLookup_returnsReusedAndMarksReusable() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
+        when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.existing());
+        ClaimApplicationIntakeSnapshot snapshot = new ClaimApplicationIntakeSnapshot(CLAIM_APPLICATION_NO,
+                ClaimApplicationStatus.WAIT_AUDIT);
+        when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.EXISTING), eq(null),
+                eq(REQUEST_ID), eq(TRACE_ID)))
+                .thenReturn(Optional.of(ClaimApplicationIntakeOutcome.withSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                                ClaimApplicationIntakeDisposition.REUSED), snapshot)));
+
+        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
+
+        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
+        verify(snapshotQuery).markReusable(TENANT_CODE, EXTERNAL_NO, snapshot);
+        verify(snapshotQuery, never()).markMutable(TENANT_CODE, EXTERNAL_NO);
+    }
+
+    @Test
+    @DisplayName("携带平台编号：重新申请成功后失效签收快照且跳过判定缓存")
+    void intake_withPlatformNumber_reapplied_invalidatesSnapshot() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO,
+                CLAIM_APPLICATION_NO);
+        when(transactionService.intakeExisting(any(), eq(CLAIM_APPLICATION_NO), eq(BATCH_NO), eq(REQUEST_ID),
+                eq(TRACE_ID)))
+                .thenReturn(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                                ClaimApplicationIntakeDisposition.REAPPLIED)));
+
+        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
+
+        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REAPPLIED);
+        verify(snapshotQuery, never()).lookup(any(), any());
         verify(snapshotQuery).markMutable(TENANT_CODE, EXTERNAL_NO);
     }
 
     @Test
-    @DisplayName("重试耗尽：连续 5 次唯一键冲突且解析失败 → 抛 IllegalStateException")
-    void intake_retryExhausted_throwsIllegalStateException() {
+    @DisplayName("携带平台编号：补材成功后失效签收快照")
+    void intake_withPlatformNumber_supplemented_invalidatesSnapshot() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO,
+                CLAIM_APPLICATION_NO);
+        when(transactionService.intakeExisting(any(), eq(CLAIM_APPLICATION_NO), eq(BATCH_NO), eq(REQUEST_ID),
+                eq(TRACE_ID)))
+                .thenReturn(ClaimApplicationIntakeOutcome.withoutSnapshot(
+                        new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                                ClaimApplicationIntakeDisposition.SUPPLEMENTED)));
+
+        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
+
+        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.SUPPLEMENTED);
+        verify(snapshotQuery).markMutable(TENANT_CODE, EXTERNAL_NO);
+    }
+
+    @Test
+    @DisplayName("携带平台编号：编号与库中记录不一致时返回 400")
+    void intake_withPlatformNumber_mismatch_throwsInvalid() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO,
+                CLAIM_APPLICATION_NO);
+        when(transactionService.intakeExisting(any(), eq(CLAIM_APPLICATION_NO), eq(BATCH_NO), eq(REQUEST_ID),
+                eq(TRACE_ID)))
+                .thenThrow(new ApplicationException(ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID,
+                        "编号不一致"));
+
+        assertThatThrownBy(() -> useCase.intake(command, REQUEST_ID, TRACE_ID))
+                .isInstanceOf(ApplicationException.class)
+                .hasFieldOrPropertyWithValue("errorCode",
+                        ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_INVALID);
+        verify(snapshotQuery, never()).markMutable(any(), any());
+    }
+
+    @Test
+    @DisplayName("携带平台编号：保存冲突交由独立入口按补材标记重新分类")
+    void intake_withPlatformNumber_saveConflict_resolvesInNewTransaction() {
+        ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO,
+                CLAIM_APPLICATION_NO);
+        when(transactionService.intakeExisting(any(), eq(CLAIM_APPLICATION_NO), eq(BATCH_NO), eq(REQUEST_ID),
+                eq(TRACE_ID)))
+                .thenThrow(new ClaimApplicationIntakeConflictException(CLAIM_APPLICATION_NO, 1, true));
+        when(conflictResolver.resolve(TENANT_CODE, EXTERNAL_NO, CLAIM_APPLICATION_NO, 1, true, REQUEST_ID, TRACE_ID))
+                .thenReturn(new ClaimApplicationIntakeResult(CLAIM_APPLICATION_NO,
+                        ClaimApplicationIntakeDisposition.REUSED));
+
+        ClaimApplicationIntakeResult result = useCase.intake(command, REQUEST_ID, TRACE_ID);
+
+        assertThat(result.disposition()).isEqualTo(ClaimApplicationIntakeDisposition.REUSED);
+        verify(snapshotQuery, never()).markMutable(any(), any());
+    }
+
+    @Test
+    @DisplayName("未携带平台编号：唯一键冲突重试耗尽返回处理中")
+    void intake_withoutPlatformNumber_retryExhausted_throwsBusy() {
         ClaimApplicationIntakeCommand command = IntakeCommandFixture.command(TENANT_CODE, EXTERNAL_NO);
+        when(policy.uniqueKeyRetryTimes()).thenReturn(1);
         when(snapshotQuery.lookup(TENANT_CODE, EXTERNAL_NO)).thenReturn(ClaimApplicationIntakeLookup.absent());
         when(noGenerator.nextClaimApplicationNo()).thenReturn(CLAIM_APPLICATION_NO);
         when(transactionService.intake(any(), eq(ClaimApplicationIntakeLookupKind.ABSENT), eq(CLAIM_APPLICATION_NO),
@@ -181,7 +220,8 @@ class ClaimApplicationIntakeUseCaseTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.intake(command, REQUEST_ID, TRACE_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ApplicationException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIntakeErrorCode.CLAIM_APPLICATION_INTAKE_BUSY)
                 .hasMessageContaining(TENANT_CODE)
                 .hasMessageContaining(EXTERNAL_NO);
     }

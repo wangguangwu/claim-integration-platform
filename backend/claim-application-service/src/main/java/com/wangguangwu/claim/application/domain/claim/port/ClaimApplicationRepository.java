@@ -32,6 +32,14 @@ public interface ClaimApplicationRepository {
     Optional<ClaimApplication> findByClaimApplicationNo(String claimApplicationNo);
 
     /**
+     * 按问题件编号查询其所属申请的完整聚合。
+     *
+     * @param issueNo 问题件编号
+     * @return 理赔申请聚合；问题件不存在或所属申请缺失时为空
+     */
+    Optional<ClaimApplication> findByIssueNo(String issueNo);
+
+    /**
      * 按编号前缀倒序取第一条，得到当天已生成的最大申请编号。
      *
      * @param numberPrefix 理赔申请编号前缀
@@ -50,26 +58,17 @@ public interface ClaimApplicationRepository {
     List<ClaimApplication> findByStatusUpdatedBefore(ClaimApplicationStatus status, LocalDateTime updatedBefore, int limit);
 
     /**
-     * 插入新理赔申请聚合。
+     * 插入新理赔申请聚合，一次写入根与全部材料，版本由仓储初始化为 0。
      *
      * @param claimApplication 待插入聚合
      */
     void insert(ClaimApplication claimApplication);
 
     /**
-     * 以受理失败状态为更新条件写入重新申请结果，状态被并发改写时不覆盖。
+     * 以乐观锁版本为条件保存聚合变更，成功后才写入材料与问题件。
      *
-     * @param claimApplication 已变更的理赔申请聚合
-     * @return 更新成功时为 true
+     * @param claimApplication 已变更的聚合
+     * @return 保存成功时为 true；false 表示版本已过期或聚合尚未持久化
      */
-    boolean updateForReapply(ClaimApplication claimApplication);
-
-    /**
-     * 以期望状态和申请尝试次数为条件推进生命周期状态。
-     *
-     * @param claimApplication    已变更的理赔申请聚合，携带目标状态
-     * @param expectedStatus 更新前的状态
-     * @return 更新成功时为 true；false 表示已被并发推进或尝试次数已变化
-     */
-    boolean updateStatus(ClaimApplication claimApplication, ClaimApplicationStatus expectedStatus);
+    boolean save(ClaimApplication claimApplication);
 }

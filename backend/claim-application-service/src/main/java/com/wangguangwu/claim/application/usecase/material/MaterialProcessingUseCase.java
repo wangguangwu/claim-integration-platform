@@ -1,18 +1,19 @@
 package com.wangguangwu.claim.application.usecase.material;
 
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
-import com.wangguangwu.claim.application.usecase.material.model.FileUploadResult;
-import com.wangguangwu.claim.application.domain.material.Material;
-import com.wangguangwu.claim.application.domain.material.port.MaterialRepository;
-import com.wangguangwu.claim.application.domain.material.MaterialStatus;
-import com.wangguangwu.claim.application.usecase.material.model.MaterialUploadRequest;
-import com.wangguangwu.claim.application.usecase.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.usecase.integration.record.ClaimApplicationLifecycleRecordFactory;
 import com.wangguangwu.claim.application.usecase.material.command.MaterialProcessCommand;
+import com.wangguangwu.claim.application.usecase.material.model.FileUploadResult;
+import com.wangguangwu.claim.application.usecase.material.model.MaterialUploadRequest;
+import com.wangguangwu.claim.application.usecase.material.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.usecase.material.result.MaterialProcessOutcome;
 import com.wangguangwu.claim.application.usecase.underwriting.UnderwritingUseCase;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 材料处理用例：校验事件与申请一致性、逐条处理材料并驱动承保分流。
+ * 材料处理用例：校验事件与申请一致性、逐条上传材料并驱动承保分流。
  *
- * <p>行为轨迹的开始与结束都由事务服务一次写入，用例本身不再单独登记开始事件，
- * 避免外部调用中断后留下没有结束的轨迹。</p>
+ * <p>文件处理在事务外执行，只负责生成材料处理结果；申请状态与材料结果是聚合内的同一份事实，
+ * 由事务服务重新加载聚合并一次保存，避免并发请求基于过期快照推进状态。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -37,7 +38,6 @@ public class MaterialProcessingUseCase {
 
     private final ClaimApplicationRepository claimApplicationRepository;
     private final ConsumedEventRepository consumedEventRepository;
-    private final MaterialRepository materialRepository;
     private final MaterialFileProcessor materialFileProcessor;
     private final MaterialProcessingTransactionService transactionService;
     private final ClaimApplicationLifecycleRecordFactory recordFactory;
@@ -46,8 +46,8 @@ public class MaterialProcessingUseCase {
     /**
      * 处理一次材料处理事件。
      *
-     * <p>文件处理在事务外执行：文件系统明确拒绝时材料置为失败并推进受理失败；
-     * 文件系统不可用或超时时异常向上抛出，由 binder 重投，材料与申请保持原状态。</p>
+     * <p>文件系统明确拒绝时材料结果记为失败并推进受理失败；文件系统不可用或超时时异常向上抛出，
+     * 由 binder 重投，材料与申请保持原状态。</p>
      *
      * @param command 材料处理命令
      */
@@ -67,29 +67,25 @@ public class MaterialProcessingUseCase {
             transactionService.recordReused(command, interactionNo);
             return;
         }
-        List<Material> materials = loadPendingMaterials(command.claimApplicationNo());
+        List<MaterialProcessingResult> results = new ArrayList<>();
         String errorCode = null;
         String errorMessage = null;
-        for (Material material : materials) {
+        for (Material material : pendingMaterials(claimApplication)) {
             FileUploadResult uploadResult = materialFileProcessor.upload(new MaterialUploadRequest(
-                    material.getClaimApplicationNo(), material.getBatchNo(), material.getMaterialType(),
+                    command.claimApplicationNo(), material.getBatchNo(), material.getMaterialType(),
                     material.getOriginalFileUrl()));
-            if (uploadResult.success()) {
-                material.markProcessed(uploadResult.uploadedFileUrl());
-                continue;
-            }
-            material.markFailed();
-            if (errorCode == null) {
+            results.add(new MaterialProcessingResult(material.getId(), uploadResult.success(),
+                    uploadResult.success() ? uploadResult.uploadedFileUrl() : null));
+            if (!uploadResult.success() && errorCode == null) {
                 errorCode = uploadResult.errorCode();
                 errorMessage = uploadResult.errorMessage();
             }
         }
-        boolean allSucceeded = materials.stream()
-                .allMatch(material -> material.getStatus() == MaterialStatus.PROCESSED);
+        boolean allSucceeded = results.stream().allMatch(MaterialProcessingResult::succeeded);
         String failureCode = allSucceeded ? null : (errorCode == null ? FILE_UPLOAD_FAILED_CODE : errorCode);
         String failureMessage = allSucceeded ? null : errorMessage;
-        MaterialProcessOutcome outcome = transactionService.recordProcessed(command, interactionNo, claimApplication,
-                materials, allSucceeded, failureCode, failureMessage);
+        MaterialProcessOutcome outcome = transactionService.recordProcessed(command, interactionNo, results,
+                failureCode, failureMessage);
         if (outcome == MaterialProcessOutcome.ACCEPTED) {
             underwritingUseCase.dispatch(command.claimApplicationNo(), command.traceId());
         }
@@ -100,8 +96,8 @@ public class MaterialProcessingUseCase {
                 && Objects.equals(claimApplication.getClaimApplicationAttempt(), eventClaimApplicationAttempt);
     }
 
-    private List<Material> loadPendingMaterials(String claimApplicationNo) {
-        return materialRepository.findByClaimApplicationNoAndDeletedFalse(claimApplicationNo).stream()
+    private List<Material> pendingMaterials(ClaimApplication claimApplication) {
+        return claimApplication.getMaterials().stream()
                 .filter(material -> material.getStatus() == MaterialStatus.PENDING_PROCESS)
                 .toList();
     }

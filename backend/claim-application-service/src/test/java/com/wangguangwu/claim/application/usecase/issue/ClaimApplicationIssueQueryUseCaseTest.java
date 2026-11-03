@@ -2,20 +2,18 @@ package com.wangguangwu.claim.application.usecase.issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssueStatus;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.shared.contract.BusinessException;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueQueryResult;
+import com.wangguangwu.claim.application.usecase.query.model.IssueView;
+import com.wangguangwu.claim.application.usecase.query.port.ClaimApplicationDetailQuery;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,16 +35,16 @@ class ClaimApplicationIssueQueryUseCaseTest {
     private static final LocalDateTime RAISED_AT = LocalDateTime.of(2026, 11, 2, 10, 5);
 
     private ClaimCaseRelationRepository claimCaseRelationRepository;
-    private ClaimApplicationIssueRepository claimApplicationIssueRepository;
+    private ClaimApplicationDetailQuery claimApplicationDetailQuery;
 
     private ClaimApplicationIssueQueryUseCase useCase;
 
     @BeforeEach
     void setUp() {
         claimCaseRelationRepository = mock(ClaimCaseRelationRepository.class);
-        claimApplicationIssueRepository = mock(ClaimApplicationIssueRepository.class);
+        claimApplicationDetailQuery = mock(ClaimApplicationDetailQuery.class);
 
-        useCase = new ClaimApplicationIssueQueryUseCase(claimCaseRelationRepository, claimApplicationIssueRepository);
+        useCase = new ClaimApplicationIssueQueryUseCase(claimCaseRelationRepository, claimApplicationDetailQuery);
     }
 
     @Test
@@ -54,7 +52,7 @@ class ClaimApplicationIssueQueryUseCaseTest {
     void queryByCaseNo_openIssue_returnsIssueDetails() {
         when(claimCaseRelationRepository.findClaimApplicationNo(TENANT_CODE, CASE_NO))
                 .thenReturn(Optional.of(CLAIM_APPLICATION_NO));
-        when(claimApplicationIssueRepository.findOpenByClaimApplicationNo(CLAIM_APPLICATION_NO))
+        when(claimApplicationDetailQuery.findOpenIssue(TENANT_CODE, CLAIM_APPLICATION_NO))
                 .thenReturn(Optional.of(openIssue()));
 
         ClaimApplicationIssueQueryResult result = useCase.queryByCaseNo(TENANT_CODE, CASE_NO);
@@ -72,7 +70,7 @@ class ClaimApplicationIssueQueryUseCaseTest {
     void queryByCaseNo_noOpenIssue_returnsEmptyIssueFields() {
         when(claimCaseRelationRepository.findClaimApplicationNo(TENANT_CODE, CASE_NO))
                 .thenReturn(Optional.of(CLAIM_APPLICATION_NO));
-        when(claimApplicationIssueRepository.findOpenByClaimApplicationNo(CLAIM_APPLICATION_NO))
+        when(claimApplicationDetailQuery.findOpenIssue(TENANT_CODE, CLAIM_APPLICATION_NO))
                 .thenReturn(Optional.empty());
 
         ClaimApplicationIssueQueryResult result = useCase.queryByCaseNo(TENANT_CODE, CASE_NO);
@@ -94,12 +92,11 @@ class ClaimApplicationIssueQueryUseCaseTest {
                 .hasFieldOrPropertyWithValue("errorCode", ClaimApplicationIssueErrorCode.CASE_RELATION_NOT_FOUND)
                 .hasMessageContaining(CASE_NO);
 
-        verify(claimApplicationIssueRepository, never()).findOpenByClaimApplicationNo(anyString());
-        verify(claimApplicationIssueRepository, never()).insert(any());
+        verify(claimApplicationDetailQuery, never()).findOpenIssue(TENANT_CODE, CLAIM_APPLICATION_NO);
     }
 
-    private ClaimApplicationIssue openIssue() {
-        return ClaimApplicationIssue.restore(null, CLAIM_APPLICATION_NO, "ISSUE-2026-0001", "医疗票据缺失",
-                "auditor-01", "{}", ClaimApplicationIssueStatus.OPEN, null, RAISED_AT, RAISED_AT);
+    private IssueView openIssue() {
+        return new IssueView("ISSUE-2026-0001", "医疗票据缺失", "auditor-01", "{}",
+                ClaimApplicationIssueStatus.OPEN, null, RAISED_AT);
     }
 }

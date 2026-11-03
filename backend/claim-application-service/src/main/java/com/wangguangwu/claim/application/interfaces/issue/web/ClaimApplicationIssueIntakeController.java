@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.interfaces.issue.web;
 
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.interfaces.issue.web.render.ClaimApplicationIssueResponseRenderer;
 import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import com.wangguangwu.claim.application.shared.contract.BusinessErrorCode;

@@ -1,26 +1,20 @@
 package com.wangguangwu.claim.application.usecase.issue;
 
-import com.wangguangwu.claim.application.domain.issue.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.issue.port.ClaimApplicationIssueRepository;
-import com.wangguangwu.claim.application.domain.issue.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.issue.service.IssueDomainService;
-import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
+import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
+import com.wangguangwu.claim.application.domain.exception.DomainException;
 import com.wangguangwu.claim.application.usecase.issue.command.ClaimApplicationIssueCloseCommand;
 import com.wangguangwu.claim.application.usecase.issue.result.ClaimApplicationIssueCloseResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 问题件关闭用例：幂等判断、事务管理、委托领域服务执行业务逻辑。
+ * 问题件关闭用例：定位聚合、调用根关闭问题件并处理保存冲突。
  *
- * <p>职责：
- * <ul>
- *   <li>幂等性检查（应用层关注点）</li>
- *   <li>事务管理（应用层关注点）</li>
- *   <li>委托领域服务执行跨聚合业务规则</li>
- * </ul>
+ * <p>已关闭的问题件由根直接按幂等返回 {@code false}；保存冲突在事务之外重新读取，
+ * 若并发执行者已关闭则按幂等返回，否则唯一重试一次。</p>
  *
  * @author wangguangwu
  * @since 2026-10-31
@@ -30,8 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ClaimApplicationIssueCloseUseCase {
 
-    private final IssueDomainService issueDomainService;
-    private final ClaimApplicationIssueRepository claimApplicationIssueRepository;
+    private final ClaimApplicationRepository claimApplicationRepository;
+    private final ClaimApplicationIssueTransactionService transactionService;
 
     /**
      * 处理一次问题件关闭请求。
@@ -39,23 +33,38 @@ public class ClaimApplicationIssueCloseUseCase {
      * @param command 问题件关闭命令
      * @return 关闭结果
      */
-    @Transactional(rollbackFor = Exception.class)
     public ClaimApplicationIssueCloseResult close(ClaimApplicationIssueCloseCommand command) {
-        ClaimApplicationIssue issue = claimApplicationIssueRepository
-                .findByIssueNo(command.issueNo())
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
+        ClaimApplication claimApplication = claimApplicationRepository.findByIssueNo(command.issueNo())
+                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
                         "问题件不存在，issueNo=" + command.issueNo()));
-
-        if (issue.isClosed()) {
+        if (!claimApplication.closeIssue(command.issueNo(), command.auditor())) {
             log.info("问题件已关闭，按幂等处理，issueNo={}，claimApplicationNo={}", command.issueNo(),
-                    issue.getClaimApplicationNo());
+                    claimApplication.getClaimApplicationNo());
             return new ClaimApplicationIssueCloseResult(command.issueNo(), false);
         }
+        if (transactionService.save(claimApplication)) {
+            log.info("问题件关闭成功，issueNo={}，claimApplicationNo={}", command.issueNo(),
+                    claimApplication.getClaimApplicationNo());
+            return new ClaimApplicationIssueCloseResult(command.issueNo(), true);
+        }
+        return resolveAfterConflict(command);
+    }
 
-        issueDomainService.closeIssue(issue, command.auditor());
-
-        log.info("问题件关闭成功，issueNo={}，claimApplicationNo={}", command.issueNo(), issue.getClaimApplicationNo());
-        return new ClaimApplicationIssueCloseResult(command.issueNo(), true);
+    private ClaimApplicationIssueCloseResult resolveAfterConflict(ClaimApplicationIssueCloseCommand command) {
+        ClaimApplication current = claimApplicationRepository.findByIssueNo(command.issueNo())
+                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
+                        "问题件不存在，issueNo=" + command.issueNo()));
+        if (!current.closeIssue(command.issueNo(), command.auditor())) {
+            log.info("问题件已被并发关闭，按幂等处理，issueNo={}，claimApplicationNo={}", command.issueNo(),
+                    current.getClaimApplicationNo());
+            return new ClaimApplicationIssueCloseResult(command.issueNo(), false);
+        }
+        if (transactionService.save(current)) {
+            log.info("问题件关闭重试成功，issueNo={}，claimApplicationNo={}", command.issueNo(),
+                    current.getClaimApplicationNo());
+            return new ClaimApplicationIssueCloseResult(command.issueNo(), true);
+        }
+        throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
+                "申请状态已被并发改变，无法关闭问题件，issueNo=" + command.issueNo());
     }
 }

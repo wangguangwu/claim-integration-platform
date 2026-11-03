@@ -1,19 +1,31 @@
 package com.wangguangwu.claim.application.domain.claim;
 
+import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.issue.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
 import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
 import com.wangguangwu.claim.application.domain.claim.person.Applicant;
 import com.wangguangwu.claim.application.domain.claim.person.Payee;
 import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
+import com.wangguangwu.claim.application.domain.exception.DomainException;
+import com.wangguangwu.claim.foundation.common.util.AssertUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 
 /**
- * 理赔申请聚合根，承载平台统一的人员信息、提交材料与生命周期状态。
+ * 理赔申请聚合根，承载平台统一的人员信息、当前材料与问题件历史，并保证生命周期状态的一致性。
  *
- * <p>租户协议流水线的转换产物即为该模型：提交结果只包含租户口径的业务字段，
- * 平台申请编号与状态由签收用例绑定。字段装配只通过本类的领域工厂完成。</p>
+ * <p>材料处理结果、问题件打开/关闭都必须在同一事务内与申请状态一起落库，因此材料与问题件是聚合内实体，
+ * 不单独提供仓储。租户协议流水线的转换产物即为该模型：提交结果只包含租户口径的业务字段，
+ * 平台申请编号由签收用例绑定，乐观锁版本由持久化层回填。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -22,8 +34,16 @@ import lombok.Getter;
 @Builder(access = AccessLevel.PRIVATE)
 public class ClaimApplication {
 
+    /**
+     * 租户补材关闭问题件时使用的关闭人标识，区分审核系统关闭行为。
+     */
+    public static final String SUPPLEMENT_AUDITOR = "TENANT_SUPPLEMENT";
+
     /** 数据库主键，仅用于持久化更新条件。 */
     private Long id;
+
+    /** 乐观锁版本号，为空表示尚未持久化。 */
+    private Long version;
 
     /** 理赔申请所属租户，用于数据隔离和外部申请幂等。 */
     private String tenantCode;
@@ -37,7 +57,7 @@ public class ClaimApplication {
     /** 理赔申请当前生命周期状态，约束可执行的业务迁移。 */
     private ClaimApplicationStatus status;
 
-    /** 同一外部申请编号的受理尝试次数，重新申请时递增。 */
+    /** 同一外部申请编号的受理尝试次数，重新申请与租户补材时递增。 */
     private Integer claimApplicationAttempt;
 
     /** 申请人标准化信息。 */
@@ -52,8 +72,29 @@ public class ClaimApplication {
     /** 领款人标准化信息。 */
     private Payee payee;
 
-    /** 本次提交的材料，落库后由材料仓储独立管理。 */
-    private List<MaterialSubmission> materials;
+    /** 当前有效材料，已逻辑删除的历史材料不随聚合加载。 */
+    private List<Material> materials;
+
+    /** 全部问题件历史，含已关闭问题件。 */
+    private List<ClaimApplicationIssue> issues;
+
+    /**
+     * 返回当前有效材料的只读快照，调用方无法通过集合引用增删聚合内实体。
+     *
+     * @return 不可变材料列表
+     */
+    public List<Material> getMaterials() {
+        return List.copyOf(materials);
+    }
+
+    /**
+     * 返回全部问题件的只读快照，调用方无法通过集合引用增删聚合内实体。
+     *
+     * @return 不可变问题件列表
+     */
+    public List<ClaimApplicationIssue> getIssues() {
+        return List.copyOf(issues);
+    }
 
     /**
      * 创建租户协议提交结果，此时还没有平台申请编号与状态。
@@ -67,51 +108,58 @@ public class ClaimApplication {
      * @param primaryInsured        主被保险人
      * @param accidentPerson        出险人
      * @param payee                 领款人
-     * @param materials             本次提交的材料
+     * @param materialSubmissions        本次提交的材料
+     * @param batchNo                    本次提交共用的材料批次编号
      * @return 待签收的理赔申请
      */
     public static ClaimApplication submit(String tenantCode, String externalClaimApplicationNo, Applicant applicant,
                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
-                                          List<MaterialSubmission> materials) {
-        if (tenantCode == null || tenantCode.isBlank()) {
-            throw new IllegalArgumentException("租户编码不能为空");
-        }
-        if (externalClaimApplicationNo == null || externalClaimApplicationNo.isBlank()) {
-            throw new IllegalArgumentException("外部申请编号不能为空");
-        }
-        if (materials == null || materials.isEmpty()) {
-            throw new IllegalArgumentException("首次签收至少需要一项材料");
-        }
+                                          List<MaterialSubmission> materialSubmissions, String batchNo) {
+        AssertUtil.notBlank(tenantCode, "租户编码不能为空");
+        AssertUtil.notBlank(externalClaimApplicationNo, "外部申请编号不能为空");
+        AssertUtil.notNull(applicant, "申请人不能为空");
+        AssertUtil.notNull(primaryInsured, "主被保险人不能为空");
+        AssertUtil.notNull(accidentPerson, "出险人不能为空");
+        AssertUtil.notNull(payee, "领款人不能为空");
+        AssertUtil.notEmpty(materialSubmissions, "签收至少需要一项材料");
+        AssertUtil.notBlank(batchNo, "材料批次编号不能为空");
+        List<Material> materials = new ArrayList<>();
+        materialSubmissions.forEach(submission -> materials.add(Material.createPending(batchNo, submission)));
         return ClaimApplication.builder().tenantCode(tenantCode).externalClaimApplicationNo(externalClaimApplicationNo)
                 .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
-                .materials(materials).build();
+                .materials(materials).issues(new ArrayList<>()).build();
     }
 
     /**
-     * 从已落库的数据重建聚合，仅供持久化层反水化使用。
+     * 从已落库的数据重建完整聚合，仅供持久化层反水化使用。
      *
-     * <p>本次提交的材料只在签收时产生，重建时不随申请返回，因此本工厂不含材料入参。</p>
-     *
-     * @param id                  数据库主键
-     * @param tenantCode          租户编码
-     * @param claimApplicationNo       平台申请编号
+     * @param id                         数据库主键
+     * @param tenantCode                 租户编码
+     * @param claimApplicationNo         平台申请编号
      * @param externalClaimApplicationNo 外部申请编号
-     * @param status              当前生命周期状态
-     * @param claimApplicationAttempt  受理尝试次数
-     * @param applicant           申请人
-     * @param primaryInsured      主被保险人
-     * @param accidentPerson      出险人
-     * @param payee               领款人
+     * @param status                     当前生命周期状态
+     * @param claimApplicationAttempt    受理尝试次数
+     * @param applicant                  申请人
+     * @param primaryInsured             主被保险人
+     * @param accidentPerson             出险人
+     * @param payee                      领款人
+     * @param version                    乐观锁版本号
+     * @param materials                  当前有效材料
+     * @param issues                     全部问题件历史
      * @return 已落库的理赔申请
      */
     public static ClaimApplication restore(Long id, String tenantCode, String claimApplicationNo,
                                            String externalClaimApplicationNo, ClaimApplicationStatus status,
                                            Integer claimApplicationAttempt, Applicant applicant,
-                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee) {
+                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
+                                           Long version, List<Material> materials,
+                                           List<ClaimApplicationIssue> issues) {
         return ClaimApplication.builder().id(id).tenantCode(tenantCode).claimApplicationNo(claimApplicationNo)
-                .externalClaimApplicationNo(externalClaimApplicationNo).status(status).claimApplicationAttempt(claimApplicationAttempt)
-                .applicant(applicant).primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee)
-                .build();
+                .externalClaimApplicationNo(externalClaimApplicationNo).status(status)
+                .claimApplicationAttempt(claimApplicationAttempt).applicant(applicant)
+                .primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee).version(version)
+                .materials(materials == null ? new ArrayList<>() : new ArrayList<>(materials))
+                .issues(issues == null ? new ArrayList<>() : new ArrayList<>(issues)).build();
     }
 
     /**
@@ -120,6 +168,11 @@ public class ClaimApplication {
      * @param claimApplicationNo 平台申请编号
      */
     public void bindClaimApplicationNo(String claimApplicationNo) {
+        AssertUtil.notBlank(claimApplicationNo, "平台申请编号不能为空");
+        if (this.claimApplicationNo != null) {
+            throw new IllegalStateException("理赔申请平台编号已绑定，不允许重复绑定，claimApplicationNo="
+                    + this.claimApplicationNo);
+        }
         this.claimApplicationNo = claimApplicationNo;
         this.status = ClaimApplicationStatus.PENDING_ACCEPT;
         this.claimApplicationAttempt = 1;
@@ -138,35 +191,93 @@ public class ClaimApplication {
     }
 
     /**
-     * 使用新一次协议提交的人员信息与材料重新发起失败申请。
+     * 同步聚合的乐观锁版本，仅供持久化层在插入或保存成功后回填。
+     *
+     * @param version 数据库当前版本号
+     */
+    public void bindVersion(Long version) {
+        AssertUtil.notNull(version, "乐观锁版本不能为空");
+        boolean initialVersion = this.version == null && version == 0L;
+        boolean nextVersion = this.version != null && version == this.version + 1;
+        if (!initialVersion && !nextVersion) {
+            throw new IllegalStateException("乐观锁版本只能回填插入版本或保存后的下一版本，claimApplicationNo="
+                    + claimApplicationNo + "，当前版本=" + this.version + "，待绑定版本=" + version);
+        }
+        this.version = version;
+    }
+
+    /**
+     * 使用新一次协议提交的人员信息与材料重新发起受理失败的申请。
+     *
+     * <p>重新申请允许修改人员：四类人员整体替换；旧材料逻辑删除，新批次材料追加到聚合。
+     * 与租户补材的区别只在人员处理规则。</p>
      *
      * @param submitted 新一次提交的理赔申请
+     * @param batchNo   本次提交的材料批次编号
      */
-    public void reapply(ClaimApplication submitted) {
+    public void reapply(ClaimApplication submitted, String batchNo) {
         if (!isReapplicable()) {
-            throw new IllegalStateException("仅受理失败的申请允许重新申请");
+            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
+                    "仅受理失败的申请允许重新申请，claimApplicationNo=" + claimApplicationNo
+                            + "，当前状态=" + status);
         }
-        status = ClaimApplicationStatus.PENDING_ACCEPT;
-        claimApplicationAttempt = claimApplicationAttempt + 1;
+        List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
+        softDeleteCurrentMaterials();
+        materials.addAll(adoptedMaterials);
         this.applicant = submitted.applicant;
         this.primaryInsured = submitted.primaryInsured;
         this.accidentPerson = submitted.accidentPerson;
         this.payee = submitted.payee;
-        this.materials = submitted.materials;
+        this.claimApplicationAttempt = claimApplicationAttempt + 1;
+        status = ClaimApplicationStatus.PENDING_ACCEPT;
     }
 
     /**
-     * 材料处理成功，本次申请受理通过。
+     * 租户补材：关闭当前未关闭问题件、逻辑删除旧材料并追加全新影像件。
+     *
+     * <p>补材不接收人员变更：四类人员保持聚合原值，提交中的人员字段一律忽略且不做一致性校验。
+     * 受理尝试次数加 1，状态由 {@code ISSUE} 迁移到 {@code PENDING_ACCEPT}，随后按首次签收链路异步处理材料。</p>
+     *
+     * @param submitted 新一次提交的理赔申请
+     * @param batchNo   本次提交的材料批次编号
      */
-    public void accept() {
-        transitionTo(ClaimApplicationStatus.PENDING_ACCEPT, ClaimApplicationStatus.ACCEPTED);
+    public void supplement(ClaimApplication submitted, String batchNo) {
+        List<ClaimApplicationIssue> openIssues = openIssues();
+        if (status != ClaimApplicationStatus.ISSUE || openIssues.isEmpty()) {
+            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
+                    "申请状态不合法，无法受理租户补材，claimApplicationNo=" + claimApplicationNo
+                            + "，当前状态=" + status + "，未关闭问题件数=" + openIssues.size());
+        }
+        List<Material> adoptedMaterials = adoptMaterials(submitted, batchNo);
+        openIssues.forEach(issue -> issue.close(SUPPLEMENT_AUDITOR));
+        softDeleteCurrentMaterials();
+        materials.addAll(adoptedMaterials);
+        this.claimApplicationAttempt = claimApplicationAttempt + 1;
+        status = ClaimApplicationStatus.PENDING_ACCEPT;
     }
 
     /**
-     * 材料处理失败，本次申请尝试结束，等待租户重新申请。
+     * 应用一批材料处理结果，并依据全部材料状态决定受理成功或失败。
+     *
+     * <p>结果必须与当前全部待处理材料一一对应：不得重复、缺失、包含未知或非待处理材料，
+     * 避免部分结果导致申请提前受理成功。</p>
+     *
+     * @param results 本次材料处理结果
      */
-    public void failAccept() {
-        transitionTo(ClaimApplicationStatus.PENDING_ACCEPT, ClaimApplicationStatus.ACCEPT_FAILED);
+    public void applyMaterialResults(List<MaterialProcessingResult> results) {
+        ensureStatus(ClaimApplicationStatus.PENDING_ACCEPT, "应用材料处理结果");
+        List<Material> pendingMaterials = pendingMaterials();
+        validateResults(results, pendingMaterials);
+        for (MaterialProcessingResult result : results) {
+            Material material = pendingMaterials.stream()
+                    .filter(candidate -> result.materialId().equals(candidate.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            material.applyProcessResult(result.succeeded(), result.uploadedFileUrl());
+        }
+        boolean allProcessed = materials.stream()
+                .allMatch(material -> material.getStatus() == MaterialStatus.PROCESSED);
+        status = allProcessed ? ClaimApplicationStatus.ACCEPTED : ClaimApplicationStatus.ACCEPT_FAILED;
     }
 
     /**
@@ -193,17 +304,45 @@ public class ClaimApplication {
     /**
      * 审核系统下发问题件，申请挂起等待租户补材。
      *
-     * <p>业务语义是"进入问题件等待补材阶段"，不暴露状态机实现细节。</p>
+     * @param issueNo      问题件编号
+     * @param reason       问题原因
+     * @param auditor      审核人员
+     * @param issueContent 问题详情 JSON
      */
-    public void enterIssue() {
-        transitionTo(ClaimApplicationStatus.WAIT_AUDIT, ClaimApplicationStatus.ISSUE);
+    public void raiseIssue(String issueNo, String reason, String auditor, String issueContent) {
+        if (status != ClaimApplicationStatus.WAIT_AUDIT) {
+            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
+                    "申请状态不合法，无法下发问题件，claimApplicationNo=" + claimApplicationNo
+                            + "，当前状态=" + status);
+        }
+        if (!openIssues().isEmpty()) {
+            throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN,
+                    "同一申请已有未关闭问题件，claimApplicationNo=" + claimApplicationNo);
+        }
+        issues.add(ClaimApplicationIssue.create(issueNo, reason, auditor, issueContent));
+        status = ClaimApplicationStatus.ISSUE;
     }
 
     /**
-     * 问题件关闭，申请恢复审核。
+     * 关闭指定问题件；已关闭的问题件直接按幂等返回 {@code false}，不校验申请状态。
+     *
+     * @param issueNo 问题件编号
+     * @param auditor 处理人
+     * @return 本次是否真正关闭了问题件
      */
-    public void resumeAudit() {
-        transitionTo(ClaimApplicationStatus.ISSUE, ClaimApplicationStatus.WAIT_AUDIT);
+    public boolean closeIssue(String issueNo, String auditor) {
+        ClaimApplicationIssue issue = issues.stream()
+                .filter(candidate -> candidate.getIssueNo().equals(issueNo))
+                .findFirst()
+                .orElseThrow(() -> new DomainException(ClaimApplicationIssueErrorCode.ISSUE_NOT_FOUND,
+                        "问题件不存在，claimApplicationNo=" + claimApplicationNo + "，issueNo=" + issueNo));
+        if (issue.isClosed()) {
+            return false;
+        }
+        ensureStatus(ClaimApplicationStatus.ISSUE, "关闭未关闭问题件");
+        issue.close(auditor);
+        status = ClaimApplicationStatus.WAIT_AUDIT;
+        return true;
     }
 
     /**
@@ -224,6 +363,15 @@ public class ClaimApplication {
      */
     public boolean isReapplicable() {
         return status == ClaimApplicationStatus.ACCEPT_FAILED;
+    }
+
+    /**
+     * 判断申请是否可由租户补材。
+     *
+     * @return 状态为 ISSUE 且存在未关闭问题件时为 true
+     */
+    public boolean isSupplementable() {
+        return status == ClaimApplicationStatus.ISSUE && !openIssues().isEmpty();
     }
 
     /**
@@ -266,11 +414,67 @@ public class ClaimApplication {
         return primaryInsured.certificateNo();
     }
 
-    private void transitionTo(ClaimApplicationStatus expectedStatus, ClaimApplicationStatus targetStatus) {
-        if (status != expectedStatus) {
-            throw new IllegalStateException("申请状态不允许迁移，claimApplicationNo=" + claimApplicationNo
-                    + "，期望状态=" + expectedStatus + "，实际状态=" + status);
+    private List<Material> adoptMaterials(ClaimApplication submitted, String batchNo) {
+        AssertUtil.notNull(submitted, "重新提交申请不能为空，claimApplicationNo=" + claimApplicationNo);
+        AssertUtil.notEmpty(submitted.getMaterials(), "重新提交至少需要一项材料，claimApplicationNo=" + claimApplicationNo);
+        AssertUtil.notBlank(batchNo, "材料批次编号不能为空，claimApplicationNo=" + claimApplicationNo);
+        for (Material material : submitted.getMaterials()) {
+            if (!batchNo.equals(material.getBatchNo())) {
+                throw new IllegalStateException("材料批次编号不一致，claimApplicationNo=" + claimApplicationNo
+                        + "，期望批次=" + batchNo + "，实际批次=" + material.getBatchNo());
+            }
         }
+        return submitted.getMaterials();
+    }
+
+    private void softDeleteCurrentMaterials() {
+        materials.forEach(Material::softDelete);
+    }
+
+    private List<Material> pendingMaterials() {
+        return materials.stream().filter(material -> material.getStatus() == MaterialStatus.PENDING_PROCESS).toList();
+    }
+
+    private List<ClaimApplicationIssue> openIssues() {
+        return issues.stream().filter(ClaimApplicationIssue::isOpen).toList();
+    }
+
+    private void validateResults(List<MaterialProcessingResult> results, List<Material> pendingMaterials) {
+        AssertUtil.notNull(results, "材料处理结果不能为空，claimApplicationNo=" + claimApplicationNo);
+        Set<Long> pendingMaterialIds = new HashSet<>();
+        pendingMaterials.forEach(material -> pendingMaterialIds.add(material.getId()));
+        Set<Long> resultMaterialIds = new HashSet<>();
+        for (MaterialProcessingResult result : results) {
+            if (!resultMaterialIds.add(result.materialId())) {
+                throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
+                        "材料处理结果重复，claimApplicationNo=" + claimApplicationNo
+                                + "，materialId=" + result.materialId());
+            }
+            if (!pendingMaterialIds.contains(result.materialId())) {
+                throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
+                        "材料处理结果包含未知或非待处理材料，claimApplicationNo=" + claimApplicationNo
+                                + "，materialId=" + result.materialId());
+            }
+        }
+        if (resultMaterialIds.size() != pendingMaterialIds.size()) {
+            Set<Long> missingMaterialIds = new HashSet<>(pendingMaterialIds);
+            missingMaterialIds.removeAll(resultMaterialIds);
+            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_MATERIAL_RESULT_INVALID,
+                    "材料处理结果缺失待处理材料，claimApplicationNo=" + claimApplicationNo
+                            + "，缺失材料=" + missingMaterialIds);
+        }
+    }
+
+    private void ensureStatus(ClaimApplicationStatus expectedStatus, String action) {
+        if (status != expectedStatus) {
+            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
+                    "申请状态不允许" + action + "，claimApplicationNo=" + claimApplicationNo
+                            + "，期望状态=" + expectedStatus + "，实际状态=" + status);
+        }
+    }
+
+    private void transitionTo(ClaimApplicationStatus expectedStatus, ClaimApplicationStatus targetStatus) {
+        ensureStatus(expectedStatus, "迁移");
         status = targetStatus;
     }
 }
