@@ -48,7 +48,12 @@ claim:
           path: ${CLAIM_APPLICATION_RATE_LIMIT_INTAKE_PATH:/api/claim/v1/application/intake}
           match-strategy: exact
           tenants:
-            tenant-a: ${CLAIM_APPLICATION_RATE_LIMIT_TENANT_A_QPS:20}
+            PICCLIFE: ${CLAIM_APPLICATION_RATE_LIMIT_PICCLIFE_QPS:20}
+            XINHUA: ${CLAIM_APPLICATION_RATE_LIMIT_XINHUA_QPS:20}
+            CPIC: ${CLAIM_APPLICATION_RATE_LIMIT_CPIC_QPS:20}
+            PINGAN: ${CLAIM_APPLICATION_RATE_LIMIT_PINGAN_QPS:20}
+            TAIKANG: ${CLAIM_APPLICATION_RATE_LIMIT_TAIKANG_QPS:20}
+            YONGCHONG: ${CLAIM_APPLICATION_RATE_LIMIT_YONGCHONG_QPS:20}
     # 控制台只做观测：规则仍由本文件在启动时加载，控制台改动在网关重启后失效。
     # dashboard-server 留空表示关闭心跳上报，避免控制台未启动时每 10 秒刷一条失败 WARN。
     sentinel:

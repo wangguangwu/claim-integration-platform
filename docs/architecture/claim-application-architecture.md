@@ -122,7 +122,7 @@ flowchart TB
 
 - 根包是 DDD 四层 `interfaces`、`application`、`domain`、`infrastructure`，另有 `shared` 位于依赖图底部。层内按角色分包：`interfaces/{web,consumer,scheduler}`、`application/{command,query,port,process,exception}`、`domain/claim`（聚合根、状态枚举）与 `domain/claim/{material,issue,person,port}`、`domain/claimcase/{port}`（聚合外追加事实）、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`。
 - 依赖方向为 `interfaces → application → domain ← infrastructure`；`domain` 不依赖任何上层与框架，`infrastructure` 只依赖 `application/port`、`application/port/model`、`application/query/model`、`domain` 与 `shared`，不依赖用例编排或 `interfaces`，`application` 不依赖 `interfaces`/`infrastructure`。
-- `interfaces/web` 放 HTTP 入站适配（`controller` 放四个控制器，`advice` 放唯一异常处理器，`dto/{request,response}` 放对外请求与响应，`tenantprotocol/pipeline` 放流水线接口、注册中心与默认实现，`tenantprotocol/stage` 放五个阶段端口与默认实现，`tenantprotocol/tenants/tenant_a` 放租户 request/解析/转换与流水线注册）；`interfaces/consumer` 放 MQ 消费者，报文解析与命令装配在 `consumer/message`；`interfaces/scheduler` 放 Outbox 投递与补偿调度。
+- `interfaces/web` 放 HTTP 入站适配（`controller` 放四个控制器，`advice` 放唯一异常处理器，`dto/{request,response}` 放对外请求与响应，`tenantprotocol/pipeline` 放流水线契约、标准命令公共链路与注册中心，`tenantprotocol/tenants/{picclife,xinhua,cpic,pingan,taikang,yongchong}` 放各租户独立流水线，当前以标准报文完成命令转换）；`interfaces/consumer` 放 MQ 消费者，报文解析与命令装配在 `consumer/message`；`interfaces/scheduler` 放 Outbox 投递与补偿调度。
 - `application/command` 放用例入参；`application/query` 与 `application/query/model` 放详情查询用例与读模型；`application/port` 与 `application/port/model` 放锁、发号、快照查询、外部系统调用、Outbox、消费去重、补偿策略与读模型端口；`application/process` 放用例编排、事务服务、结果模型、冲突解析与记录装配；`application/exception` 放应用异常。
 - `domain/claim` 只含聚合根（`ClaimApplication`）与生命周期状态枚举，零框架依赖；聚合内实体的 `Material`、`ClaimApplicationIssue` 分别在 `domain/claim/material`、`domain/claim/issue`，人员值对象在 `domain/claim/person`；聚合 Repository 在 `domain/claim/port`；聚合根不暴露 setter 且构造器私有。案件关联事实 `ClaimCaseRelation` 不参与聚合加载，位于 `domain/claimcase`。
 - `infrastructure/persistence` 放 DO、ORM `*DOMapper`、DO↔领域对象的 `*Converter`、仓储实现与读模型实现；`infrastructure/adapter` 放 Redis、Redisson、发号、分布式锁与熔断降级；`infrastructure/acl` 放审核、承保与文件服务的日志实现；`infrastructure/mq` 放 Outbox 发布；`infrastructure/config` 放配置属性与框架装配。哪些属于标准强制、哪些属于本项目方言，见 [005 Spec 目录词典](../../specs/005-application-service-package-refactoring/design.md) 与 [026 Spec 角色分包](../../specs/026-package-standard-alignment/design.md)。
@@ -549,7 +549,7 @@ flowchart LR
 | 层 | Sentinel 资源 | 匹配方式 | 默认阈值 |
 | --- | --- | --- | --- |
 | 路由兜底 | 路由 ID `claim-application-service` | 不区分接口、不区分租户 | `default-qps` 50 |
-| 接口级租户配额 | API 定义名，如 `claim-application-intake` | 路径匹配 + 请求头 `X-Tenant-Code` 精确匹配 | `tenant-a` 20 |
+| 接口级租户配额 | API 定义名，如 `claim-application-intake` | 路径匹配 + 请求头 `X-Tenant-Code` 精确匹配 | 六租户各 20 |
 
 - 接口级配额只能更严：任一租户配额大于 `default-qps` 时网关启动失败；接口未配置的租户只受路由兜底约束。
 - 同一路由下不同接口的租户配额互相独立，例如签收被限流时同一租户的承保回调仍可正常进入。

@@ -415,18 +415,21 @@ claim-application-service
 
 ```
 interfaces/web/tenantprotocol
-├─ core
-│  ├─ pipeline
-│  └─ stage
+├─ pipeline
 └─ tenants
-   └─ tenant_a
+   ├─ picclife
+   ├─ xinhua
+   ├─ cpic
+   ├─ pingan
+   ├─ taikang
+   └─ yongchong
 ```
 
 协议路由：
 
 **tenantCode + protocolVersion → TenantProtocolPipelineRegistry → TenantProtocolPipeline**
 
-TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → 转换”执行，负责处理租户接入协议差异；验签与解密提供默认直通实现，真实租户按需覆写：
+每个租户注册一条独立流水线，负责处理租户接入协议差异；当前六个租户先将平台标准签收报文转换为标准受理命令，验签与解密使用可替换的空实现。接入真实协议时在各自流水线内替换以下能力：
 
 - 协议解析
 - 参数校验
@@ -437,7 +440,7 @@ TenantProtocolPipeline 固定按“验签 → 解密 → 解析 → 校验 → �
 
 请求链路：
 
-**外部请求 → Tenant 识别 → TenantProtocolPipelineRegistry → TenantProtocolPipeline（验签 → 解密 → Parser → Validator → Converter） → 理赔申请用例 → ClaimApplication**
+**外部请求 → Tenant 识别 → TenantProtocolPipelineRegistry → TenantProtocolPipeline → 理赔申请用例 → ClaimApplication**
 
 理赔申请内部的聚合根、聚合内实体、值对象、Repository、状态机及表结构由理赔申请业务域设计文档定义。
 
