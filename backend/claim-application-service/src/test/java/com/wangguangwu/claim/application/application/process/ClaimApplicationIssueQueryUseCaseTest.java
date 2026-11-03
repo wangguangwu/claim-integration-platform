@@ -7,9 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;
 import com.wangguangwu.claim.application.application.query.model.IssueView;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationDetailQuery;

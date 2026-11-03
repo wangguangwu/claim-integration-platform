@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.application.query.model;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
 import java.time.LocalDateTime;
 
 /**

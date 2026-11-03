@@ -2,12 +2,12 @@ package com.wangguangwu.claim.application.interfaces.web.tenantprotocol.tenants.
 
 import com.wangguangwu.claim.application.interfaces.dto.TenantAIntakeRequest;
 
-import com.wangguangwu.claim.application.domain.claim.AccidentPerson;
-import com.wangguangwu.claim.application.domain.claim.Applicant;
-import com.wangguangwu.claim.application.domain.claim.Gender;
-import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
-import com.wangguangwu.claim.application.domain.claim.Payee;
-import com.wangguangwu.claim.application.domain.claim.PrimaryInsured;
+import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
+import com.wangguangwu.claim.application.domain.claim.person.Applicant;
+import com.wangguangwu.claim.application.domain.claim.person.Gender;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialSubmission;
+import com.wangguangwu.claim.application.domain.claim.person.Payee;
+import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIntakeErrorCode;
 import com.wangguangwu.claim.application.interfaces.web.tenantprotocol.core.stage.TenantProtocolConverter;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;

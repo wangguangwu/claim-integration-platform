@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.MaterialProcessingResult;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.application.port.ConsumedEventRepository;
 import com.wangguangwu.claim.application.application.port.model.InteractionAction;

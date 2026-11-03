@@ -5,6 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationErrorCode;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialProcessingResult;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialSubmission;
+import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
+import com.wangguangwu.claim.application.domain.claim.person.Applicant;
+import com.wangguangwu.claim.application.domain.claim.person.Gender;
+import com.wangguangwu.claim.application.domain.claim.person.Payee;
+import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import java.time.LocalDateTime;
 import java.util.List;

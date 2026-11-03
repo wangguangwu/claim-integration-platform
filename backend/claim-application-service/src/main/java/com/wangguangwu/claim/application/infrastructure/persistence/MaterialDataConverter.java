@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.persistence;
 
-import com.wangguangwu.claim.application.domain.claim.Material;
-import com.wangguangwu.claim.application.domain.claim.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

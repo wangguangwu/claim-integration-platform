@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claimcase;
 
 import com.wangguangwu.claim.foundation.common.util.AssertUtil;
 import lombok.Getter;

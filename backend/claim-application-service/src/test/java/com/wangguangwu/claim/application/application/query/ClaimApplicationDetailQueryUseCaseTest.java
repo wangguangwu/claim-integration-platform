@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationQueryErrorCode;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssueStatus;
-import com.wangguangwu.claim.application.domain.claim.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationDetailQuery;
 import com.wangguangwu.claim.application.application.query.model.CaseView;

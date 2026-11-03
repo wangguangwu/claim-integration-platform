@@ -1,9 +1,9 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.application.exception.AuditSignedConflictException;
 import com.wangguangwu.claim.application.application.exception.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.application.command.AuditSignedCommand;

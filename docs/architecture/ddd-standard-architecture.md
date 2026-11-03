@@ -28,7 +28,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 |---|---|---|---|
 | `interfaces` | 把外部请求翻译成用例调用（Ports & Adapters 里的 driving adapter） | `web` 下的 Controller、统一响应与异常处理、响应渲染、租户协议流水线；`consumer` 下的 MQ 消费者与报文解析装配；`dto` 下的 HTTP 请求/响应模型；`scheduler` 下的定时任务入口 | 业务规则、数据库访问、事务编排、聚合组装 |
 | `application` | 用例编排：按顺序调用领域与端口，管理事务、幂等与重试 | `process` 下的 UseCase、TransactionService、记录装配工厂、结果模型；`command` 下的命令入参；`query` 下的查询用例与读模型；`port` 下的出站能力端口与端口模型；`exception` 下的应用异常与异步错误码 | 业务不变式（属于聚合）、DO、框架化的持久化细节、配置绑定 |
-| `domain` | 业务本身：状态、不变式、词汇 | 聚合根、聚合内实体、值对象、状态枚举（`domain/claim`）、聚合 Repository（`domain/claim/port`）、领域错误码（`domain/claim/exception`） | Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ、Jackson；DO；任何序列化细节；锁、发号、外部系统调用、Outbox 等技术能力端口 |
+| `domain` | 业务本身：状态、不变式、词汇 | 聚合根、聚合内实体、值对象、状态枚举（`domain/claim` 及其 `{material,issue,person}` 子包）、聚合 Repository（`domain/claim/port`、`domain/claimcase/port`）、领域错误码（`domain/claim/exception`） | Spring、MyBatis-Plus、Redisson、MapStruct、Feign、MQ、Jackson；DO；任何序列化细节；锁、发号、外部系统调用、Outbox 等技术能力端口 |
 | `infrastructure` | 端口的技术实现（driven adapter） | `persistence` 下的 `*DO`、ORM `*DOMapper`、DO↔领域对象 `*Converter`、`MyBatis*Repository` 与读模型实现；`adapter` 下的 Redis 缓存/锁/编号生成/熔断；`acl` 下的外部系统实现；`mq` 下的消息发布；`config` 下的 `*Properties` 与框架配置 | 业务规则、用例流程决策 |
 | `shared` | 跨层、跨域的传输无关契约 | `exception` 下的 `BusinessException`、`DomainException` 与 `BusinessErrorCode`；`message` 下的消息契约；`util` 下的无业务归属工具 | 单一业务域模型、HTTP 请求响应、应用编排 |
 
@@ -43,12 +43,12 @@ DDD 的标准约束只有三条，其余都是项目方言：
 | 角色 | 后缀/形态 | 所在层 | 本项目实例 |
 |---|---|---|---|
 | 聚合根 | 业务名词，record/class，构造器私有或只暴露命名工厂 | `domain/<聚合>` | `domain/claim/ClaimApplication` |
-| 聚合内实体 | 业务名词，只能由聚合根创建与修改 | `domain/<聚合>` | `domain/claim/Material`、`domain/claim/ClaimApplicationIssue` |
-| 聚合外追加事实 | 业务名词，只追加、不参与聚合加载与保存 | `domain/<聚合>` | `domain/claim/ClaimCaseRelation`（审核签收案件关联） |
-| 值对象 | 业务名词 | `domain/<聚合>` | `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`MaterialSubmission` |
+| 聚合内实体 | 业务名词，只能由聚合根创建与修改 | `domain/<聚合>/<子域>` | `domain/claim/material/Material`、`domain/claim/issue/ClaimApplicationIssue` |
+| 聚合外追加事实 | 业务名词，只追加、不参与聚合加载与保存 | `domain/<聚合>/<子域>` | `domain/claimcase/ClaimCaseRelation`（审核签收案件关联） |
+| 值对象 | 业务名词 | `domain/<聚合>/<子域>` | `domain/claim/person` 下的 `PersonInfo` 基类与 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个角色子类、`MaterialSubmission` |
 | 状态/类型枚举 | `*Status`、`*Type`、`*Action`、`*Direction` | 业务状态在 `domain`；异步内核枚举在 `application/port/model` | `domain`：`ClaimApplicationStatus`、`MaterialStatus`、`ClaimApplicationIssueStatus`；`application/port/model`：`OutboxEventStatus`、`ClaimApplicationEventType`、`InteractionType`、`InteractionAction` |
 | 枚举自带的业务映射 | 枚举字段与方法 | 随枚举所在层 | `InteractionType.direction()`/`targetSystem()`、`InteractionAction.resultStatus()`——方向、目标系统、结果状态这类固定词汇由枚举自己回答，不得由用例层 `switch` 推断 |
-| 聚合仓储端口 | `*Repository` | `domain/<聚合>/port` | `ClaimApplicationRepository`、`ClaimCaseRelationRepository`（材料与问题件不设独立仓储） |
+| 聚合仓储端口 | `*Repository` | `domain/<聚合>/port` | `domain/claim/port/ClaimApplicationRepository`、`domain/claimcase/port/ClaimCaseRelationRepository`（材料与问题件不设独立仓储） |
 | 外部能力端口与配置策略 | `*Query`、`*Generator`、`*Lock`、`*Processor`、`*Publisher`、`*Policy`、`*Port` | `application/port` | `UnderwritingSystemPort`、`AuditSystemPort`、`ClaimApplicationNoGenerator`、`ClaimApplicationIntakeLock`、`ClaimApplicationIntakeSnapshotQuery`、`ClaimApplicationDetailQuery`、`MaterialFileProcessor`、`OutboxEventPublisher`、`OutboxRelayPolicy`、`ClaimApplicationCompensationPolicy`、`ClaimApplicationIntakePolicy` |
 | 端口模型 | 随端口一起被用例与基础设施共享的查询/请求/结果 record 或枚举 | `application/port/model` | `ClaimApplicationIntakeLookup`、`ClaimApplicationIntakeSnapshot`、`AuditDeliveryRequest`、`UnderwritingResult`、`MaterialUploadRequest`、`FileUploadResult`、`OutboxEvent`、`InteractionLog` |
 | 读模型 | 查询输出视图 | `application/query/model` | `ClaimApplicationWithMaterials`、`ClaimApplicationWithIssues`、`ClaimApplicationWithCases`、`IssueView`、`MaterialView`、`CaseView`、`ClaimApplicationSummary` |
@@ -85,7 +85,7 @@ DDD 的标准约束只有三条，其余都是项目方言：
 
 - `interfaces/web` 的 28 个类里有 20 个是租户协议防腐层（`tenantprotocol/core/{pipeline,stage}` 放流水线装配与五个阶段端口，`tenantprotocol/tenants/{tenant_a,tenant_b}` 放每租户一套 request/解析/校验/转换），这是本项目"多租户报文接不进统一领域模型"的真实复杂度，不是分层装饰。
 - 防腐层的产物是 `ClaimApplicationIntakeCommand`，`interfaces` 里对 `ClaimApplication` 的引用为 0；该层对 `domain` 的依赖只剩 `Applicant`/`PrimaryInsured`/`AccidentPerson`/`Payee` 四个人员角色、`Gender`、`MaterialSubmission` 与业务错误码。
-- 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `application/{command,query,port,process,exception}`、`interfaces/{web,consumer,dto,scheduler}`、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`、`domain/claim/{port,exception}`。
+- 包内不平铺：同一包里出现两类以上互不相干的职责、且每类可聚成 ≥2 个类时必须拆子包。本轮落地为 `application/{command,query,port,process,exception}`、`interfaces/{web,consumer,dto,scheduler}`、`infrastructure/{persistence,adapter,acl,mq,config}`、`shared/{exception,message,util}`、`domain/claim/{material,issue,person,port,exception}`、`domain/claimcase/{port}`。
 - 异步内核（Outbox 投递、消费去重、交互轨迹、滞留补偿）不再单独成域：端口与端口模型在 `application/port` 与 `application/port/model`，编排在 `application/process`，持久化在 `infrastructure/persistence`，调度入口在 `interfaces/scheduler`。记录装配工厂只做载荷序列化与标识生成，交互事件本身由 `InteractionLog.of(...)` 装配。
 - 两个 `@RestControllerAdvice` 都限定 `basePackages` 到 `interfaces/web`：无作用域限制的兜底 advice 会接管其他入站通道的异常，与限定作用域的 advice 优先级不确定。
 - `shared` 不含用例：只含跨层异常、消息契约与工具，因此不依赖任何业务分层。

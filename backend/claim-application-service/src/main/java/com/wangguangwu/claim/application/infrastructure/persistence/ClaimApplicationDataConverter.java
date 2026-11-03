@@ -2,8 +2,8 @@ package com.wangguangwu.claim.application.infrastructure.persistence;
 
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.claim.Material;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

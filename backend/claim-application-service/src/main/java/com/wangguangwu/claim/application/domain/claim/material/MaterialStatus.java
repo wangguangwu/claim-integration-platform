@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claim.material;
 
 /**
  * 理赔材料处理状态。

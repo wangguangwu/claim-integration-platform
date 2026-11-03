@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claim.person;
 
 /**
  * 平台标准人员性别，由租户转换器把租户性别编码归一化后使用。

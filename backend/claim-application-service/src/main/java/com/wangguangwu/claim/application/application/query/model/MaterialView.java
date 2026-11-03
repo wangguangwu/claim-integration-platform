@@ -1,6 +1,6 @@
 package com.wangguangwu.claim.application.application.query.model;
 
-import com.wangguangwu.claim.application.domain.claim.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
 import java.time.LocalDateTime;
 
 /**

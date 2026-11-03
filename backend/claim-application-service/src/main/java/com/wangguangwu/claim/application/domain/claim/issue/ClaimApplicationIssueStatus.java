@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claim.issue;
 
 /**
  * 问题件处理状态。

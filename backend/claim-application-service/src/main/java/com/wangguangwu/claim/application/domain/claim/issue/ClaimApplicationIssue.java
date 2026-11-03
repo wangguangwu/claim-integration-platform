@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claim.issue;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
 import com.wangguangwu.claim.application.shared.exception.DomainException;

@@ -14,8 +14,8 @@ import com.wangguangwu.claim.application.application.port.InteractionLogReposito
 import com.wangguangwu.claim.application.application.port.MaterialFileProcessor;
 import com.wangguangwu.claim.application.application.port.UnderwritingSystemPort;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplication;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.claim.Material;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.material.Material;
 import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
 import com.wangguangwu.claim.application.interfaces.web.ApiErrorCodeProvider;
 import com.wangguangwu.claim.application.shared.exception.BusinessException;

@@ -1,6 +1,6 @@
-package com.wangguangwu.claim.application.domain.claim.port;
+package com.wangguangwu.claim.application.domain.claimcase.port;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimCaseRelation;
+import com.wangguangwu.claim.application.domain.claimcase.ClaimCaseRelation;
 import java.util.List;
 import java.util.Optional;
 

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
 import com.wangguangwu.claim.application.shared.exception.DomainException;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;

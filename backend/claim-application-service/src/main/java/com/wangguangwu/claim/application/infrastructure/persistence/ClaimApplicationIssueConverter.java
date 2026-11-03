@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.infrastructure.persistence;
 
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssue;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssue;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
 import org.springframework.stereotype.Component;
 
 /**

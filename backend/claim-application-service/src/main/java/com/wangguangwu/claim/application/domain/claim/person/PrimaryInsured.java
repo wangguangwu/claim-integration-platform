@@ -1,4 +1,4 @@
-package com.wangguangwu.claim.application.domain.claim;
+package com.wangguangwu.claim.application.domain.claim.person;
 
 import lombok.EqualsAndHashCode;
 

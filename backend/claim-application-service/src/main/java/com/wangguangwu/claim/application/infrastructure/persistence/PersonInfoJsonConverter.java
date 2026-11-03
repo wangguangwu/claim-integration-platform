@@ -2,12 +2,12 @@ package com.wangguangwu.claim.application.infrastructure.persistence;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wangguangwu.claim.application.domain.claim.AccidentPerson;
-import com.wangguangwu.claim.application.domain.claim.Applicant;
-import com.wangguangwu.claim.application.domain.claim.Gender;
-import com.wangguangwu.claim.application.domain.claim.Payee;
-import com.wangguangwu.claim.application.domain.claim.PersonInfo;
-import com.wangguangwu.claim.application.domain.claim.PrimaryInsured;
+import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
+import com.wangguangwu.claim.application.domain.claim.person.Applicant;
+import com.wangguangwu.claim.application.domain.claim.person.Gender;
+import com.wangguangwu.claim.application.domain.claim.person.Payee;
+import com.wangguangwu.claim.application.domain.claim.person.PersonInfo;
+import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

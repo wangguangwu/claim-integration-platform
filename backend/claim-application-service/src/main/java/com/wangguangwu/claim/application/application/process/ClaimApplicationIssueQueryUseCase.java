@@ -1,7 +1,7 @@
 package com.wangguangwu.claim.application.application.process;
 
 import com.wangguangwu.claim.application.domain.claim.exception.ClaimApplicationIssueErrorCode;
-import com.wangguangwu.claim.application.domain.claim.port.ClaimCaseRelationRepository;
+import com.wangguangwu.claim.application.domain.claimcase.port.ClaimCaseRelationRepository;
 import com.wangguangwu.claim.application.application.exception.ApplicationException;
 import com.wangguangwu.claim.application.application.query.model.IssueView;
 import com.wangguangwu.claim.application.application.port.ClaimApplicationDetailQuery;

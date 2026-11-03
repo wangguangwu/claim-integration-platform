@@ -2,8 +2,8 @@ package com.wangguangwu.claim.application.infrastructure.persistence;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.wangguangwu.claim.application.domain.claim.ClaimApplicationStatus;
-import com.wangguangwu.claim.application.domain.claim.ClaimApplicationIssueStatus;
-import com.wangguangwu.claim.application.domain.claim.MaterialStatus;
+import com.wangguangwu.claim.application.domain.claim.issue.ClaimApplicationIssueStatus;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialStatus;
 import com.wangguangwu.claim.application.application.query.model.CaseView;
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationSummary;
 import com.wangguangwu.claim.application.application.query.model.ClaimApplicationWithCases;

@@ -1,10 +1,10 @@
 package com.wangguangwu.claim.application.application.command;
 
-import com.wangguangwu.claim.application.domain.claim.AccidentPerson;
-import com.wangguangwu.claim.application.domain.claim.Applicant;
-import com.wangguangwu.claim.application.domain.claim.MaterialSubmission;
-import com.wangguangwu.claim.application.domain.claim.Payee;
-import com.wangguangwu.claim.application.domain.claim.PrimaryInsured;
+import com.wangguangwu.claim.application.domain.claim.person.AccidentPerson;
+import com.wangguangwu.claim.application.domain.claim.person.Applicant;
+import com.wangguangwu.claim.application.domain.claim.material.MaterialSubmission;
+import com.wangguangwu.claim.application.domain.claim.person.Payee;
+import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import java.util.List;
 import lombok.Builder;
 

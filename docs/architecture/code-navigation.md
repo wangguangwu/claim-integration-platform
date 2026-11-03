@@ -33,7 +33,8 @@ interfaces → application → domain ← infrastructure
 
 | 目录 | 进入条件 | 主要内容 | 不应放置的内容 |
 | --- | --- | --- | --- |
-| `domain/claim` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合根、聚合内实体、值对象、聚合外追加事实、状态枚举 | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
+| `domain/claim` | 要定义业务事实、状态规则或聚合持久化契约 | 聚合根、状态枚举；`material` 材料实体、`issue` 问题件实体、`person` 人员值对象 | 技术能力端口、Spring Controller、MyBatis Mapper、Redis 客户端调用 |
+| `domain/claimcase` | 要表达不参与聚合加载的追加事实 | 案件关联追加事实与其端口 | 聚合状态迁移、材料/问题件实体 |
 | `domain/claim/port` | 要声明聚合生命周期契约 | 聚合 Repository | 读模型查询、锁、发号、外部系统调用 |
 | `domain/claim/exception` | 要表达领域拒绝 | 领域错误码 | HTTP 状态、应用编排错误 |
 | `application/process` | 要编排一次完整业务操作 | 用例、事务服务、结果模型、记录装配、冲突解析 | HTTP 注解、数据库对象、第三方 SDK 调用、业务不变式 |
@@ -54,10 +55,10 @@ interfaces → application → domain ← infrastructure
 | 业务能力 | 领域模型 | 应用端口与编排 | 基础设施实现 | 入站入口 |
 | --- | --- | --- | --- | --- |
 | 申请签收 | `domain/claim`（`ClaimApplication` 聚合根） | `application/process/{ClaimApplicationIntakeUseCase,ClaimApplicationIntakeTransactionService}`、`application/port` | `infrastructure/persistence`、`infrastructure/adapter`（锁、快照、发号） | `interfaces/web`、`interfaces/web/tenantprotocol` |
-| 材料处理 | `domain/claim`（`Material` 聚合内实体） | `application/process/{MaterialProcessingUseCase,MaterialProcessingTransactionService}` | `infrastructure/acl/LoggingMaterialFileProcessor` | `interfaces/consumer/MaterialProcessConsumer` |
+| 材料处理 | `domain/claim/material`（`Material` 聚合内实体） | `application/process/{MaterialProcessingUseCase,MaterialProcessingTransactionService}` | `infrastructure/acl/LoggingMaterialFileProcessor` | `interfaces/consumer/MaterialProcessConsumer` |
 | 自动承保 | `domain/claim` 的状态推进 | `application/process/{UnderwritingUseCase,UnderwritingTransactionService,UnderwritingCallbackUseCase}`、`application/port/UnderwritingSystemPort` | `infrastructure/acl/LoggingUnderwritingSystem` | `interfaces/web/UnderwritingCallbackController` |
-| 审核交付与签收完成 | `domain/claim`（`ClaimCaseRelation` 追加事实、`WAIT_AUDIT → COMPLETED` 状态迁移） | `application/process/{AuditDeliveryUseCase,AuditSignedUseCase,AuditSignedTransactionService}`、`application/port/AuditSystemPort` | `infrastructure/persistence`、`infrastructure/acl/LoggingAuditSystem` | `interfaces/consumer/{AuditDeliveryConsumer,AuditSignedConsumer}` |
-| 问题件 | `domain/claim`（`ClaimApplicationIssue` 聚合内实体） | `application/process/{ClaimApplicationIssueIntakeUseCase,ClaimApplicationIssueCloseUseCase,ClaimApplicationIssueQueryUseCase}` | `infrastructure/persistence` | `interfaces/web/ClaimApplicationIssueIntakeController`、`ClaimApplicationIssueQueryController` |
+| 审核交付与签收完成 | `domain/claimcase`（`ClaimCaseRelation` 追加事实）、`domain/claim`（`WAIT_AUDIT → COMPLETED` 状态迁移） | `application/process/{AuditDeliveryUseCase,AuditSignedUseCase,AuditSignedTransactionService}`、`application/port/AuditSystemPort` | `infrastructure/persistence`、`infrastructure/acl/LoggingAuditSystem` | `interfaces/consumer/{AuditDeliveryConsumer,AuditSignedConsumer}` |
+| 问题件 | `domain/claim/issue`（`ClaimApplicationIssue` 聚合内实体） | `application/process/{ClaimApplicationIssueIntakeUseCase,ClaimApplicationIssueCloseUseCase,ClaimApplicationIssueQueryUseCase}` | `infrastructure/persistence` | `interfaces/web/ClaimApplicationIssueIntakeController`、`ClaimApplicationIssueQueryController` |
 | 详情查询 | — | `application/query/ClaimApplicationDetailQueryUseCase`、`application/port/ClaimApplicationDetailQuery` | `infrastructure/persistence/MyBatisClaimApplicationDetailQuery` | `interfaces/web/ClaimApplicationQueryController` |
 | 异步集成 | — | `application/process/{OutboxRelayUseCase,ClaimApplicationCompensationUseCase}`、`application/process/compensation/*CompensationHandler`、`application/port/{OutboxEventRepository,OutboxEventPublisher,ConsumedEventRepository,InteractionLogRepository}` | `infrastructure/mq/RocketMqOutboxPublisher`、`infrastructure/persistence/MyBatis*Repository` | `interfaces/scheduler/{OutboxRelayScheduler,ClaimApplicationCompensationScheduler}` |
 
