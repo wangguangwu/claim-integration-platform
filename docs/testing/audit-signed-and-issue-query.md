@@ -305,7 +305,7 @@ java -jar backend/claim-application-service/target/claim-application-service-*.j
   --claim.compensation.wait-audit-timeout=10s
 ```
 
-`SIGNED`（推进 `COMPLETED`）、`NOT_FOUND`（重新交付审核系统）与查询失败（写 `AUDIT_SIGNED_QUERY_FAILED` 轨迹）三个分支需要真实审核系统返回对应结果，本地日志实现无法构造；接入真实系统后再按原规则验证。补偿分支的单测覆盖见 `WaitAuditCompensationHandlerTest`。
+`SIGNED`（推进 `COMPLETED`）、`NOT_FOUND`（重新交付审核系统）与查询失败（写 `AUDIT_SIGNED_QUERY_FAILED` 轨迹）三个分支需要真实审核系统返回对应结果，本地日志实现无法构造；接入真实系统后再按原规则验证。补偿分支不保留单元测试，按本文的补偿调度步骤在运行栈上验证。
 
 ## 状态核对清单
 

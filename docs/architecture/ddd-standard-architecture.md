@@ -142,7 +142,7 @@ grep -rn '^import .*shared\.exception\.BusinessException' --include='*.java' dom
 
 当前结果：第 1～7、9～14 项均为 0；第 8 项 2 个接口（`ClaimApplicationRepository`、`ClaimCaseRelationRepository`，均在 `port` 子包），第 8b 项 0。
 
-单元测试覆盖聚合边界、签收分流、重新申请与补材、版本冲突、读模型与分层规则，`mvn -pl backend/claim-application-service -am test` 编译与测试通过；由 `ClaimApplicationArchitectureTest` 持续校验分层方向。
+业务行为不保留单元测试，统一在运行栈上按黄金路径验证；`ClaimApplicationArchitectureTest` 是唯一保留的测试，持续校验分层方向，`mvn -pl backend/claim-application-service -am test` 仅运行该分层规则。
 
 ## 6. 本项目的标准与方言分界
 
