@@ -12,7 +12,15 @@
 | 重投上限 | `max-reconsume-times`，默认 3，环境变量 `CLAIM_APPLICATION_MQ_MAX_RECONSUME_TIMES` 覆盖 |
 | 应用内处理 | 不消费死信、不自动重放 |
 
-消息进入死信说明消费在重投耗尽后仍然失败。常见原因：申请不存在、消息载荷非法、数据库持续不可用。应用不会吞掉异常，失败原因以 ERROR 形式记录在应用日志，日志包含 `consumerGroup`、`claimApplicationNo`、`eventId` 与异常摘要。
+消息进入死信说明消费在重投耗尽后仍然失败。常见原因：申请不存在、消息载荷非法、租户不一致、申请状态不是 `WAIT_AUDIT`/`COMPLETED`、`WAIT_AUDIT` 仍存在未关闭问题件或数据库持续不可用。应用不会吞掉异常，失败原因以 ERROR 形式记录在应用日志，日志包含 `consumerGroup`、`claimApplicationNo`、`eventId` 与异常摘要。
+
+| 错误码 | HTTP 映射 | 触发场景 | 处置建议 |
+|---|---|---|---|
+| `CLAIM_APPLICATION_NOT_FOUND` | 404 | 平台不存在该申请 | 确认 `claimApplicationNo`，必要时补建申请后重放 |
+| `AUDIT_SIGNED_INVALID` | 400 | 消息载荷非法（如案件号为空、超长） | 由审核系统修正消息后发送新事件 |
+| `AUDIT_SIGNED_TENANT_MISMATCH` | 400 | 消息 `tenantCode` 与申请归属不一致 | 核对审核系统租户映射，修正后重发 |
+| `AUDIT_SIGNED_STATUS_INVALID` | 409 | 申请状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 存在未关闭问题件 | 核对申请当前状态与问题件，确认业务是否已变更 |
+| `CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR` | 500 | 未预期的系统异常 | 排查数据库与依赖后重放 |
 
 ## 告警邮件字段
 
@@ -65,6 +73,10 @@ docker exec claim-rocketmq-broker sh /home/rocketmq/rocketmq-5.5.0/bin/mqadmin s
 5. 核对处理结果：
 
 ```sql
+SELECT tenant_code, claim_application_no, status, completed_at
+  FROM t_claim_application
+ WHERE claim_application_no = '<claimApplicationNo>';
+
 SELECT tenant_code, claim_application_no, case_no
   FROM t_claim_case_relation
  WHERE claim_application_no = '<claimApplicationNo>';
@@ -81,7 +93,7 @@ SELECT consumer_group, event_id
    AND consumer_group = 'claim-application-audit-signed-v1';
 ```
 
-重放使用原 `eventId`。事务失败时消费登记一起回滚，重放会重新处理；若消费登记已存在，重放会按幂等跳过，不会重复写入案件关联与轨迹。
+重放使用原 `eventId`。事务失败时消费登记一起回滚，重放会重新处理；若消费登记已存在，重放会按幂等跳过，不会重复写入案件关联与轨迹。`WAIT_AUDIT` 申请首次成功重放后状态为 `COMPLETED` 且 `completed_at` 非空；已完成申请重放只补插缺失案件关联，不改变状态与完成时间。
 
 ## 禁止操作
 

@@ -39,6 +39,7 @@ public class ClaimApplicationDataConverter {
                 .claimApplicationNo(claimApplication.getClaimApplicationNo())
                 .externalClaimApplicationNo(claimApplication.getExternalClaimApplicationNo())
                 .claimApplicationAttempt(claimApplication.getClaimApplicationAttempt())
+                .completedAt(claimApplication.getCompletedAt())
                 .version(claimApplication.getVersion()).status(status == null ? null : status.name())
                 .applicantJson(personInfoJsonConverter.toJson(claimApplication.getApplicant()))
                 .primaryInsuredJson(personInfoJsonConverter.toJson(claimApplication.getPrimaryInsured()))
@@ -63,6 +64,7 @@ public class ClaimApplicationDataConverter {
                 claimApplicationDO.getClaimApplicationNo(), claimApplicationDO.getExternalClaimApplicationNo(),
                 ClaimApplicationStatus.valueOf(claimApplicationDO.getStatus()),
                 claimApplicationDO.getClaimApplicationAttempt(),
+                claimApplicationDO.getCompletedAt(),
                 personInfoJsonConverter.toApplicant(claimApplicationDO.getApplicantJson()),
                 personInfoJsonConverter.toPrimaryInsured(claimApplicationDO.getPrimaryInsuredJson()),
                 personInfoJsonConverter.toAccidentPerson(claimApplicationDO.getAccidentPersonJson()),

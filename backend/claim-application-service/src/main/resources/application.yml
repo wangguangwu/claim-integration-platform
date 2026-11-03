@@ -98,13 +98,14 @@ claim:
       retry-base-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_BASE_SECONDS:5}
       retry-max-seconds: ${CLAIM_APPLICATION_OUTBOX_RELAY_RETRY_MAX_SECONDS:300}
   compensation:
-    # 补偿调度间隔、批量与四类滞留阈值，全部由配置决定。
+    # 补偿调度间隔、批量与五类滞留阈值，全部由配置决定。
     fixed-delay-ms: ${CLAIM_APPLICATION_COMPENSATION_FIXED_DELAY_MS:30000}
     batch-size: ${CLAIM_APPLICATION_COMPENSATION_BATCH_SIZE:20}
     outbox-sending-timeout: ${CLAIM_APPLICATION_COMPENSATION_OUTBOX_SENDING_TIMEOUT:60s}
     accepted-stall-timeout: ${CLAIM_APPLICATION_COMPENSATION_ACCEPTED_STALL_TIMEOUT:5m}
     underwriting-timeout: ${CLAIM_APPLICATION_COMPENSATION_UNDERWRITING_TIMEOUT:1m}
     pending-accept-timeout: ${CLAIM_APPLICATION_COMPENSATION_PENDING_ACCEPT_TIMEOUT:5m}
+    wait-audit-timeout: ${CLAIM_APPLICATION_COMPENSATION_WAIT_AUDIT_TIMEOUT:5m}
   intake:
     snapshot-cache:
       # 已过受理的安全状态单调不可逆，可复用快照可以缓存较久。
@@ -137,6 +138,12 @@ claim:
       fail-material-types: []
       # 开启后审核交付固定失败，用于验证重投与死信。
       fail-audit-delivery: ${CLAIM_APPLICATION_LOCAL_FAIL_AUDIT_DELIVERY:false}
+      # 审核签收查询返回值，取值 PROCESSING / SIGNED / NOT_FOUND。
+      audit-signed-result: ${CLAIM_APPLICATION_LOCAL_AUDIT_SIGNED_RESULT:PROCESSING}
+      # 审核签收查询返回 SIGNED 时携带的案件号。
+      audit-signed-case-nos: []
+      # 开启后审核签收查询固定失败，用于验证等待审核滞留补偿重试。
+      fail-audit-signed-query: ${CLAIM_APPLICATION_LOCAL_FAIL_AUDIT_SIGNED_QUERY:false}
 
 ---
 spring:

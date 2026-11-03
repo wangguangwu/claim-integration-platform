@@ -136,6 +136,7 @@ public class MyBatisClaimApplicationRepository implements ClaimApplicationReposi
             throw new IllegalStateException("理赔申请已持久化，不允许重复插入，claimApplicationNo="
                     + claimApplication.getClaimApplicationNo());
         }
+        validateCompletionState(claimApplication);
         ClaimApplicationDO claimApplicationDO = claimApplicationDataConverter.toDataObject(claimApplication);
         claimApplicationDO.setVersion(0L);
         claimApplicationMapper.insert(claimApplicationDO);
@@ -161,12 +162,14 @@ public class MyBatisClaimApplicationRepository implements ClaimApplicationReposi
             throw new IllegalStateException("理赔申请缺少乐观锁版本，不允许保存，claimApplicationNo="
                     + claimApplication.getClaimApplicationNo());
         }
+        validateCompletionState(claimApplication);
         ClaimApplicationDO claimApplicationDO = claimApplicationDataConverter.toDataObject(claimApplication);
         int updatedRows = claimApplicationMapper.update(null, Wrappers.lambdaUpdate(ClaimApplicationDO.class)
                 .eq(ClaimApplicationDO::getId, claimApplicationDO.getId())
                 .eq(ClaimApplicationDO::getVersion, claimApplicationDO.getVersion())
                 .set(ClaimApplicationDO::getStatus, claimApplicationDO.getStatus())
                 .set(ClaimApplicationDO::getClaimApplicationAttempt, claimApplicationDO.getClaimApplicationAttempt())
+                .set(ClaimApplicationDO::getCompletedAt, claimApplicationDO.getCompletedAt())
                 .set(ClaimApplicationDO::getApplicantJson, claimApplicationDO.getApplicantJson())
                 .set(ClaimApplicationDO::getPrimaryInsuredJson, claimApplicationDO.getPrimaryInsuredJson())
                 .set(ClaimApplicationDO::getAccidentPersonJson, claimApplicationDO.getAccidentPersonJson())
@@ -228,7 +231,7 @@ public class MyBatisClaimApplicationRepository implements ClaimApplicationReposi
     }
 
     /**
-     * 新增问题件插入，已落库问题件只更新状态、审核人与关闭时间，原因与详情不可变。
+     * 新增问题件插入，已落库问题件只更新状态、关闭人与关闭时间，原因与详情不可变。
      *
      * @param claimApplication 已通过版本校验的聚合
      */
@@ -244,8 +247,23 @@ public class MyBatisClaimApplicationRepository implements ClaimApplicationReposi
                     .eq(ClaimApplicationIssueDO::getId, issueDO.getId())
                     .set(ClaimApplicationIssueDO::getStatus, issueDO.getStatus())
                     .set(ClaimApplicationIssueDO::getIsOpen, issueDO.getIsOpen())
-                    .set(ClaimApplicationIssueDO::getAuditor, issueDO.getAuditor())
+                    .set(ClaimApplicationIssueDO::getClosedBy, issueDO.getClosedBy())
                     .set(ClaimApplicationIssueDO::getClosedAt, issueDO.getClosedAt()));
+        }
+    }
+
+    /**
+     * 校验状态与完成时间成对出现，避免无完成时间的终态或无终态的完成时间落库。
+     *
+     * @param claimApplication 待持久化聚合
+     */
+    private void validateCompletionState(ClaimApplication claimApplication) {
+        boolean completed = claimApplication.getStatus() == ClaimApplicationStatus.COMPLETED;
+        boolean hasCompletedAt = claimApplication.getCompletedAt() != null;
+        if (completed != hasCompletedAt) {
+            throw new IllegalStateException("理赔申请状态与完成时间不一致，claimApplicationNo="
+                    + claimApplication.getClaimApplicationNo() + "，状态=" + claimApplication.getStatus()
+                    + "，完成时间=" + claimApplication.getCompletedAt());
         }
     }
 }

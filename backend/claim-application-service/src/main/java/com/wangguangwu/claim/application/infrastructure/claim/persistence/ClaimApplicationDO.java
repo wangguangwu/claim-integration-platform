@@ -48,6 +48,10 @@ public class ClaimApplicationDO {
     @TableField("claim_application_attempt")
     private Integer claimApplicationAttempt;
 
+    /** 审核完成时间，仅 COMPLETED 状态非空。 */
+    @TableField("completed_at")
+    private LocalDateTime completedAt;
+
     /** 聚合乐观锁版本号，保存时以版本条件更新并自增。 */
     private Long version;
 

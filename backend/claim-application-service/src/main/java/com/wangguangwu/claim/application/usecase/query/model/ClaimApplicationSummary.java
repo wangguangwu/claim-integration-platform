@@ -13,11 +13,12 @@ import java.time.LocalDateTime;
  * @param claimApplicationAttempt 受理尝试次数
  * @param createdAt              创建时间
  * @param updatedAt              更新时间
+ * @param completedAt            审核完成时间，未完成时为空
  * @author wangguangwu
  * @since 2026-11-03
  */
 public record ClaimApplicationSummary(String tenantCode, String claimApplicationNo,
                                       String externalClaimApplicationNo, ClaimApplicationStatus status,
                                       Integer claimApplicationAttempt, LocalDateTime createdAt,
-                                      LocalDateTime updatedAt) {
+                                      LocalDateTime updatedAt, LocalDateTime completedAt) {
 }

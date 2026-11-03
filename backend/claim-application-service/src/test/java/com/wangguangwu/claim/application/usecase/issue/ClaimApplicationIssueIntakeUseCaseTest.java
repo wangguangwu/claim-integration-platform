@@ -187,7 +187,7 @@ class ClaimApplicationIssueIntakeUseCaseTest {
     }
 
     private ClaimApplication application(ClaimApplicationStatus status) {
-        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, 1,
+        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, 1, null,
                 new Applicant("张三", Gender.MALE, "身份证", "110101199001011234"),
                 new PrimaryInsured("李四", Gender.MALE, "身份证", "110101199002022345"),
                 new AccidentPerson("王五", Gender.MALE, "身份证", "110101199003033456"),

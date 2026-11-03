@@ -46,10 +46,10 @@ interfaces → usecase → domain ← infrastructure
 | 申请签收 | `domain/claim`（`ClaimApplication` 聚合根） | `usecase/intake`、`usecase/intake/{port,model}` | `infrastructure/intake`、`infrastructure/claim/persistence` | `interfaces/intake/web`、`interfaces/intake/tenantprotocol` |
 | 材料处理 | `domain/claim/material`（聚合内实体） | `usecase/material`、`usecase/material/{port,model}` | `infrastructure/material/{external,number}` | `interfaces/material/messaging` |
 | 自动承保 | `domain/claim` 的状态推进 | `usecase/underwriting`、`usecase/underwriting/{port,model}` | `infrastructure/underwriting` | `interfaces/underwriting/web` |
-| 审核交付 | `domain/claim`（`ClaimCaseRelation` 追加事实） | `usecase/audit`、`usecase/audit/{port,model}` | `infrastructure/claim/persistence`、`infrastructure/audit` | `interfaces/audit/messaging` |
+| 审核交付与签收完成 | `domain/claim`（`ClaimCaseRelation` 追加事实、`WAIT_AUDIT → COMPLETED` 状态迁移） | `usecase/audit`、`usecase/audit/{port,model}`（含 `AuditSignedStatusQuery`） | `infrastructure/claim/persistence`、`infrastructure/audit`（含 `LocalAuditSignedStatusQuery`） | `interfaces/audit/messaging` |
 | 问题件 | `domain/claim/issue`（聚合内实体） | `usecase/issue` | `infrastructure/claim/persistence` | `interfaces/issue/web` |
 | 详情查询 | — | `usecase/query`、`usecase/query/{port,model}` | `infrastructure/query/persistence` | `interfaces/claim/web` |
-| 异步集成 | — | `usecase/integration/{outbox,consumption,compensation,interaction}` | `infrastructure/integration` | `interfaces/integration/scheduling` |
+| 异步集成 | — | `usecase/integration/{outbox,consumption,compensation,interaction}`（等待审核补偿在 `compensation/ClaimApplicationCompensationUseCase`） | `infrastructure/integration`（本地审核签收查询在 `infrastructure/audit/external`） | `interfaces/integration/scheduling` |
 
 ## 常用排查路径
 
@@ -60,6 +60,8 @@ interfaces → usecase → domain ← infrastructure
 | 承保回调为什么未推进状态 | `interfaces/underwriting/web` | `usecase/underwriting` → `domain/claim` → `usecase/underwriting/port` |
 | 消息没有发出或重复发送 | `interfaces/integration/scheduling` | `usecase/integration/outbox` → `usecase/integration/outbox/{model,port}` → `infrastructure/integration/persistence/outbox` |
 | 问题件无法下发或关闭 | `interfaces/issue/web` | `usecase/issue` → `domain/claim/issue` → `infrastructure/claim/persistence` |
+| 审核签收为什么未推进完成 | `interfaces/audit/messaging` | `usecase/audit/AuditSignedUseCase` → `usecase/audit/AuditSignedTransactionService` → `domain/claim`（`completeAudit`）→ `infrastructure/claim/persistence` |
+| 等待审核滞留为何未恢复 | `interfaces/integration/scheduling` | `usecase/integration/compensation/ClaimApplicationCompensationUseCase` → `usecase/audit/port/AuditSignedStatusQuery` → `infrastructure/audit/external/LocalAuditSignedStatusQuery` |
 | 详情查询为什么返回 404 | `interfaces/claim/web` | `usecase/query` → `usecase/query/port` → `infrastructure/query/persistence` |
 
 # 并发控制

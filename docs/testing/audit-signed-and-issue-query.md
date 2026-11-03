@@ -4,10 +4,12 @@
 
 | 场景 | 触发方式 | 预期结果 |
 |---|---|---|
-| 审核签收多案件号 | 发送携带 2 个案件号的 `AUDIT_SIGNED` 消息 | 案件关联新增 2 行，轨迹新增 `STARTED`/`COMPLETED`，消费登记新增 1 行 |
+| 审核签收多案件号 | `WAIT_AUDIT` 申请收到携带 2 个案件号的 `AUDIT_SIGNED` 消息 | 案件关联新增 2 行，申请迁移 `COMPLETED` 并写入 `completedAt`，轨迹新增 `STARTED`/`COMPLETED`，消费登记新增 1 行 |
 | 重复签收事件 | 重发同一 `eventId` | 三张表行数不变，日志出现「审核签收事件已消费，跳过处理」 |
-| 部分案件号重叠 | 发送新 `eventId`，携带 1 个已存在、1 个新案件号 | 只补插缺失案件号，轨迹结果与新增数量一致 |
+| 部分案件号重叠 | 对 `COMPLETED` 申请发送新 `eventId`，携带 1 个已存在、1 个新案件号 | 只补插缺失案件号，状态与 `completedAt` 不变，轨迹结果与新增数量一致 |
 | 审核签收申请不存在 | 发送不存在的 `claimApplicationNo` | 重投耗尽后进入 `%DLQ%claim-application-audit-signed-v1` |
+| 审核签收租户不一致 | 消息 `tenantCode` 与申请归属不一致 | 重投后进入死信，返回 400 `AUDIT_SIGNED_TENANT_MISMATCH`，无业务写入 |
+| 审核签收状态不合法 | 对 `ISSUE` 或 `ACCEPTED` 申请发送签收消息 | 重投后进入死信，返回 409 `AUDIT_SIGNED_STATUS_INVALID`，无业务写入 |
 | 问题件下发与关闭 | 经网关调用问题件接口 | 返回 2xx，申请在 `WAIT_AUDIT` 与 `ISSUE` 间流转 |
 | 问题件业务拒绝 | 状态不合法、重复关闭、问题件不存在 | 返回 4xx 与明确错误码，不进入死信 |
 | 问题件状态查询 | 按案件号查询未关闭问题件 | 分别返回有、无、案件关系不存在三种结果 |
@@ -100,7 +102,13 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 - 案件关联 2 行，`case_no` 分别为 `CASE-2026-0001`、`CASE-2026-0002`。
 - 轨迹 2 行，同一 `interaction_no` 下为 `STARTED` 与 `COMPLETED`，`request_id` 为消息 `eventId`。
 - 消费登记 1 行。
-- 申请状态保持 `WAIT_AUDIT`，不因签收改变。
+- 申请状态为 `COMPLETED`，`completed_at` 非空；可用下面语句核对：
+
+```bash
+docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e "
+  SELECT claim_application_no, status, completed_at, version
+    FROM t_claim_application WHERE claim_application_no='$APP_NO';"
+```
 
 ## 场景二：重复签收事件
 
@@ -112,7 +120,8 @@ docker exec claim-mysql mysql -uclaim_app -pclaim_app -D claim_application_db -e
 
 - `t_claim_case_relation` 只新增 `CASE-2026-0003`，总数为 3；
 - 轨迹新增一组 `STARTED`/`COMPLETED`；
-- 新 `eventId` 新增一条消费登记。
+- 新 `eventId` 新增一条消费登记；
+- 申请仍为 `COMPLETED`，`completed_at` 与第一次签收一致，`version` 不变。
 
 ## 场景四：审核签收申请不存在进入死信
 
@@ -133,6 +142,13 @@ docker exec claim-rocketmq-broker /home/rocketmq/rocketmq-5.5.0/bin/mqadmin topi
 ```
 
 预期 `#Max Offset` 为 1，平台不消费死信。
+
+## 场景四之二：审核签收租户不一致与状态不合法
+
+1. 准备一笔 `WAIT_AUDIT` 申请，发送 `tenantCode=tenant-b` 的 `AUDIT_SIGNED` 消息，`caseNos` 非空。
+2. 预期重投耗尽后进入死信，应用日志包含 `AUDIT_SIGNED_TENANT_MISMATCH`；`t_claim_case_relation`、`t_claim_consumed_event` 与 `t_claim_application` 均无新增或状态变化。
+3. 对处于 `ISSUE` 的申请发送合法租户的签收消息，预期重投后进入死信，日志包含 `AUDIT_SIGNED_STATUS_INVALID`，申请仍为 `ISSUE` 且无案件关联写入。
+4. 将数据构造为 `WAIT_AUDIT` 且存在未关闭问题件，再次发送签收消息，预期同样返回 `AUDIT_SIGNED_STATUS_INVALID`，不允许带着问题件完成。
 
 ## 场景五：问题件下发与关闭（经网关）
 
@@ -262,10 +278,25 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 预期：
 
 - 三个接口均返回 200，`data` 包含申请摘要与对应集合；材料只含未删除行，问题件含历史记录，案件关联在审核签收后可见。
+- 审核完成后摘要 `status=COMPLETED` 且 `completedAt` 非空；等待审核阶段 `completedAt` 为 `null`。
+- 问题件响应包含 `raisedBy` 与 `closedBy`：未关闭问题件 `closedBy`、`closedAt` 为 `null`；审核关闭后 `closedBy` 为关闭人；租户补材关闭后 `closedBy=TENANT_SUPPLEMENT`，`raisedBy` 保持原下发人。
 - 空集合返回 200 与空数组，不返回 404。
 - 使用 `X-Tenant-Code: tenant-b` 查询同一申请返回 404 `CLAIM_APPLICATION_QUERY_NOT_FOUND`。
 - 缺少租户请求头时返回 400 `CLAIM_APPLICATION_QUERY_INVALID`。
 - 查询前后 `t_claim_interaction_log` 行数不变。
+
+## 场景十：等待审核滞留补偿
+
+通过本地审核签收查询配置分别验证三种结果，服务重启后等待 `wait-audit-timeout`（默认 5m）到期或临时调小阈值以触发补偿：
+
+| 配置 | 补偿行为 | 预期 |
+|---|---|---|
+| `claim.integration.local.audit-signed-result=SIGNED`，`audit-signed-case-nos` 非空 | 复用审核签收用例推进完成 | 申请 `COMPLETED`，案件关联与签收轨迹写入，`completedAt` 非空 |
+| `claim.integration.local.audit-signed-result=PROCESSING` | 只记录 INFO | 申请保持 `WAIT_AUDIT`，无新增轨迹与状态变化 |
+| `claim.integration.local.audit-signed-result=NOT_FOUND` | 重新调用审核交付端口 | 申请保持 `WAIT_AUDIT`，新增一组 `AUDIT_DELIVERY` 的 `STARTED`/`COMPLETED` 轨迹 |
+| `claim.integration.local.fail-audit-signed-query=true` | 查询失败 | 申请保持 `WAIT_AUDIT`，新增 `AUDIT_SIGNED` 的 `FAILED` 轨迹，错误码 `AUDIT_SIGNED_QUERY_FAILED` |
+
+`SIGNED` 但 `audit-signed-case-nos` 为空时按空案件号处理，写 `AUDIT_SIGNED_CASE_NO_MISSING` 失败轨迹并保持 `WAIT_AUDIT`。同批多笔申请中单笔失败不阻断其他申请，可在日志与轨迹中分别核对。
 
 ## 状态核对清单
 
@@ -274,7 +305,9 @@ curl -sS "http://127.0.0.1:8081/api/claim/v1/application/$APP_NO/cases" \
 | 案件关联已登记 | `t_claim_case_relation` | 按 `claimApplicationNo` 可查到消息中的全部案件号 |
 | 签收轨迹已记录 | `t_claim_interaction_log` | `interaction_type=AUDIT_SIGNED` 且含 `STARTED`/`COMPLETED` |
 | 消费去重 | `t_claim_consumed_event` | 同一 `(consumer_group, event_id)` 只有一行 |
-| 申请状态不被签收改变 | `t_claim_application` | 签收前后均为 `WAIT_AUDIT` |
+| 审核完成 | `t_claim_application` | `WAIT_AUDIT` 签收后为 `COMPLETED`，`completed_at` 非空；重复签收只补关系，状态与时间不变 |
+| 问题件人员字段 | `t_claim_application_issue` | 下发写 `raised_by`；关闭只写 `closed_by`，不覆盖 `raised_by` |
+| 等待审核补偿 | `t_claim_application`、`t_claim_interaction_log` | 已签收推进 `COMPLETED`；处理中保持；未找到重发交付；查询失败写失败轨迹 |
 | 问题件状态流转 | `t_claim_application` | 下发后 `ISSUE`，关闭后 `WAIT_AUDIT` |
 | 补材闭环 | `t_claim_application`、`t_claim_material`、`t_claim_application_issue` | 状态回到 `PENDING_ACCEPT` 后重新到达 `WAIT_AUDIT`；问题件由 `TENANT_SUPPLEMENT` 关闭；旧材料逻辑删除 |
 | 乐观锁 | `t_claim_application` | 重新申请与补材后 `claim_application_attempt` 与 `version` 均递增 |

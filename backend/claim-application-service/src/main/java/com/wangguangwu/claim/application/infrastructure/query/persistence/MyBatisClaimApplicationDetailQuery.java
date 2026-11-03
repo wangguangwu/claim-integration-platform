@@ -148,7 +148,7 @@ public class MyBatisClaimApplicationDetailQuery implements ClaimApplicationDetai
         return new ClaimApplicationSummary(applicationDO.getTenantCode(), applicationDO.getClaimApplicationNo(),
                 applicationDO.getExternalClaimApplicationNo(),
                 ClaimApplicationStatus.valueOf(applicationDO.getStatus()), applicationDO.getClaimApplicationAttempt(),
-                applicationDO.getCreatedAt(), applicationDO.getUpdatedAt());
+                applicationDO.getCreatedAt(), applicationDO.getUpdatedAt(), applicationDO.getCompletedAt());
     }
 
     private MaterialView toMaterialView(MaterialDO materialDO) {
@@ -158,9 +158,9 @@ public class MyBatisClaimApplicationDetailQuery implements ClaimApplicationDetai
     }
 
     private IssueView toIssueView(ClaimApplicationIssueDO issueDO) {
-        return new IssueView(issueDO.getIssueNo(), issueDO.getReason(), issueDO.getAuditor(),
+        return new IssueView(issueDO.getIssueNo(), issueDO.getReason(), issueDO.getRaisedBy(),
                 issueDO.getIssueContentJson(), ClaimApplicationIssueStatus.valueOf(issueDO.getStatus()),
-                issueDO.getClosedAt(), issueDO.getCreatedAt());
+                issueDO.getClosedBy(), issueDO.getClosedAt(), issueDO.getCreatedAt());
     }
 
     private CaseView toCaseView(ClaimCaseRelationDO relationDO) {

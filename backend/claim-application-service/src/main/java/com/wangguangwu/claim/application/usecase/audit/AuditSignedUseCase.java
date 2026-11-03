@@ -1,17 +1,14 @@
 package com.wangguangwu.claim.application.usecase.audit;
 
-import com.wangguangwu.claim.application.domain.claim.port.ClaimApplicationRepository;
-import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
-import com.wangguangwu.claim.application.usecase.exception.ApplicationException;
-import com.wangguangwu.claim.application.shared.contract.ClaimApplicationAsyncErrorCode;
 import com.wangguangwu.claim.application.usecase.audit.command.AuditSignedCommand;
 import com.wangguangwu.claim.application.usecase.audit.result.AuditSignedOutcome;
+import com.wangguangwu.claim.application.usecase.integration.consumption.port.ConsumedEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 审核签收用例：消费登记预判、申请存在性校验，并委托事务服务写库。
+ * 审核签收用例：只做消费登记预判，业务校验与状态迁移全部下沉到事务服务。
  *
  * @author wangguangwu
  * @since 2026-11-02
@@ -21,7 +18,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuditSignedUseCase {
 
-    private final ClaimApplicationRepository claimApplicationRepository;
     private final ConsumedEventRepository consumedEventRepository;
     private final AuditSignedTransactionService transactionService;
 
@@ -37,11 +33,6 @@ public class AuditSignedUseCase {
                     command.eventId());
             return AuditSignedOutcome.SKIPPED;
         }
-        claimApplicationRepository.findByClaimApplicationNo(command.claimApplicationNo())
-                .orElseThrow(() -> new ApplicationException(
-                        ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_NOT_FOUND,
-                        "审核签收事件对应的申请不存在，claimApplicationNo=" + command.claimApplicationNo()
-                                + "，eventId=" + command.eventId()));
         AuditSignedOutcome outcome = transactionService.record(command);
         log.info("审核签收处理完成，claimApplicationNo={}，eventId={}，caseNoCount={}，outcome={}",
                 command.claimApplicationNo(), command.eventId(), command.caseNos().size(), outcome);

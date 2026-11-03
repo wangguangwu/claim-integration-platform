@@ -50,6 +50,8 @@ class BusinessErrorStatusRegistryTest {
             Map.entry(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR),
             Map.entry(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID, HttpStatus.BAD_REQUEST),
+            Map.entry(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_TENANT_MISMATCH, HttpStatus.BAD_REQUEST),
+            Map.entry(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_STATUS_INVALID, HttpStatus.CONFLICT),
             Map.entry(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_NOT_FOUND, HttpStatus.NOT_FOUND),
             Map.entry(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_INVALID, HttpStatus.BAD_REQUEST),
             Map.entry(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_SYSTEM_ERROR,

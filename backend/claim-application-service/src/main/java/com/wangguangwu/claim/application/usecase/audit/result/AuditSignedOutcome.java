@@ -9,12 +9,17 @@ package com.wangguangwu.claim.application.usecase.audit.result;
 public enum AuditSignedOutcome {
 
     /**
-     * 至少登记了一个新的案件号。
+     * 本次签收把申请从等待审核迁移到已完成。
+     */
+    COMPLETED,
+
+    /**
+     * 申请已完成，本次补充登记了新的案件号。
      */
     RECORDED,
 
     /**
-     * 申请存在，但本次全部案件号已登记过。
+     * 申请已完成，但本次全部案件号已登记过。
      */
     REUSED,
 

@@ -7,7 +7,8 @@ import java.util.Optional;
 /**
  * 签收事务的产物：对外结果与本次回源观察到的可复用快照。
  *
- * <p>快照只在事务内读到 {@code ACCEPTED}、{@code UNDERWRITING}、{@code WAIT_AUDIT} 时才有值，
+ * <p>快照只在事务内读到 {@code ACCEPTED}、{@code UNDERWRITING}、{@code WAIT_AUDIT} 与
+ * {@code COMPLETED} 时才有值，
  * 用例在事务提交后用它把存在标记升级为可复用快照，后续重复请求即可不再读库。</p>
  *
  * @param result           对外签收结果

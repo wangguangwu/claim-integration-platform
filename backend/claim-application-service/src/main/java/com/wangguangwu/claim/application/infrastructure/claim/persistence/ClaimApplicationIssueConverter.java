@@ -44,7 +44,8 @@ public class ClaimApplicationIssueConverter {
                 .claimApplicationNo(claimApplicationNo)
                 .issueNo(issue.getIssueNo())
                 .reason(issue.getReason())
-                .auditor(issue.getAuditor())
+                .raisedBy(issue.getRaisedBy())
+                .closedBy(issue.getClosedBy())
                 .issueContentJson(issue.getIssueContent())
                 .status(status == null ? null : status.name())
                 .isOpen(issue.isOpen() ? 1 : 0)
@@ -66,7 +67,8 @@ public class ClaimApplicationIssueConverter {
                 issueDO.getId(),
                 issueDO.getIssueNo(),
                 issueDO.getReason(),
-                issueDO.getAuditor(),
+                issueDO.getRaisedBy(),
+                issueDO.getClosedBy(),
                 issueDO.getIssueContentJson(),
                 ClaimApplicationIssueStatus.valueOf(issueDO.getStatus()),
                 issueDO.getClosedAt(),

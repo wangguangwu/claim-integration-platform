@@ -20,7 +20,13 @@ public enum ClaimApplicationAsyncErrorCode implements BusinessErrorCode {
     CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR,
 
     /** 审核签收消息载荷非法，案件号缺失或不符合约定格式。 */
-    AUDIT_SIGNED_INVALID;
+    AUDIT_SIGNED_INVALID,
+
+    /** 审核签收消息携带的租户与申请所属租户不一致。 */
+    AUDIT_SIGNED_TENANT_MISMATCH,
+
+    /** 审核签收对应的申请状态不允许完成。 */
+    AUDIT_SIGNED_STATUS_INVALID;
 
     /**
      * 返回对外错误码字符串，与枚举常量名保持一致。

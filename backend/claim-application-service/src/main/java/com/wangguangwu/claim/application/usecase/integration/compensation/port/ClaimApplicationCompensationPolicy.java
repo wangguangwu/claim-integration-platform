@@ -44,4 +44,11 @@ public interface ClaimApplicationCompensationPolicy {
      * @return 滞留阈值
      */
     Duration pendingAcceptTimeout();
+
+    /**
+     * 等待审核申请判定为签收滞留的时长。
+     *
+     * @return 滞留阈值
+     */
+    Duration waitAuditTimeout();
 }

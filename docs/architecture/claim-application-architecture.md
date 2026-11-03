@@ -41,7 +41,7 @@
 | 申请受理 | 使用 `tenantCode + externalClaimApplicationNo` 确认唯一性，创建或按平台编号分流重新申请与补材。 |
 | 材料管理 | 聚合内材料实体管理首次材料与补材批次，保留软删除材料的审计轨迹。 |
 | 承保协同 | 查询有效保单；无保单时发起自动承保并等待完成通知。 |
-| 审核协同 | 提交审核申请，接收一次性返回全部案件的审核签收回调，只追加案件关联。 |
+| 审核协同 | 提交审核申请，接收一次性返回全部案件的审核签收回调，追加案件关联并完成申请。 |
 | 问题件处理 | 聚合内问题件实体同时只维护一条未关闭记录；租户补材后立即关闭并重新走签收链路。 |
 | 详情查询 | 通过读模型返回申请摘要及材料、问题件、案件关联，不加载聚合、不写轨迹。 |
 | 撤销处理 | 撤销对象是理赔申请；已完成审核签收时需经审核系统确认、锁定和撤销。 |
@@ -135,7 +135,7 @@ flowchart TB
 | 理赔申请提交 | 租户系统 | 同步 | 完成校验、幂等、理赔申请落库并返回 `claimApplicationNo`；携带平台编号时按状态走重新申请或补材。 |
 | 材料处理 | 理赔申请| 异步 | 材料处理完成后推进承保确认。 |
 | 自动承保完成通知 | 承保系统 | 异步 | 无有效保单时进入 `UNDERWRITING`，通知后推进审核交付。 |
-| 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，只追加案件关联，不改变申请状态。 |
+| 审核签收回调 | 审核系统 | 异步 | 一次性返回全部 `caseNo`，追加案件关联；`WAIT_AUDIT` 申请同事务迁移 `COMPLETED`，已完成申请只补齐关系。 |
 | 问题件回调 | 审核系统 | 异步 | 创建未关闭问题件并挂起申请；关闭问题件后恢复等待审核。 |
 | 详情查询 | 租户系统 | 同步 | 按申请编号返回摘要及材料、问题件或案件关联，租户不匹配返回 404。 |
 | 理赔申请撤销 | 租户系统 | 同步发起 | 未完成审核签收时直接撤销；完成后协同审核系统撤销。 |
@@ -237,7 +237,7 @@ erDiagram
 
 ### 状态定义
 
-当前实现覆盖签收、材料处理、承保分流与问题件链路，`ClaimApplicationStatus` 保留六个状态：
+当前实现覆盖签收、材料处理、承保分流、问题件与审核完成链路，`ClaimApplicationStatus` 保留七个状态：
 
 | 状态 | 业务含义 |
 | --- | --- |
@@ -247,8 +247,9 @@ erDiagram
 | `UNDERWRITING` | 未找到有效保单，自动承保处理中，等待完成通知。 |
 | `WAIT_AUDIT` | 已进入审核签收流程，等待审核系统处理。 |
 | `ISSUE` | 审核下发问题件，等待租户补材或审核关闭。 |
+| `COMPLETED` | 审核系统已签收并返回案件号，理赔申请在平台内的生命周期结束；不可逆终态，同时记录 `completedAt`。 |
 
-`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `claimApplicationNo` 并开始新的申请尝试。`COMPLETED` 与 `REVOKED` 尚未实现，审核签收当前只追加案件关联、不推进申请状态。
+`ACCEPT_FAILED` 是当前申请尝试的结束状态，不是理赔申请聚合的永久终态。租户可以使用同一外部申请号重新申请，系统复用 `claimApplicationNo` 并开始新的申请尝试。`COMPLETED` 是审核完成后的终态：不得重新申请、补材、下发问题件或关闭未关闭问题件；已关闭问题件重复关闭按幂等返回。重复提交按可复用状态返回 `REUSED`，迟到的审核签收只补齐缺失案件关联。`REVOKED` 尚未实现。
 
 ```mermaid
 stateDiagram-v2
@@ -264,16 +265,18 @@ stateDiagram-v2
     UNDERWRITING --> WAIT_AUDIT: 承保完成通知
     WAIT_AUDIT --> ISSUE: 审核下发问题件
     ISSUE --> WAIT_AUDIT: 审核关闭问题件
+    WAIT_AUDIT --> COMPLETED: 审核签收返回案件号
 ```
 
-补材与重新申请的区别只在人员：重新申请用报文人员整体替换，补材保留聚合原人员。后续 `WAIT_AUDIT → COMPLETED`、`→ REVOKED` 等状态迁移在对应能力实现时按目标态迁移表重新加入。
+补材与重新申请的区别只在人员：重新申请用报文人员整体替换，补材保留聚合原人员。`COMPLETED` 只能由审核签收从 `WAIT_AUDIT` 迁入，且迁入前不得存在未关闭问题件。
 
 状态推进规则：
 
 - 异步通知只能在理赔申请当前状态符合预期时推进状态；迟到通知、重复通知和状态不匹配的通知只记录交互轨迹，不改变状态。
 - 所有写操作通过聚合根方法推进状态，并一次 `save` 落库；保存返回 `false` 说明版本已过期，按重复事件或冲突规则处理，不覆盖其他执行者已写入的结果。
 - 问题件下发与关闭由根统一迁移 `WAIT_AUDIT ⇄ ISSUE`；租户补材由根关闭未关闭问题件并迁移 `ISSUE → PENDING_ACCEPT`。
-- 撤销能力尚未实现；实现后，审核签收完成与撤销的状态迁移需在此表补充并通过根方法落地。
+- 审核签收由根方法 `completeAudit()` 完成 `WAIT_AUDIT → COMPLETED`，同时写入完成时间；存在未关闭问题件时拒绝完成。
+- 撤销能力尚未实现；实现后，撤销的状态迁移需在此表补充并通过根方法落地。
 
 ## 核心链路设计
 
@@ -398,6 +401,7 @@ sequenceDiagram
     participant A as 审核系统
     participant U as AuditSignedTransactionService
     participant CR as ClaimCaseRelation
+    participant APP as ClaimApplication
     participant DB as MySQL
 
     O->>A: 投递审核交付事件
@@ -406,13 +410,21 @@ sequenceDiagram
     alt 已消费
         U-->>A: SKIPPED，不重复处理
     else 首次消费
+        U->>DB: 加载聚合，校验租户与状态
         U->>CR: 按 tenantCode + claimApplicationNo + caseNo 补齐缺失关联
+        alt 当前状态 WAIT_AUDIT
+            U->>APP: completeAudit() 迁移 COMPLETED 并写完成时间
+            U->>DB: 乐观锁保存聚合
+        end
         U->>DB: 同事务写入开始与结束交互轨迹
     end
 ```
 
 - 审核系统在一次签收回调中返回该理赔申请的全部 `caseNo`，重复回调只补齐缺失关系，不重复创建 `ClaimCaseRelation`。
-- 审核签收只追加案件关联事实，不加载或保存聚合，也不改变理赔申请状态；`COMPLETED` 状态迁移待撤销与审核签收目标态一起实现。
+- 审核签收在同一个 `@Transactional` 内完成消费登记、租户校验、状态校验、缺失案件关联追加、`WAIT_AUDIT → COMPLETED` 迁移与完成时间写入、聚合保存和交互轨迹写入；任一失败整体回滚。
+- 租户不一致返回 `AUDIT_SIGNED_TENANT_MISMATCH`（400）；申请不存在返回 `CLAIM_APPLICATION_NOT_FOUND`（404）；状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件，返回 `AUDIT_SIGNED_STATUS_INVALID`（409）。
+- `COMPLETED` 申请只补齐缺失案件关联，不改变状态与完成时间；版本冲突抛出内部冲突信号使事务回滚，交由 MQ 重投后按 `COMPLETED` 重放。
+- `WAIT_AUDIT` 滞留补偿通过审核签收状态查询端口恢复：已签收且案件号非空时复用审核签收用例推进 `COMPLETED`，处理中保持状态，未找到时重新调用审核交付端口；查询失败、空案件号或签收失败写失败轨迹并等待下一轮。
 
 ### 问题件与补材
 
@@ -500,14 +512,14 @@ sequenceDiagram
 
 - 理赔申请主表的唯一约束确保同一租户相同外部申请号不会创建多条主记录；签名锁在同一外部申请号上串行化签收。
 - 创建、重复请求判断、重新申请、补材和 Outbox 写入必须在同一事务内完成。
-- 未携带平台编号时，除创建外一律按重复请求复用；携带平台编号时只有 `ACCEPT_FAILED` 与未关闭问题件会改写聚合，其余状态只记录轨迹。
+- 未携带平台编号时，除创建外一律按重复请求复用；携带平台编号时只有 `ACCEPT_FAILED` 与未关闭问题件会改写聚合，`COMPLETED` 等其余状态只记录轨迹并按 `REUSED` 返回。
 - 聚合写库使用 `t_claim_application.version` 乐观锁：`save` 以 `id + version` 条件更新，并同时维护材料与问题件子表；条件不命中返回 `false`，不写任何子表。
 - `save` 返回 `false` 时事务抛出内部冲突信号并回滚，`ClaimApplicationIntakeConflictResolver` 以 `REQUIRES_NEW` 重读聚合完成分类：尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 `CLAIM_APPLICATION_INTAKE_BUSY`（HTTP 503）。
 - 冲突重读必须在新事务中进行：MySQL 默认 `REPEATABLE_READ` 下原事务内重读仍会返回旧快照。
 
 ### 回调与事件幂等
 
-- 审核签收回调通过 `ClaimCaseRelation` 唯一约束保证重复消息不重复建关联，且只追加事实、不改变申请状态。
+- 审核签收回调通过 `ClaimCaseRelation` 唯一约束保证重复消息不重复建关联；同一 `eventId` 重投返回 `SKIPPED`，不同 `eventId` 只补插缺失案件号。`WAIT_AUDIT` 首次签收在同一事务内迁移 `COMPLETED`，已完成申请不再改变状态与完成时间。
 - 问题件回调通过当前未关闭问题件保证重复消息不重复建问题件；已关闭问题件再次关闭按幂等返回。
 - 承保完成通知仅允许将 `UNDERWRITING` 推进到 `WAIT_AUDIT`；条件不满足或保存失败只记录 InteractionLog。
 - 材料处理在事务内校验 `PENDING_ACCEPT` 与受理尝试次数，过期批次、迟到事件和版本冲突都只记录轨迹。
@@ -552,7 +564,7 @@ flowchart LR
 | `N` | 不存在 | 1 分钟 |
 
 - 键为 `claim-applicationintake:snapshot:` + `sha256(租户编码:外部申请号)`，签收锁为 `claim-applicationintake:lock:` + 同一摘要；两者前缀必须区分，否则字符串快照会覆盖 Redisson 锁结构。
-- 只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT` 三种单调状态写入可复用快照；命中即返回 `REUSED`，不读取聚合、不调用外部系统。
+- 只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT`、`COMPLETED` 四种可复用状态写入可复用快照；命中即返回 `REUSED`，不读取聚合、不调用外部系统。
 - `PENDING_ACCEPT` 与 `ACCEPT_FAILED` 不作为可直接复用的依据，必须回源数据库确认，重新申请语义不变。
 - 快照不需要失效动作：安全状态在状态机中单调不可逆。进程内 L1 存活 5 秒、条目上限 10000，只用于吸收重复探测。
 - 创建成功后把不存在标记覆盖为 `X`，避免刚创建的申请被空标记误判为不存在。
@@ -584,6 +596,7 @@ flowchart LR
 - 投递器只投递已提交的 OutboxEvent；投递失败的事件保留并由补偿任务重试。
 - 消费者按照 `eventId` 和 `claimApplicationNo` 幂等处理；至少一次投递不会造成重复数据或重复状态推进。
 - 承保完成通知缺失时，补偿任务查询承保结果，不将理赔申请标记为自动承保失败。
+- 等待审核滞留时，补偿任务查询审核签收状态：已签收复用审核签收用例推进 `COMPLETED`，处理中保持 `WAIT_AUDIT`，未找到重新交付审核系统；查询失败、已签收但案件号为空或签收失败时写失败轨迹并等待下一轮。
 - 状态不匹配或已进入终态的理赔申请收到迟到事件时，只记录交互轨迹，不触发业务补偿。
 
 ## 异常处理与可观测性

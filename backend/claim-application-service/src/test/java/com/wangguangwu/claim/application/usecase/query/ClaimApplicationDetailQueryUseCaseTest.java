@@ -126,7 +126,7 @@ class ClaimApplicationDetailQueryUseCaseTest {
     @DisplayName("查询问题件：关闭时间等信息原样返回")
     void findWithIssues_existing_returnsView() {
         IssueView issue = new IssueView("ISSUE-001", "缺少发票", "auditor-1", "{}",
-                ClaimApplicationIssueStatus.CLOSED, NOW, NOW);
+                ClaimApplicationIssueStatus.CLOSED, "auditor-2", NOW, NOW);
         when(claimApplicationDetailQuery.findWithIssues(TENANT_CODE, CLAIM_APPLICATION_NO))
                 .thenReturn(Optional.of(new ClaimApplicationWithIssues(summary(), List.of(issue))));
 
@@ -149,6 +149,6 @@ class ClaimApplicationDetailQueryUseCaseTest {
 
     private ClaimApplicationSummary summary() {
         return new ClaimApplicationSummary(TENANT_CODE, CLAIM_APPLICATION_NO, "EXT-20261103-001",
-                ClaimApplicationStatus.WAIT_AUDIT, 1, NOW, NOW);
+                ClaimApplicationStatus.WAIT_AUDIT, 1, NOW, NOW, null);
     }
 }

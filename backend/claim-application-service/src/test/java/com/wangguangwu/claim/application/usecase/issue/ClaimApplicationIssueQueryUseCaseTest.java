@@ -97,6 +97,6 @@ class ClaimApplicationIssueQueryUseCaseTest {
 
     private IssueView openIssue() {
         return new IssueView("ISSUE-2026-0001", "医疗票据缺失", "auditor-01", "{}",
-                ClaimApplicationIssueStatus.OPEN, null, RAISED_AT);
+                ClaimApplicationIssueStatus.OPEN, null, null, RAISED_AT);
     }
 }

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS t_claim_application (
     external_claim_application_no VARCHAR(128) NOT NULL COMMENT '租户侧申请编号，与租户编码组成幂等键',
     status VARCHAR(32) NOT NULL COMMENT '理赔申请生命周期状态',
     claim_application_attempt INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '同一外部申请编号的受理尝试次数',
+    completed_at DATETIME(3) NULL COMMENT '审核完成时间，COMPLETED 时非空',
     version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '聚合乐观锁版本号',
     applicant_json JSON NULL COMMENT '申请人标准化信息 JSON',
     primary_insured_json JSON NULL COMMENT '主被保险人标准化信息 JSON',
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS t_claim_application_issue (
     claim_application_no VARCHAR(64) NOT NULL COMMENT '所属理赔申请的平台申请编号',
     issue_no VARCHAR(64) NOT NULL COMMENT '平台问题件编号',
     reason VARCHAR(512) NOT NULL COMMENT '问题件原因说明',
-    auditor VARCHAR(128) NOT NULL COMMENT '创建或处理问题件的审核人员标识',
+    raised_by VARCHAR(128) NOT NULL COMMENT '问题件下发人标识',
+    closed_by VARCHAR(128) NULL COMMENT '问题件关闭人标识，未关闭时为空',
     issue_content_json JSON NOT NULL COMMENT '问题件详情 JSON',
     status VARCHAR(32) NOT NULL COMMENT '问题件处理状态',
     is_open TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否为未关闭问题件',
@@ -71,7 +73,8 @@ CREATE TABLE IF NOT EXISTS t_claim_case_relation (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '关联最后更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_tenant_claim_application_case (tenant_code, claim_application_no, case_no),
-    KEY idx_case_relation_claim_application (claim_application_no)
+    KEY idx_case_relation_claim_application (claim_application_no),
+    KEY idx_case_relation_tenant_case (tenant_code, case_no)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '理赔申请与案件关联表';
 
 -- 一行记录一个交互事件；同一 interaction_no 的多行按发生时间组成完整行为。

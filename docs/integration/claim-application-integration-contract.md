@@ -132,9 +132,9 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 - 携带 `claimApplicationNo` 时跳过快照直接读库，编号必须与 `tenantCode + externalClaimApplicationNo` 对应记录一致；申请不存在或编号不一致返回 HTTP 400 与 `CLAIM_APPLICATION_INTAKE_INVALID`，且不新建申请。
 - 携带 `claimApplicationNo` 且状态为 `ACCEPT_FAILED` 时返回 `REAPPLIED`：人员与材料整体替换，旧材料逻辑删除，尝试次数加 1，状态回到 `PENDING_ACCEPT`。
 - 携带 `claimApplicationNo`、状态为 `ISSUE` 且存在未关闭问题件时返回 `SUPPLEMENTED`：关闭该问题件（关闭人 `TENANT_SUPPLEMENT`），报文人员不生效，旧材料逻辑删除并写入新批次，尝试次数加 1，状态回到 `PENDING_ACCEPT`，随后异步处理材料。
-- 携带 `claimApplicationNo` 的其他状态返回 `REUSED`，只写交互轨迹。
+- 携带 `claimApplicationNo` 的其他状态（含 `COMPLETED`）返回 `REUSED`，只写交互轨迹，不触发重新申请或补材。
 - 聚合保存冲突时，尝试次数已增大按 `REUSED`；补材时状态已离开 `ISSUE` 返回 HTTP 400 与 `ISSUE_APPLICATION_STATUS_INVALID`；其余返回 HTTP 503 与 `CLAIM_APPLICATION_INTAKE_BUSY`，调用方可重试。
-- 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT` 三种单调状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT`、`ACCEPT_FAILED` 与 `ISSUE` 每次都回源数据库确认。
+- 判定结果缓存在 Redis，只有 `ACCEPTED`、`UNDERWRITING`、`WAIT_AUDIT`、`COMPLETED` 四种可复用状态形成可复用快照（TTL 1 小时），命中后重复请求不再读库；`PENDING_ACCEPT`、`ACCEPT_FAILED` 与 `ISSUE` 每次都回源数据库确认。
 - 该缓存不改变对调用方可见的响应结构与响应码。
 
 ### Redis 降级
@@ -215,11 +215,12 @@ MQ Topic 与消费者组名、数据库名与 Redis 键前缀均保持不变；�
 
 | 处理结果 | 条件 |
 |---|---|
-| `RECORDED` | 至少登记了一个新的案件号 |
-| `REUSED` | 申请存在，但本次全部案件号已登记过 |
+| `COMPLETED` | 申请处于 `WAIT_AUDIT`，本次追加缺失案件关联并迁移 `COMPLETED`，同时写入完成时间 |
+| `RECORDED` | 申请处于 `COMPLETED`，本次至少追加了一个新的案件号，状态与完成时间不变 |
+| `REUSED` | 申请处于 `COMPLETED`，本次全部案件号已登记过 |
 | `SKIPPED` | 同一 `eventId` 已被本消费组登记 |
 
-审核签收只登记 `t_claim_case_relation`，不改变申请状态；申请签收前后均保持 `WAIT_AUDIT`，案件生命周期由案件服务承载。
+审核签收在同一事务内完成消费登记、案件关联追加、`WAIT_AUDIT → COMPLETED` 迁移与轨迹写入。租户不一致返回 `AUDIT_SIGNED_TENANT_MISMATCH`（400）；申请不存在返回 `CLAIM_APPLICATION_NOT_FOUND`（404）；状态不是 `WAIT_AUDIT`/`COMPLETED`，或 `WAIT_AUDIT` 仍存在未关闭问题件，返回 `AUDIT_SIGNED_STATUS_INVALID`（409）。失败时不写入任何业务数据，由 MQ 重投后进入死信。案件生命周期由案件服务承载。
 
 样例中的 `eventVersion`、`occurredAt` 属于历史信封字段，平台不再读取；审核系统继续携带这两个字段或其他契约外字段时按未知字段忽略，不影响处理。
 
@@ -247,6 +248,7 @@ InteractionLog 以“一个事件一条记录”保存跨系统和材料处理�
 | `AutoUnderwritingRequester` | 发起自动承保 | `LocalAutoUnderwritingRequester` | `claim.integration.local.delay` |
 | `UnderwritingResultQuery` | 查询自动承保结果 | `LocalUnderwritingResultQuery` | `claim.integration.local.underwriting-result` |
 | `ServiceAuditSystemPort` | 交付申请给审核系统 | `LocalAuditSystemClient` | `claim.integration.local.fail-audit-delivery` |
+| `AuditSignedStatusQuery` | 查询审核系统签收状态 | `LocalAuditSignedStatusQuery` | `claim.integration.local.audit-signed-result`、`audit-signed-case-nos`、`fail-audit-signed-query` |
 
 约定：
 

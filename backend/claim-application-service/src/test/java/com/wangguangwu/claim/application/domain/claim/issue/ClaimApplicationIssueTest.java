@@ -29,7 +29,8 @@ class ClaimApplicationIssueTest {
 
         assertThat(issue.getIssueNo()).isEqualTo(ISSUE_NO);
         assertThat(issue.getReason()).isEqualTo(REASON);
-        assertThat(issue.getAuditor()).isEqualTo(AUDITOR);
+        assertThat(issue.getRaisedBy()).isEqualTo(AUDITOR);
+        assertThat(issue.getClosedBy()).isNull();
         assertThat(issue.getIssueContent()).isEqualTo(ISSUE_CONTENT);
         assertThat(issue.getStatus()).isEqualTo(ClaimApplicationIssueStatus.OPEN);
         assertThat(issue.isOpen()).isTrue();
@@ -38,14 +39,15 @@ class ClaimApplicationIssueTest {
     }
 
     @Test
-    @DisplayName("关闭问题件：状态变更为 CLOSED，记录 closedAt")
-    void close_transitionsStatusToClosedAndRecordsClosedAt() {
+    @DisplayName("关闭问题件：状态变更为 CLOSED，记录关闭人且下发人保持不变")
+    void close_transitionsStatusToClosedAndRecordsClosedBy() {
         ClaimApplicationIssue issue = ClaimApplicationIssue.create(ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT);
 
         issue.close("auditor_lisi");
 
         assertThat(issue.getStatus()).isEqualTo(ClaimApplicationIssueStatus.CLOSED);
-        assertThat(issue.getAuditor()).isEqualTo("auditor_lisi");
+        assertThat(issue.getRaisedBy()).isEqualTo(AUDITOR);
+        assertThat(issue.getClosedBy()).isEqualTo("auditor_lisi");
         assertThat(issue.getClosedAt()).isNotNull();
         assertThat(issue.isOpen()).isFalse();
         assertThat(issue.isClosed()).isTrue();
@@ -83,11 +85,11 @@ class ClaimApplicationIssueTest {
     }
 
     @Test
-    @DisplayName("创建时参数校验：审核人员为空")
+    @DisplayName("创建时参数校验：下发人为空")
     void create_withBlankAuditor_throwsException() {
         assertThatThrownBy(() -> ClaimApplicationIssue.create(ISSUE_NO, REASON, "", ISSUE_CONTENT))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("审核人员不能为空");
+                .hasMessageContaining("下发人不能为空");
     }
 
     @Test
@@ -99,12 +101,22 @@ class ClaimApplicationIssueTest {
     }
 
     @Test
-    @DisplayName("关闭时参数校验：处理人为空")
+    @DisplayName("关闭时参数校验：关闭人为空")
     void close_withBlankAuditor_throwsException() {
         ClaimApplicationIssue issue = ClaimApplicationIssue.create(ISSUE_NO, REASON, AUDITOR, ISSUE_CONTENT);
 
         assertThatThrownBy(() -> issue.close(""))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("处理人不能为空");
+                .hasMessageContaining("关闭人不能为空");
+    }
+
+    @Test
+    @DisplayName("反序列化：已关闭问题件可携带关闭人，历史数据关闭人为空")
+    void restore_allowsNullClosedBy() {
+        ClaimApplicationIssue issue = ClaimApplicationIssue.restore(1L, ISSUE_NO, REASON, AUDITOR, null,
+                ISSUE_CONTENT, ClaimApplicationIssueStatus.OPEN, null, null, null);
+
+        assertThat(issue.getRaisedBy()).isEqualTo(AUDITOR);
+        assertThat(issue.getClosedBy()).isNull();
     }
 }

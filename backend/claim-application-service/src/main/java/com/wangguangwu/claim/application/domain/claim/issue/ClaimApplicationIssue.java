@@ -30,8 +30,11 @@ public class ClaimApplicationIssue {
     /** 问题件原因说明，必填，最大 512 字符。 */
     private String reason;
 
-    /** 创建或处理问题件的审核人员标识，必填，最大 128 字符。 */
-    private String auditor;
+    /** 问题件下发人标识，必填，最大 128 字符，落库后不可变。 */
+    private String raisedBy;
+
+    /** 问题件关闭人标识，未关闭时为空，最大 128 字符。 */
+    private String closedBy;
 
     /** 问题件详情 JSON，记录缺少的材料清单、疑问说明等。 */
     private String issueContent;
@@ -53,21 +56,21 @@ public class ClaimApplicationIssue {
      *
      * @param issueNo      问题件编号
      * @param reason       问题原因
-     * @param auditor      审核人员
+     * @param raisedBy     问题件下发人
      * @param issueContent 问题详情 JSON
      * @return 新问题件
      */
-    public static ClaimApplicationIssue create(String issueNo, String reason, String auditor, String issueContent) {
+    public static ClaimApplicationIssue create(String issueNo, String reason, String raisedBy, String issueContent) {
         AssertUtil.notBlank(issueNo, "问题件编号不能为空");
         AssertUtil.notBlank(reason, "问题原因不能为空");
         AssertUtil.isTrue(reason.length() <= 512, "问题原因不能超过 512 字符");
-        AssertUtil.notBlank(auditor, "审核人员不能为空");
-        AssertUtil.isTrue(auditor.length() <= 128, "审核人员不能超过 128 字符");
+        AssertUtil.notBlank(raisedBy, "下发人不能为空");
+        AssertUtil.isTrue(raisedBy.length() <= 128, "下发人不能超过 128 字符");
         AssertUtil.notNull(issueContent, "问题详情不能为空");
         return ClaimApplicationIssue.builder()
                 .issueNo(issueNo)
                 .reason(reason)
-                .auditor(auditor)
+                .raisedBy(raisedBy)
                 .issueContent(issueContent)
                 .status(ClaimApplicationIssueStatus.OPEN)
                 .build();
@@ -79,7 +82,8 @@ public class ClaimApplicationIssue {
      * @param id           数据库主键
      * @param issueNo      问题件编号
      * @param reason       问题原因
-     * @param auditor      审核人员
+     * @param raisedBy     问题件下发人
+     * @param closedBy     问题件关闭人，未关闭时为空
      * @param issueContent 问题详情 JSON
      * @param status       问题件状态
      * @param closedAt     关闭时间
@@ -87,15 +91,16 @@ public class ClaimApplicationIssue {
      * @param updatedAt    更新时间
      * @return 已落库的问题件
      */
-    public static ClaimApplicationIssue restore(Long id, String issueNo, String reason, String auditor,
-                                                String issueContent, ClaimApplicationIssueStatus status,
-                                                LocalDateTime closedAt, LocalDateTime createdAt,
-                                                LocalDateTime updatedAt) {
+    public static ClaimApplicationIssue restore(Long id, String issueNo, String reason, String raisedBy,
+                                                String closedBy, String issueContent,
+                                                ClaimApplicationIssueStatus status, LocalDateTime closedAt,
+                                                LocalDateTime createdAt, LocalDateTime updatedAt) {
         return ClaimApplicationIssue.builder()
                 .id(id)
                 .issueNo(issueNo)
                 .reason(reason)
-                .auditor(auditor)
+                .raisedBy(raisedBy)
+                .closedBy(closedBy)
                 .issueContent(issueContent)
                 .status(status)
                 .closedAt(closedAt)
@@ -105,18 +110,19 @@ public class ClaimApplicationIssue {
     }
 
     /**
-     * 关闭问题件，记录关闭人与关闭时间。
+     * 关闭问题件，记录关闭人与关闭时间；下发人保持不变。
      *
-     * @param auditor 处理人
+     * @param closedBy 问题件关闭人
      */
-    public void close(String auditor) {
+    public void close(String closedBy) {
         if (status != ClaimApplicationIssueStatus.OPEN) {
             throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_STATUS_INVALID,
                     "问题件状态不允许关闭，issueNo=" + issueNo + "，当前状态=" + status);
         }
-        AssertUtil.notBlank(auditor, "处理人不能为空");
+        AssertUtil.notBlank(closedBy, "关闭人不能为空");
+        AssertUtil.isTrue(closedBy.length() <= 128, "关闭人不能超过 128 字符");
         this.status = ClaimApplicationIssueStatus.CLOSED;
-        this.auditor = auditor;
+        this.closedBy = closedBy;
         this.closedAt = LocalDateTime.now();
     }
 

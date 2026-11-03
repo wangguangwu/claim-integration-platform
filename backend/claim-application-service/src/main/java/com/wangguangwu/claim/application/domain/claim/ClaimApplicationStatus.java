@@ -1,9 +1,9 @@
 package com.wangguangwu.claim.application.domain.claim;
 
 /**
- * 理赔申请生命周期状态，覆盖接入、审核与问题件链路。
+ * 理赔申请生命周期状态，覆盖接入、审核、问题件与审核完成链路。
  *
- * <p>结案与撤销状态属于后续审核能力，未实现前不保留枚举值。</p>
+ * <p>撤销状态属于后续审核能力，未实现前不保留枚举值。</p>
  *
  * @author wangguangwu
  * @since 2026-10-27
@@ -26,17 +26,21 @@ public enum ClaimApplicationStatus {
     WAIT_AUDIT,
 
     /** 审核退回补正，存在未关闭的问题件。 */
-    ISSUE;
+    ISSUE,
+
+    /** 审核系统已完成签收并返回案件号，理赔申请在平台内的生命周期结束。 */
+    COMPLETED;
 
     /**
      * 判断该状态下的申请是否已通过签收、可按重复请求直接复用。
      *
-     * <p>可复用结论属于申请状态语义：已受理、承保中与等待审核都已完成签收。状态并非严格单调，
-     * {@code WAIT_AUDIT} 可因问题件回退到 {@code ISSUE}，因此复用结论依赖问题件下发时主动失效快照。</p>
+     * <p>可复用结论属于申请状态语义：已受理、承保中、等待审核与审核完成都已完成签收。
+     * 状态并非严格单调，{@code WAIT_AUDIT} 可因问题件回退到 {@code ISSUE}，
+     * 因此复用结论依赖问题件下发时主动失效快照；{@code COMPLETED} 是不可逆终态。</p>
      *
      * @return 属于可复用状态时为 true
      */
     public boolean isReusableAfterIntake() {
-        return this == ACCEPTED || this == UNDERWRITING || this == WAIT_AUDIT;
+        return this == ACCEPTED || this == UNDERWRITING || this == WAIT_AUDIT || this == COMPLETED;
     }
 }

@@ -12,6 +12,7 @@ import com.wangguangwu.claim.application.domain.claim.person.Payee;
 import com.wangguangwu.claim.application.domain.claim.person.PrimaryInsured;
 import com.wangguangwu.claim.application.domain.exception.DomainException;
 import com.wangguangwu.claim.foundation.common.util.AssertUtil;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +60,9 @@ public class ClaimApplication {
 
     /** 同一外部申请编号的受理尝试次数，重新申请与租户补材时递增。 */
     private Integer claimApplicationAttempt;
+
+    /** 审核完成时间，仅 {@code COMPLETED} 状态非空。 */
+    private LocalDateTime completedAt;
 
     /** 申请人标准化信息。 */
     private Applicant applicant;
@@ -139,6 +143,7 @@ public class ClaimApplication {
      * @param externalClaimApplicationNo 外部申请编号
      * @param status                     当前生命周期状态
      * @param claimApplicationAttempt    受理尝试次数
+     * @param completedAt                审核完成时间，仅 COMPLETED 状态非空
      * @param applicant                  申请人
      * @param primaryInsured             主被保险人
      * @param accidentPerson             出险人
@@ -150,13 +155,13 @@ public class ClaimApplication {
      */
     public static ClaimApplication restore(Long id, String tenantCode, String claimApplicationNo,
                                            String externalClaimApplicationNo, ClaimApplicationStatus status,
-                                           Integer claimApplicationAttempt, Applicant applicant,
-                                           PrimaryInsured primaryInsured, AccidentPerson accidentPerson, Payee payee,
-                                           Long version, List<Material> materials,
-                                           List<ClaimApplicationIssue> issues) {
+                                           Integer claimApplicationAttempt, LocalDateTime completedAt,
+                                           Applicant applicant, PrimaryInsured primaryInsured,
+                                           AccidentPerson accidentPerson, Payee payee, Long version,
+                                           List<Material> materials, List<ClaimApplicationIssue> issues) {
         return ClaimApplication.builder().id(id).tenantCode(tenantCode).claimApplicationNo(claimApplicationNo)
                 .externalClaimApplicationNo(externalClaimApplicationNo).status(status)
-                .claimApplicationAttempt(claimApplicationAttempt).applicant(applicant)
+                .claimApplicationAttempt(claimApplicationAttempt).completedAt(completedAt).applicant(applicant)
                 .primaryInsured(primaryInsured).accidentPerson(accidentPerson).payee(payee).version(version)
                 .materials(materials == null ? new ArrayList<>() : new ArrayList<>(materials))
                 .issues(issues == null ? new ArrayList<>() : new ArrayList<>(issues)).build();
@@ -302,14 +307,30 @@ public class ClaimApplication {
     }
 
     /**
+     * 审核系统完成签收，申请进入终态并记录完成时间。
+     *
+     * <p>只有等待审核的申请可以完成；存在未关闭问题件说明状态已漂移，拒绝完成，
+     * 避免带着问题件进入终态。</p>
+     */
+    public void completeAudit() {
+        ensureStatus(ClaimApplicationStatus.WAIT_AUDIT, "完成审核签收");
+        if (hasOpenIssue()) {
+            throw new DomainException(ClaimApplicationErrorCode.CLAIM_APPLICATION_STATUS_INVALID,
+                    "存在未关闭问题件，不允许完成审核签收，claimApplicationNo=" + claimApplicationNo);
+        }
+        status = ClaimApplicationStatus.COMPLETED;
+        completedAt = LocalDateTime.now();
+    }
+
+    /**
      * 审核系统下发问题件，申请挂起等待租户补材。
      *
      * @param issueNo      问题件编号
      * @param reason       问题原因
-     * @param auditor      审核人员
+     * @param raisedBy     问题件下发人
      * @param issueContent 问题详情 JSON
      */
-    public void raiseIssue(String issueNo, String reason, String auditor, String issueContent) {
+    public void raiseIssue(String issueNo, String reason, String raisedBy, String issueContent) {
         if (status != ClaimApplicationStatus.WAIT_AUDIT) {
             throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_APPLICATION_STATUS_INVALID,
                     "申请状态不合法，无法下发问题件，claimApplicationNo=" + claimApplicationNo
@@ -319,18 +340,18 @@ public class ClaimApplication {
             throw new DomainException(ClaimApplicationIssueErrorCode.ISSUE_ALREADY_OPEN,
                     "同一申请已有未关闭问题件，claimApplicationNo=" + claimApplicationNo);
         }
-        issues.add(ClaimApplicationIssue.create(issueNo, reason, auditor, issueContent));
+        issues.add(ClaimApplicationIssue.create(issueNo, reason, raisedBy, issueContent));
         status = ClaimApplicationStatus.ISSUE;
     }
 
     /**
      * 关闭指定问题件；已关闭的问题件直接按幂等返回 {@code false}，不校验申请状态。
      *
-     * @param issueNo 问题件编号
-     * @param auditor 处理人
+     * @param issueNo  问题件编号
+     * @param closedBy 问题件关闭人
      * @return 本次是否真正关闭了问题件
      */
-    public boolean closeIssue(String issueNo, String auditor) {
+    public boolean closeIssue(String issueNo, String closedBy) {
         ClaimApplicationIssue issue = issues.stream()
                 .filter(candidate -> candidate.getIssueNo().equals(issueNo))
                 .findFirst()
@@ -340,7 +361,7 @@ public class ClaimApplication {
             return false;
         }
         ensureStatus(ClaimApplicationStatus.ISSUE, "关闭未关闭问题件");
-        issue.close(auditor);
+        issue.close(closedBy);
         status = ClaimApplicationStatus.WAIT_AUDIT;
         return true;
     }
@@ -352,6 +373,24 @@ public class ClaimApplication {
      */
     public boolean isAwaitingAudit() {
         return status == ClaimApplicationStatus.WAIT_AUDIT;
+    }
+
+    /**
+     * 判断申请是否已完成审核签收。
+     *
+     * @return 状态为 COMPLETED 时为 true
+     */
+    public boolean isCompleted() {
+        return status == ClaimApplicationStatus.COMPLETED;
+    }
+
+    /**
+     * 判断申请当前是否存在未关闭问题件。
+     *
+     * @return 存在未关闭问题件时为 true
+     */
+    public boolean hasOpenIssue() {
+        return !openIssues().isEmpty();
     }
 
     /**

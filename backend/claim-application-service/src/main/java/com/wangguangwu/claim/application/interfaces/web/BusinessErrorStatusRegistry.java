@@ -73,6 +73,8 @@ public final class BusinessErrorStatusRegistry {
         mappings.put(ClaimApplicationAsyncErrorCode.CLAIM_APPLICATION_ASYNC_SYSTEM_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR);
         mappings.put(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_INVALID, HttpStatus.BAD_REQUEST);
+        mappings.put(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_TENANT_MISMATCH, HttpStatus.BAD_REQUEST);
+        mappings.put(ClaimApplicationAsyncErrorCode.AUDIT_SIGNED_STATUS_INVALID, HttpStatus.CONFLICT);
 
         mappings.put(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_NOT_FOUND, HttpStatus.NOT_FOUND);
         mappings.put(ClaimApplicationQueryErrorCode.CLAIM_APPLICATION_QUERY_INVALID, HttpStatus.BAD_REQUEST);

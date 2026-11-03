@@ -6,7 +6,7 @@ package com.wangguangwu.claim.application.usecase.issue.command;
  * @param claimApplicationNo 平台申请编号
  * @param issueNo            问题件编号
  * @param reason             问题原因
- * @param auditor            审核人员
+ * @param auditor            问题件下发人，沿用 HTTP 请求字段名，传入聚合后记为 raisedBy
  * @param issueContent       问题详情 JSON
  * @author wangguangwu
  * @since 2026-10-31

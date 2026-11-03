@@ -15,6 +15,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param underwritingResult 承保结果查询端口的返回值
  * @param failMaterialTypes 命中这些材料类型时文件上传端口返回拒绝
  * @param failAuditDelivery 开启后审核交付端口固定抛出异常
+ * @param auditSignedResult 审核签收查询返回结果
+ * @param auditSignedCaseNos 已签收时返回的案件号
+ * @param failAuditSignedQuery 开启后审核签收查询固定抛出异常
  * @author wangguangwu
  * @since 2026-10-29
  */
@@ -24,5 +27,8 @@ public record LocalIntegrationProperties(
         boolean validPolicy,
         UnderwritingResult underwritingResult,
         List<String> failMaterialTypes,
-        boolean failAuditDelivery) {
+        boolean failAuditDelivery,
+        AuditSignedQueryResult auditSignedResult,
+        List<String> auditSignedCaseNos,
+        boolean failAuditSignedQuery) {
 }

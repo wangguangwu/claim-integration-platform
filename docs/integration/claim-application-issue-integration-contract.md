@@ -55,7 +55,7 @@
 | `claimApplicationNo` | String | 是 | 64 | 平台生成的理赔申请编号 |
 | `issueNo` | String | 是 | 64 | 审核系统生成的问题件编号，全局唯一 |
 | `reason` | String | 是 | 512 | 问题件原因说明 |
-| `auditor` | String | 是 | 128 | 创建问题件的审核人员标识 |
+| `auditor` | String | 是 | 128 | 创建问题件的审核人员标识，平台落库为 `raisedBy` 下发人 |
 | `issueContent` | String | 是 | 64KB | 问题件详情 JSON，记录缺少的材料清单、疑问说明等 |
 
 **请求示例**：
@@ -170,7 +170,7 @@
 
 | 字段 | 类型 | 必填 | 长度限制 | 说明 |
 |---|---|---|---|---|
-| `auditor` | String | 是 | 128 | 处理问题件的审核人员标识 |
+| `auditor` | String | 是 | 128 | 关闭问题件的审核人员标识，平台落库为 `closedBy` 关闭人 |
 
 **请求示例**：
 
@@ -247,9 +247,25 @@
 3. **状态变更**：
    - 问题件状态从 `OPEN` 变更为 `CLOSED`
    - 记录 `closedAt` 为当前时间
-   - 更新 `auditor` 为处理人
+   - 写入 `closed_by` 为本次关闭人，`raised_by` 下发人保持原值
    - 申请状态从 `ISSUE` 回退到 `WAIT_AUDIT`
    - 问题件是 `ClaimApplication` 聚合内实体，与申请状态在同一次聚合 `save` 中提交
+
+---
+
+## 字段语义
+
+025 把问题件的单一 `auditor` 拆为下发人与关闭人，请求字段保持不变，响应字段按新语义输出：
+
+| 场景 | 请求字段 | 落库字段 | 响应字段 |
+|---|---|---|---|
+| 下发问题件 | `auditor` | `raised_by` | `raisedBy` |
+| 审核关闭问题件 | `auditor` | `closed_by` | `closedBy` |
+| 租户补材关闭问题件 | 无（签收接口触发） | `closed_by = TENANT_SUPPLEMENT` | `closedBy=TENANT_SUPPLEMENT` |
+
+- 审核系统对接方式不变：下发与关闭仍传 `auditor`，平台在用例入口按动作映射为下发人或关闭人。
+- 详情查询的问题件响应使用 `raisedBy` 与 `closedBy`，原 `auditor` 字段不再返回；未关闭问题件 `closedBy`、`closedAt` 为 `null`。
+- 关闭不会覆盖 `raised_by`，同一问题件的下发人与关闭人可以不同。
 
 ---
 
@@ -260,7 +276,10 @@
 ```
 WAIT_AUDIT → ISSUE（下发问题件）
 ISSUE → WAIT_AUDIT（关闭问题件）
+WAIT_AUDIT → COMPLETED（审核签收返回案件号）
 ```
+
+`COMPLETED` 是终态：不得再下发问题件，下发请求返回 `ISSUE_APPLICATION_STATUS_INVALID`；已关闭问题件重复关闭仍按幂等返回 `closed=false`。
 
 ### 问题件状态
 
@@ -281,7 +300,8 @@ CLOSED（已关闭）
 | `claim_application_no` | VARCHAR(64) | 所属理赔申请的平台申请编号 |
 | `issue_no` | VARCHAR(64) | 平台问题件编号，全局唯一 |
 | `reason` | VARCHAR(512) | 问题件原因说明 |
-| `auditor` | VARCHAR(128) | 创建或处理问题件的审核人员标识 |
+| `raised_by` | VARCHAR(128) | 问题件下发人标识，关闭不覆盖 |
+| `closed_by` | VARCHAR(128) | 问题件关闭人标识，未关闭时为 NULL |
 | `issue_content_json` | JSON | 问题件详情 JSON |
 | `status` | VARCHAR(32) | 问题件处理状态（OPEN/CLOSED） |
 | `is_open` | TINYINT(1) | 是否为未关闭问题件（1=OPEN, 0=CLOSED） |
@@ -304,7 +324,7 @@ CLOSED（已关闭）
 | 错误码 | HTTP 状态 | 说明 | 触发场景 |
 |---|---|---|---|
 | `ISSUE_APPLICATION_NOT_FOUND` | 404 | 申请不存在 | 下发问题件时申请编号未找到 |
-| `ISSUE_APPLICATION_STATUS_INVALID` | 400 | 申请状态不合法 | 下发问题时申请状态不是 `WAIT_AUDIT` |
+| `ISSUE_APPLICATION_STATUS_INVALID` | 400 | 申请状态不合法 | 下发问题时申请状态不是 `WAIT_AUDIT`（含已 `COMPLETED`） |
 | `ISSUE_ALREADY_OPEN` | 409 | 已有未关闭问题件 | 同一申请已有 `OPEN` 状态问题件 |
 | `ISSUE_NOT_FOUND` | 404 | 问题件不存在 | 关闭时问题件编号未找到 |
 | `ISSUE_INTAKE_INVALID` | 400 | 问题件命令不合法 | 必填字段缺失或超长 |

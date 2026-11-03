@@ -226,7 +226,7 @@ class MaterialProcessingTransactionServiceTest {
     private ClaimApplication application(ClaimApplicationStatus status, int attempt) {
         Material material = Material.restore(MATERIAL_ID, BATCH_NO, "POLICY", "https://example.com/policy.pdf",
                 null, MaterialStatus.PENDING_PROCESS, false, null);
-        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, attempt,
+        return ClaimApplication.restore(1L, TENANT_CODE, CLAIM_APPLICATION_NO, EXTERNAL_NO, status, attempt, null,
                 new Applicant("张三", Gender.MALE, "身份证", "110101199001011234"),
                 new PrimaryInsured("李四", Gender.MALE, "身份证", "110101199002022345"),
                 null,

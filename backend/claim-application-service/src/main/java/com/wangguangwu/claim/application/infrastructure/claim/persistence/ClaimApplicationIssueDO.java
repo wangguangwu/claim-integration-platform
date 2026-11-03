@@ -41,9 +41,13 @@ public class ClaimApplicationIssueDO {
     @TableField("reason")
     private String reason;
 
-    /** 创建或处理问题件的审核人员标识。 */
-    @TableField("auditor")
-    private String auditor;
+    /** 问题件下发人标识。 */
+    @TableField("raised_by")
+    private String raisedBy;
+
+    /** 问题件关闭人标识，未关闭时为空。 */
+    @TableField("closed_by")
+    private String closedBy;
 
     /** 问题件详情 JSON。 */
     @TableField("issue_content_json")
